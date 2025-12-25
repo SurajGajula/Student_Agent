@@ -9,6 +9,8 @@ import {
   getAuthClient,
   initializeGeminiClient
 } from '../services/gemini.js'
+import { authenticateUser, AuthenticatedRequest } from './middleware/auth.js'
+import { checkTokenLimit, recordTokenUsage } from '../services/usageTracking.js'
 
 interface ClassData {
   name: string
@@ -31,6 +33,11 @@ interface VertexAIResponse {
     }
     finishReason?: string
   }>
+  usageMetadata?: {
+    promptTokenCount?: number
+    candidatesTokenCount?: number
+    totalTokenCount?: number
+  }
 }
 
 interface VertexAIError {
@@ -43,10 +50,13 @@ interface VertexAIError {
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
-router.post('/parse-schedule', upload.single('image'), async (req: Request, res: Response) => {
+router.post('/parse-schedule', authenticateUser, upload.single('image'), async (req: AuthenticatedRequest, res: Response) => {
   console.log('Received schedule parsing request')
   
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' })
+    }
     let geminiClient = getGeminiClient()
     if (!geminiClient) {
       console.log('Initializing Gemini client...')
@@ -75,6 +85,19 @@ Rules:
 - timeRange: "9:30 AM - 11:30 AM" format
 - Separate entries for different times
 - Return ONLY JSON array, no other text`
+
+    // Check token limit before making API call
+    // Estimate tokens needed (rough estimate: ~1000 tokens for prompt + image)
+    const estimatedTokens = 2000
+    const limitCheck = await checkTokenLimit(req.userId, estimatedTokens)
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'Monthly token limit exceeded',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        remaining: limitCheck.remaining
+      })
+    }
 
     console.log('Calling Gemini API...')
     let textResponse = ''
@@ -237,6 +260,26 @@ Rules:
         timeRange: cls.timeRange.trim(),
       }))
       .filter((cls) => cls.days.length > 0)
+
+    // Extract and record token usage
+    const tokenUsage = data.usageMetadata?.totalTokenCount || 0
+    console.log(`Vertex AI response - token usage: ${tokenUsage} (metadata:`, data.usageMetadata, ')')
+    
+    if (tokenUsage > 0 && req.userId) {
+      try {
+        await recordTokenUsage(req.userId, tokenUsage)
+        console.log(`Successfully recorded ${tokenUsage} tokens for user ${req.userId}`)
+      } catch (usageError) {
+        console.error('Error recording token usage:', usageError)
+        // Log the full error for debugging
+        if (usageError instanceof Error) {
+          console.error('Usage error details:', usageError.message, usageError.stack)
+        }
+        // Don't fail the request if usage recording fails
+      }
+    } else {
+      console.warn(`Skipping token recording - tokenUsage: ${tokenUsage}, userId: ${req.userId}`)
+    }
 
     console.log(`Successfully parsed ${validClasses.length} classes`)
     res.json({ classes: validClasses })

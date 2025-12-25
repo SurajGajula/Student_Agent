@@ -13,6 +13,14 @@ async function extractNotesWithBackendAPI(imageFile: File | Blob): Promise<strin
   const formData = new FormData()
   formData.append('image', imageFile)
 
+  // Get auth token
+  const { supabase } = await import('./supabase.js')
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  if (!session) {
+    throw new Error('You must be logged in to use this feature')
+  }
+
   // Add timeout to prevent hanging (increased for Gemini API processing time)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180 second (3 minute) timeout
@@ -20,6 +28,9 @@ async function extractNotesWithBackendAPI(imageFile: File | Blob): Promise<strin
   try {
     const response = await fetch(`${API_BASE_URL}/api/parse-notes`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      },
       body: formData,
       signal: controller.signal,
     })
@@ -29,6 +40,19 @@ async function extractNotesWithBackendAPI(imageFile: File | Blob): Promise<strin
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       const errorMessage = errorData.error || errorData.message || `HTTP ${response.status} ${response.statusText}`
+      
+      if (response.status === 401) {
+        throw new Error('Authentication required. Please log in to use this feature.')
+      }
+      
+      if (response.status === 429) {
+        const remaining = errorData.remaining || 0
+        const limit = errorData.limit || 0
+        throw new Error(
+          `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+          `Please upgrade your plan or wait until next month.`
+        )
+      }
       
       if (response.status === 500) {
         throw new Error(
@@ -88,7 +112,6 @@ async function checkBackendHealth(): Promise<boolean> {
  * @returns Promise resolving to extracted text
  */
 export async function parseNotesImage(imageFile: File | Blob): Promise<string> {
-  console.log('Parsing notes via backend API at', API_BASE_URL)
   
   // Check backend health first
   const isHealthy = await checkBackendHealth()
@@ -102,11 +125,9 @@ export async function parseNotesImage(imageFile: File | Blob): Promise<string> {
     )
   }
   
-  console.log('Backend server is reachable, sending image...')
   
   try {
     const text = await extractNotesWithBackendAPI(imageFile)
-    console.log('Parsed notes text length:', text.length)
     
     if (text.length === 0) {
       console.warn('No text found in notes image')

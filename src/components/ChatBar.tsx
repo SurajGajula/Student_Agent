@@ -200,11 +200,21 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           throw new Error('Note content is empty')
         }
 
+        // Get auth token
+        const { supabase } = await import('../lib/supabase.js')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          throw new Error('You must be logged in to use this feature')
+        }
+
         // Call test generation endpoint
-        const response = await fetch('http://localhost:3001/api/tests/generate', {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+        const response = await fetch(`${API_BASE_URL}/api/tests/generate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
             noteId: mentionedNote.id,
@@ -216,20 +226,39 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
         const data = await response.json()
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication required. Please log in to use this feature.')
+          }
+          
+          if (response.status === 429) {
+            const remaining = data.remaining || 0
+            const limit = data.limit || 0
+            throw new Error(
+              `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+              `Please upgrade your plan or wait until next month.`
+            )
+          }
+          
           throw new Error(data.message || data.error || 'Failed to generate test')
         }
 
         // Add test to store
         if (data.success && data.test) {
-          addTest({
-            name: data.test.name,
-            noteId: data.test.noteId,
-            noteName: data.test.noteName,
-            questions: data.test.questions
-          })
-          setStatusMessage({ type: 'success', text: `Test "${data.test.name}" created successfully!` })
-          setMessage('')
-          setMentions([])
+          try {
+            await addTest({
+              name: data.test.name,
+              folderId: undefined, // Tests from chat don't have a folder
+              noteId: data.test.noteId,
+              noteName: data.test.noteName,
+              questions: data.test.questions
+            })
+            setStatusMessage({ type: 'success', text: `Test "${data.test.name}" created successfully!` })
+            setMessage('')
+            setMentions([])
+          } catch (error) {
+            console.error('Failed to add test:', error)
+            setStatusMessage({ type: 'error', text: 'Failed to save test. Please try again.' })
+          }
         }
       } else {
         // Regular chat message - placeholder for future chat functionality

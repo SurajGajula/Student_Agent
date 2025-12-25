@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import AddNoteModal from '../modals/AddNoteModal'
 import CreateFolderModal from '../modals/CreateFolderModal'
-import { useNotesStore, type Note, type Folder } from '../../stores/notesStore'
+import { useNotesStore, type Note } from '../../stores/notesStore'
+import { useFolderStore, type Folder, type FolderType } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { parseNotesImage } from '../../lib/notesParser'
 
@@ -17,11 +18,13 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const { notes, folders, addNote, addFolder, updateNoteContent, removeNote } = useNotesStore()
+  const { notes, addNote, updateNoteContentLocal, updateNoteContent, removeNote } = useNotesStore()
+  const { getFoldersByType, addFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const folders = getFoldersByType('note')
   const currentFolder = currentFolderId ? folders.find(f => f.id === currentFolderId) : null
   const currentNote = currentNoteId ? notes.find(n => n.id === currentNoteId) : null
   const displayedNotes = currentFolderId 
@@ -46,8 +49,12 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     setIsNoteModalOpen(false)
   }
 
-  const handleSubmitNote = (noteName: string) => {
-    addNote(noteName, currentFolderId || undefined)
+  const handleSubmitNote = async (noteName: string) => {
+    try {
+      await addNote(noteName, currentFolderId || undefined)
+    } catch (error) {
+      console.error('Failed to add note:', error)
+    }
   }
 
   const handleFolderClick = (folderId: string) => {
@@ -69,14 +76,23 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const handleNoteContentChange = (content: string) => {
     if (!currentNoteId) return
     
-    updateNoteContent(currentNoteId, content)
+    // Update local state immediately for instant UI feedback
+    updateNoteContentLocal(currentNoteId, content)
     
+    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
-    saveTimeoutRef.current = setTimeout(() => {
-      // Content is already saved via updateNoteContent above
-    }, 500)
+    
+    // Debounce the Supabase save
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await updateNoteContent(currentNoteId, content)
+      } catch (err) {
+        console.error('Failed to save note:', err)
+        // Note: On error, the local state will be out of sync, but syncFromSupabase will fix it
+      }
+    }, 1000) // 1 second debounce
   }
 
   const handleNoteBlur = () => {
@@ -94,8 +110,12 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     setIsFolderModalOpen(false)
   }
 
-  const handleSubmitFolder = (folderName: string) => {
-    addFolder(folderName)
+  const handleSubmitFolder = async (folderName: string) => {
+    try {
+      await addFolder(folderName, 'note')
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+    }
   }
 
   const handleUploadNotes = () => {
@@ -147,22 +167,25 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
         }
 
         // Create note with extracted text
-        addNote(noteTitle, currentFolderId || undefined)
+        await addNote(noteTitle, currentFolderId || undefined)
         
         // Get the current state from the store to find the newly created note
-        // Since Zustand updates are synchronous, we can get the notes immediately
         const currentState = useNotesStore.getState()
         const allNotes = currentState.notes
         
         // Find the note we just created (should be the most recent one with matching name and folder)
-        // Or find by ID if we can match it (though IDs are timestamp-based, so we look for closest match)
         const newNote = allNotes
           .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
-          .sort((a, b) => parseInt(b.id) - parseInt(a.id))[0] // Get most recent with this name
+          .sort((a, b) => {
+            // Sort by created date (most recent first)
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA
+          })[0]
         
         if (newNote) {
           // Update the note content and open it for editing
-          updateNoteContent(newNote.id, extractedText)
+          await updateNoteContent(newNote.id, extractedText)
           setCurrentNoteId(newNote.id)
           setSuccessMessage('Notes uploaded successfully')
           setTimeout(() => setSuccessMessage(null), 3000)
@@ -362,9 +385,13 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
               <div key={note.id} className="note-card" onClick={() => handleNoteClick(note.id)}>
                 <button 
                   className="card-delete-button"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation()
-                    removeNote(note.id)
+                    try {
+                      await removeNote(note.id)
+                    } catch (error) {
+                      console.error('Failed to remove note:', error)
+                    }
                   }}
                   aria-label="Delete note"
                 >

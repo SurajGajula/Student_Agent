@@ -7,6 +7,8 @@ import {
   getAuthClient,
   initializeGeminiClient
 } from '../services/gemini.js'
+import { authenticateUser, AuthenticatedRequest } from './middleware/auth.js'
+import { checkTokenLimit, recordTokenUsage } from '../services/usageTracking.js'
 
 interface GenerateTestRequest {
   noteId: string
@@ -23,6 +25,11 @@ interface VertexAIResponse {
     }
     finishReason?: string
   }>
+  usageMetadata?: {
+    promptTokenCount?: number
+    candidatesTokenCount?: number
+    totalTokenCount?: number
+  }
 }
 
 interface VertexAIError {
@@ -47,7 +54,7 @@ interface GeneratedTestResponse {
 const router = express.Router()
 
 // Generate test questions using Gemini
-async function generateTestQuestions(noteContent: string): Promise<GeneratedQuestion[]> {
+async function generateTestQuestions(noteContent: string): Promise<{ questions: GeneratedQuestion[], tokenUsage: number }> {
   let geminiClient = getGeminiClient()
   if (!geminiClient) {
     console.log('Initializing Gemini client...')
@@ -135,6 +142,10 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
   }
 
   const data = (await response.json()) as VertexAIResponse
+  
+  // Extract token usage
+  const tokenUsage = data.usageMetadata?.totalTokenCount || 0
+  
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
     const content = data.candidates[0].content
     if (content.parts && content.parts[0]) {
@@ -172,20 +183,27 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
     }
 
     // Add IDs to questions
-    return questions.map((q, index) => ({
-      ...q,
-      id: `q${index + 1}`,
-    })) as GeneratedQuestion[]
+    return {
+      questions: questions.map((q, index) => ({
+        ...q,
+        id: `q${index + 1}`,
+      })) as GeneratedQuestion[],
+      tokenUsage
+    }
   } catch (error) {
     console.error('Error parsing Gemini response:', error)
     throw new Error(`Failed to parse test questions: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
-router.post('/generate', async (req: Request, res: Response) => {
+router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   console.log('Received test generation request')
   
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' })
+    }
+
     const { noteId, noteName, noteContent }: GenerateTestRequest = req.body
 
     if (!noteId || !noteName) {
@@ -201,10 +219,23 @@ router.post('/generate', async (req: Request, res: Response) => {
       })
     }
 
+    // Check token limit before making API call
+    // Estimate tokens needed (rough estimate: ~2000 tokens for prompt + response)
+    const estimatedTokens = 3000
+    const limitCheck = await checkTokenLimit(req.userId, estimatedTokens)
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'Monthly token limit exceeded',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        remaining: limitCheck.remaining
+      })
+    }
+
     console.log(`Generating test from note: ${noteName} (${noteId})`)
 
     // Generate test questions using Gemini
-    const questions = await generateTestQuestions(noteContent)
+    const { questions, tokenUsage } = await generateTestQuestions(noteContent)
 
     // Create test response
     const testData = {
@@ -219,6 +250,25 @@ router.post('/generate', async (req: Request, res: Response) => {
         options: q.options,
         correctAnswer: q.correctAnswer,
       })),
+    }
+
+    // Record token usage
+    console.log(`Vertex AI response - token usage: ${tokenUsage}`)
+    
+    if (tokenUsage > 0 && req.userId) {
+      try {
+        await recordTokenUsage(req.userId, tokenUsage)
+        console.log(`Successfully recorded ${tokenUsage} tokens for user ${req.userId}`)
+      } catch (usageError) {
+        console.error('Error recording token usage:', usageError)
+        // Log the full error for debugging
+        if (usageError instanceof Error) {
+          console.error('Usage error details:', usageError.message, usageError.stack)
+        }
+        // Don't fail the request if usage recording fails
+      }
+    } else {
+      console.warn(`Skipping token recording - tokenUsage: ${tokenUsage}, userId: ${req.userId}`)
     }
 
     console.log(`Successfully generated test with ${questions.length} questions`)

@@ -1,3 +1,6 @@
+// Load environment variables FIRST before any other imports
+import './load-env.js'
+
 import express, { Express } from 'express'
 import cors from 'cors'
 import { initializeGeminiClient } from './services/gemini.js'
@@ -7,6 +10,7 @@ import scheduleRouter from './routes/schedule.js'
 import notesRouter from './routes/notes.js'
 import chatRouter from './routes/chat.js'
 import testsRouter from './routes/tests.js'
+import usageRouter from './routes/usage.js'
 
 const app: Express = express()
 
@@ -21,6 +25,7 @@ app.use('/api', scheduleRouter)
 app.use('/api', notesRouter)
 app.use('/api', chatRouter)
 app.use('/api/tests', testsRouter)
+app.use('/api', usageRouter)
 
 // Initialize Gemini client asynchronously (don't block server startup)
 initializeGeminiClient()

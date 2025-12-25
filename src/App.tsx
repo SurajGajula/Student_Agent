@@ -6,6 +6,7 @@ import TestsView from './components/views/TestsView'
 import JobsView from './components/views/JobsView'
 import EventsView from './components/views/EventsView'
 import CalendarView from './components/views/CalendarView'
+import SettingsView from './components/views/SettingsView'
 import ChatBar from './components/ChatBar'
 import LoginModal from './components/modals/LoginModal'
 
@@ -31,6 +32,7 @@ function App() {
         {currentView === 'jobs' && <JobsView />}
         {currentView === 'events' && <EventsView />}
         {currentView === 'calendar' && <CalendarView />}
+        {currentView === 'settings' && <SettingsView />}
         <ChatBar onOpenLoginModal={openLoginModal} />
       </main>
       <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />

@@ -9,6 +9,8 @@ import {
   getAuthClient,
   initializeGeminiClient
 } from '../services/gemini.js'
+import { authenticateUser, AuthenticatedRequest } from './middleware/auth.js'
+import { checkTokenLimit, recordTokenUsage } from '../services/usageTracking.js'
 
 interface VertexAIResponse {
   candidates?: Array<{
@@ -19,6 +21,11 @@ interface VertexAIResponse {
     }
     finishReason?: string
   }>
+  usageMetadata?: {
+    promptTokenCount?: number
+    candidatesTokenCount?: number
+    totalTokenCount?: number
+  }
 }
 
 interface VertexAIError {
@@ -31,10 +38,13 @@ interface VertexAIError {
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
-router.post('/parse-notes', upload.single('image'), async (req: Request, res: Response) => {
+router.post('/parse-notes', authenticateUser, upload.single('image'), async (req: AuthenticatedRequest, res: Response) => {
   console.log('Received notes parsing request')
   
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' })
+    }
     let geminiClient = getGeminiClient()
     if (!geminiClient) {
       console.log('Initializing Gemini client...')
@@ -64,6 +74,19 @@ Preserve the structure, formatting, and organization of the notes including:
 
 Return the extracted text exactly as it appears, maintaining the original formatting and structure.
 Do not add any commentary or explanations, just return the raw extracted text.`
+
+    // Check token limit before making API call
+    // Estimate tokens needed (rough estimate: ~1000 tokens for prompt + image)
+    const estimatedTokens = 2000
+    const limitCheck = await checkTokenLimit(req.userId, estimatedTokens)
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'Monthly token limit exceeded',
+        limit: limitCheck.limit,
+        current: limitCheck.current,
+        remaining: limitCheck.remaining
+      })
+    }
 
     console.log('Calling Gemini API...')
     let textResponse = ''
@@ -157,6 +180,26 @@ Do not add any commentary or explanations, just return the raw extracted text.`
     console.log('Received response from Gemini API')
     console.log('Gemini response length:', textResponse.length)
     console.log('Gemini response preview:', textResponse.substring(0, 200))
+
+    // Extract and record token usage
+    const tokenUsage = data.usageMetadata?.totalTokenCount || 0
+    console.log(`Vertex AI response - token usage: ${tokenUsage} (metadata:`, data.usageMetadata, ')')
+    
+    if (tokenUsage > 0 && req.userId) {
+      try {
+        await recordTokenUsage(req.userId, tokenUsage)
+        console.log(`Successfully recorded ${tokenUsage} tokens for user ${req.userId}`)
+      } catch (usageError) {
+        console.error('Error recording token usage:', usageError)
+        // Log the full error for debugging
+        if (usageError instanceof Error) {
+          console.error('Usage error details:', usageError.message, usageError.stack)
+        }
+        // Don't fail the request if usage recording fails
+      }
+    } else {
+      console.warn(`Skipping token recording - tokenUsage: ${tokenUsage}, userId: ${req.userId}`)
+    }
 
     // Return the extracted text
     res.json({ text: textResponse })

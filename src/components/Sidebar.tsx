@@ -10,14 +10,14 @@ interface SidebarProps {
 function Sidebar({ onNavigate }: SidebarProps) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
-  const { isLoggedIn, username, logout } = useAuthStore()
+  const { isLoggedIn, username, signOut } = useAuthStore()
 
   const handleLogin = () => {
     setIsLoginModalOpen(true)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await signOut()
   }
 
   const handleUpgrade = () => {
@@ -25,7 +25,7 @@ function Sidebar({ onNavigate }: SidebarProps) {
   }
 
   const handleSettings = () => {
-    // Currently does nothing
+    onNavigate('settings')
   }
 
   return (

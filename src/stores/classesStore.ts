@@ -1,61 +1,138 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { supabase } from '../lib/supabase'
 
 export interface Class {
   id: string
   name: string
-  folderId?: string
-  time?: {
-    days: string[]
-    timeRange: string
-  }
-}
-
-export interface Folder {
-  id: string
-  name: string
+  folderId?: string | null
+  days?: string[]
+  timeRange?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 interface ClassesStore {
   classes: Class[]
-  folders: Folder[]
-  addClass: (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => void
-  removeClass: (id: string) => void
-  addFolder: (name: string) => void
-  removeFolder: (id: string) => void
+  isLoading: boolean
+  error: string | null
+  syncFromSupabase: () => Promise<void>
+  addClass: (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => Promise<void>
+  removeClass: (id: string) => Promise<void>
 }
 
-export const useClassesStore = create<ClassesStore>((set) => ({
-  classes: [],
-  folders: [],
-  addClass: (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => {
-    const newClass: Class = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      folderId: folderId,
-      time: time
-    }
-    set((state) => ({
-      classes: [...state.classes, newClass]
-    }))
-  },
-  removeClass: (id: string) => {
-    set((state) => ({
-      classes: state.classes.filter((classItem) => classItem.id !== id)
-    }))
-  },
-  addFolder: (name: string) => {
-    const newFolder: Folder = {
-      id: Date.now().toString(),
-      name: name.trim()
-    }
-    set((state) => ({
-      folders: [...state.folders, newFolder]
-    }))
-  },
-  removeFolder: (id: string) => {
-    set((state) => ({
-      folders: state.folders.filter((folder) => folder.id !== id)
-    }))
-  }
-}))
+export const useClassesStore = create<ClassesStore>()(
+  persist(
+    (set, get) => ({
+      classes: [],
+      isLoading: false,
+      error: null,
 
+      syncFromSupabase: async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        set({ isLoading: true, error: null })
+        try {
+          const { data: classes, error } = await supabase
+            .from('classes')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+
+          if (error) throw error
+
+          // Transform from snake_case to camelCase
+          const transformedClasses: Class[] = (classes || []).map((classItem: any) => ({
+            id: classItem.id,
+            name: classItem.name,
+            folderId: classItem.folder_id || null,
+            days: classItem.days || null,
+            timeRange: classItem.time_range || null,
+            createdAt: classItem.created_at,
+            updatedAt: classItem.updated_at,
+          }))
+
+          set({
+            classes: transformedClasses,
+            isLoading: false,
+          })
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Sync failed',
+            isLoading: false,
+          })
+        }
+      },
+
+      addClass: async (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        set({ error: null })
+        try {
+          const { data, error } = await supabase
+            .from('classes')
+            .insert({
+              user_id: user.id,
+              name: name.trim(),
+              folder_id: folderId || null,
+              days: time?.days || null,
+              time_range: time?.timeRange || null,
+            })
+            .select()
+            .single()
+
+          if (error) throw error
+
+          // Transform to camelCase
+          const newClass: Class = {
+            id: data.id,
+            name: data.name,
+            folderId: data.folder_id || null,
+            days: data.days || null,
+            timeRange: data.time_range || null,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          }
+
+          set((state) => ({
+            classes: [...state.classes, newClass]
+          }))
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to add class'
+          set({ error: errorMessage })
+          throw error
+        }
+      },
+
+      removeClass: async (id: string) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        set({ error: null })
+        try {
+          const { error } = await supabase
+            .from('classes')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+          if (error) throw error
+
+          set((state) => ({
+            classes: state.classes.filter((classItem) => classItem.id !== id)
+          }))
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to remove class'
+          set({ error: errorMessage })
+          throw error
+        }
+      },
+    }),
+    {
+      name: 'classes-storage',
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+)

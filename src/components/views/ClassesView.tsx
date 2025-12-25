@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import AddClassModal from '../modals/AddClassModal'
 import CreateFolderModal from '../modals/CreateFolderModal'
-import { useClassesStore, type Class, type Folder } from '../../stores/classesStore'
+import { useClassesStore, type Class } from '../../stores/classesStore'
+import { useFolderStore, type Folder, type FolderType } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { parseScheduleImage } from '../../lib/scheduleParser'
 
@@ -17,9 +18,11 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { classes, folders, addClass, addFolder, removeClass } = useClassesStore()
+  const { classes, addClass, removeClass } = useClassesStore()
+  const { getFoldersByType, addFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
-
+  
+  const folders = getFoldersByType('class')
   const currentFolder = currentFolderId ? folders.find(f => f.id === currentFolderId) : null
   const displayedClasses = currentFolderId 
     ? classes.filter(c => c.folderId === currentFolderId)
@@ -34,8 +37,12 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
     setIsClassModalOpen(false)
   }
 
-  const handleSubmitClass = (className: string, time?: { days: string[], timeRange: string }) => {
-    addClass(className, currentFolderId || undefined, time)
+  const handleSubmitClass = async (className: string, time?: { days: string[], timeRange: string }) => {
+    try {
+      await addClass(className, currentFolderId || undefined, time)
+    } catch (error) {
+      console.error('Failed to add class:', error)
+    }
   }
 
   const handleFolderClick = (folderId: string) => {
@@ -54,8 +61,12 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
     setIsFolderModalOpen(false)
   }
 
-  const handleSubmitFolder = (folderName: string) => {
-    addFolder(folderName)
+  const handleSubmitFolder = async (folderName: string) => {
+    try {
+      await addFolder(folderName, 'class')
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+    }
   }
 
   const handleUploadSchedule = () => {
@@ -91,16 +102,20 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
         setTimeout(() => setErrorMessage(null), 5000)
       } else {
         // Add all parsed classes
-        parsedClasses.forEach(parsedClass => {
-          addClass(
-            parsedClass.name,
-            currentFolderId || undefined,
-            {
-              days: parsedClass.days,
-              timeRange: parsedClass.timeRange
-            }
-          )
-        })
+        for (const parsedClass of parsedClasses) {
+          try {
+            await addClass(
+              parsedClass.name,
+              currentFolderId || undefined,
+              {
+                days: parsedClass.days,
+                timeRange: parsedClass.timeRange
+              }
+            )
+          } catch (error) {
+            console.error('Failed to add class:', error)
+          }
+        }
         setSuccessMessage(`Successfully created ${parsedClasses.length} class${parsedClasses.length > 1 ? 'es' : ''} from schedule`)
         setTimeout(() => setSuccessMessage(null), 3000)
       }
@@ -256,9 +271,13 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
               <div key={classItem.id} className="class-card">
                 <button 
                   className="card-delete-button"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation()
-                    removeClass(classItem.id)
+                    try {
+                      await removeClass(classItem.id)
+                    } catch (error) {
+                      console.error('Failed to remove class:', error)
+                    }
                   }}
                   aria-label="Delete class"
                 >
@@ -279,10 +298,14 @@ function ClassesView({ onOpenLoginModal }: ClassesViewProps) {
                   </svg>
                 </button>
                 <h3>{classItem.name}</h3>
-                {classItem.time && (
+                {(classItem.days || classItem.timeRange) && (
                   <div className="class-time">
-                    <span className="class-days">{classItem.time.days.join(', ')}</span>
-                    <span className="class-time-range">{classItem.time.timeRange}</span>
+                    {classItem.days && (
+                      <span className="class-days">{classItem.days.join(', ')}</span>
+                    )}
+                    {classItem.timeRange && (
+                      <span className="class-time-range">{classItem.timeRange}</span>
+                    )}
                   </div>
                 )}
               </div>

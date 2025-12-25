@@ -11,30 +11,48 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const { login } = useAuthStore()
+  const [error, setError] = useState<string | null>(null)
+  const { signIn, signUp, isLoading } = useAuthStore()
 
   useEffect(() => {
     if (isOpen) {
       setEmail('')
       setPassword('')
       setName('')
+      setError(null)
       setIsLogin(true)
     }
   }, [isOpen])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
     if (isLogin) {
       // Login logic
       if (email.trim() && password.trim()) {
-        login()
-        handleClose()
+        try {
+          await signIn(email.trim(), password.trim())
+          handleClose()
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to sign in'
+          setError(errorMessage)
+        }
+      } else {
+        setError('Please fill in all fields')
       }
     } else {
       // Signup logic
       if (email.trim() && password.trim() && name.trim()) {
-        login()
-        handleClose()
+        try {
+          await signUp(email.trim(), password.trim(), name.trim())
+          handleClose()
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to sign up'
+          setError(errorMessage)
+        }
+      } else {
+        setError('Please fill in all fields')
       }
     }
   }
@@ -52,8 +70,21 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
   return (
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
+        <div className="modal-tabs">
+          <div style={{ display: 'flex', flex: 1 }}>
+            <button
+              className={`modal-tab ${isLogin ? 'active' : ''}`}
+              onClick={() => setIsLogin(true)}
+            >
+              Login
+            </button>
+            <button
+              className={`modal-tab ${!isLogin ? 'active' : ''}`}
+              onClick={() => setIsLogin(false)}
+            >
+              Sign Up
+            </button>
+          </div>
           <button className="modal-close" onClick={handleClose}>
             <svg 
               width="20" 
@@ -68,20 +99,6 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-          </button>
-        </div>
-        <div className="modal-tabs">
-          <button
-            className={`modal-tab ${isLogin ? 'active' : ''}`}
-            onClick={() => setIsLogin(true)}
-          >
-            Login
-          </button>
-          <button
-            className={`modal-tab ${!isLogin ? 'active' : ''}`}
-            onClick={() => setIsLogin(false)}
-          >
-            Sign Up
           </button>
         </div>
         <form onSubmit={handleSubmit} className="modal-form">
@@ -121,12 +138,24 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
               autoComplete="off"
             />
           </div>
+          {error && (
+            <div className="form-error" style={{ 
+              color: '#ff4444', 
+              fontSize: '14px', 
+              marginBottom: '16px',
+              padding: '8px',
+              backgroundColor: '#ffe6e6',
+              borderRadius: '4px'
+            }}>
+              {error}
+            </div>
+          )}
           <div className="modal-actions">
-            <button type="button" className="cancel-button" onClick={handleClose}>
+            <button type="button" className="cancel-button" onClick={handleClose} disabled={isLoading}>
               Cancel
             </button>
-            <button type="submit" className="submit-button">
-              {isLogin ? 'Login' : 'Sign Up'}
+            <button type="submit" className="submit-button" disabled={isLoading}>
+              {isLoading ? 'Loading...' : isLogin ? 'Login' : 'Sign Up'}
             </button>
           </div>
         </form>
