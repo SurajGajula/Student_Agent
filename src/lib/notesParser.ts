@@ -1,20 +1,44 @@
+import { getApiBaseUrl } from './platform'
+
 /**
  * API endpoint for the backend server
  * Can be configured via environment variable or defaults to localhost
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE_URL = getApiBaseUrl()
+
+/**
+ * Platform-aware image handling
+ */
+const createFormData = async (imageSource: File | Blob | string): Promise<FormData> => {
+  const formData = new FormData()
+  
+  // React Native - imageSource is a string URI
+  if (typeof imageSource === 'string') {
+    // @ts-ignore - React Native FormData accepts different types
+    formData.append('image', {
+      uri: imageSource,
+      type: 'image/jpeg',
+      name: 'photo.jpg',
+    } as any)
+  } 
+  // Web - imageSource is File or Blob
+  else {
+    formData.append('image', imageSource)
+  }
+  
+  return formData
+}
 
 /**
  * Calls the backend API to parse notes image using service account credentials
- * @param imageFile - The image file containing the notes
+ * @param imageSource - The image file (web) or URI (native) containing the notes
  * @returns Promise resolving to extracted text
  */
-async function extractNotesWithBackendAPI(imageFile: File | Blob): Promise<string> {
-  const formData = new FormData()
-  formData.append('image', imageFile)
+async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Promise<string> {
+  const formData = await createFormData(imageSource)
 
   // Get auth token
-  const { supabase } = await import('./supabase.js')
+  const { supabase } = await import('./supabase')
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
@@ -108,26 +132,22 @@ async function checkBackendHealth(): Promise<boolean> {
 
 /**
  * Parse notes image and extract text
- * @param imageFile - The image file containing handwritten notes
+ * @param imageSource - The image file (web) or URI (native) containing handwritten notes
  * @returns Promise resolving to extracted text
  */
-export async function parseNotesImage(imageFile: File | Blob): Promise<string> {
+export async function parseNotesImage(imageSource: File | Blob | string): Promise<string> {
   
   // Check backend health first
   const isHealthy = await checkBackendHealth()
   if (!isHealthy) {
     throw new Error(
       `Cannot connect to backend server at ${API_BASE_URL}. ` +
-      `Please ensure the backend server is running:\n` +
-      `  npm run dev:server\n\n` +
-      `Or start both frontend and backend together:\n` +
-      `  npm run dev:all`
+      `Please ensure the backend server is running.`
     )
   }
   
-  
   try {
-    const text = await extractNotesWithBackendAPI(imageFile)
+    const text = await extractNotesWithBackendAPI(imageSource)
     
     if (text.length === 0) {
       console.warn('No text found in notes image')
@@ -141,11 +161,10 @@ export async function parseNotesImage(imageFile: File | Blob): Promise<string> {
     if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
       throw new Error(
         `Network error: Cannot connect to backend API at ${API_BASE_URL}. ` +
-        `Please ensure the backend server is running (npm run dev:server).`
+        `Please ensure the backend server is running.`
       )
     }
     
     throw error
   }
 }
-

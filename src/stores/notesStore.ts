@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { useUsageStore } from './usageStore'
+import { getStorage } from '../lib/storage'
 
 export interface Note {
   id: string
@@ -20,12 +22,13 @@ interface NotesStore {
   removeNote: (id: string) => Promise<void>
   updateNoteContentLocal: (id: string, content: string) => void
   updateNoteContent: (id: string, content: string) => Promise<void>
+  moveNoteToFolder: (id: string, folderId: string | null) => Promise<void>
 }
 
 export const useNotesStore = create<NotesStore>()(
   persist(
     (set, get) => ({
-      notes: [],
+  notes: [],
       isLoading: false,
       error: null,
 
@@ -71,6 +74,15 @@ export const useNotesStore = create<NotesStore>()(
 
         set({ error: null })
         try {
+          // Check plan limits for free users
+          const { planName } = useUsageStore.getState()
+          if (planName === 'free') {
+            const currentCount = get().notes.length
+            if (currentCount >= 10) {
+              throw new Error('Free plan limit reached: You can only have 10 notes. Upgrade to add more.')
+            }
+          }
+
           const { data, error } = await supabase
             .from('notes')
             .insert({
@@ -85,35 +97,35 @@ export const useNotesStore = create<NotesStore>()(
           if (error) throw error
 
           // Transform to camelCase
-          const newNote: Note = {
+    const newNote: Note = {
             id: data.id,
             name: data.name,
             folderId: data.folder_id || null,
             content: data.content || '',
             createdAt: data.created_at,
             updatedAt: data.updated_at,
-          }
+    }
 
-          set((state) => ({
-            notes: [...state.notes, newNote]
-          }))
+    set((state) => ({
+      notes: [...state.notes, newNote]
+    }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
           set({ error: errorMessage })
           throw error
         }
-      },
+  },
 
       updateNoteContentLocal: (id: string, content: string) => {
         // Optimistic update - update local state immediately
-        set((state) => ({
-          notes: state.notes.map((note) =>
+    set((state) => ({
+      notes: state.notes.map((note) =>
             note.id === id
               ? { ...note, content, updatedAt: new Date().toISOString() }
               : note
-          )
-        }))
-      },
+      )
+    }))
+  },
 
       updateNoteContent: async (id: string, content: string) => {
         const { data: { user } } = await supabase.auth.getUser()
@@ -170,10 +182,41 @@ export const useNotesStore = create<NotesStore>()(
           throw error
         }
       },
+
+      moveNoteToFolder: async (id: string, folderId: string | null) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        set({ error: null })
+        try {
+          const { error } = await supabase
+            .from('notes')
+            .update({
+              folder_id: folderId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+          if (error) throw error
+
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.id === id
+                ? { ...note, folderId: folderId || null, updatedAt: new Date().toISOString() }
+                : note
+            )
+          }))
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to move note'
+          set({ error: errorMessage })
+          throw error
+        }
+      },
     }),
     {
       name: 'notes-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => getStorage()),
     }
   )
 )

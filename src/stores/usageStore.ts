@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getApiBaseUrl } from '../lib/platform'
 
 interface UsageStore {
   planName: string
@@ -12,7 +13,7 @@ interface UsageStore {
   refreshUsage: () => Promise<void>
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE_URL = getApiBaseUrl()
 
 export const useUsageStore = create<UsageStore>((set, get) => ({
   planName: 'free',

@@ -3,40 +3,38 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
 import { getStorage } from '../lib/storage'
 
-export interface Question {
+export interface FlashcardCard {
   id: string
-  question: string
-  type: 'multiple-choice' | 'short-answer'
-  options?: string[]
-  correctAnswer?: string
+  front: string
+  back: string
 }
 
-export interface Test {
+export interface FlashcardSet {
   id: string
   name: string
   folderId?: string | null
   noteId: string
   noteName: string
-  questions: Question[]
+  cards: FlashcardCard[]
   createdAt?: string
   updatedAt?: string
 }
 
-interface TestsStore {
-  tests: Test[]
+interface FlashcardsStore {
+  flashcardSets: FlashcardSet[]
   isLoading: boolean
   error: string | null
   syncFromSupabase: () => Promise<void>
-  addTest: (test: Omit<Test, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  removeTest: (id: string) => Promise<void>
-  getTestById: (id: string) => Test | undefined
-  moveTestToFolder: (id: string, folderId: string | null) => Promise<void>
+  addFlashcardSet: (set: Omit<FlashcardSet, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
+  removeFlashcardSet: (id: string) => Promise<void>
+  getFlashcardSetById: (id: string) => FlashcardSet | undefined
+  moveFlashcardSetToFolder: (id: string, folderId: string | null) => Promise<void>
 }
 
-export const useTestsStore = create<TestsStore>()(
+export const useFlashcardsStore = create<FlashcardsStore>()(
   persist(
     (set, get) => ({
-  tests: [],
+      flashcardSets: [],
       isLoading: false,
       error: null,
 
@@ -46,28 +44,28 @@ export const useTestsStore = create<TestsStore>()(
 
         set({ isLoading: true, error: null })
         try {
-          const { data: tests, error } = await supabase
-            .from('tests')
+          const { data: flashcardSets, error } = await supabase
+            .from('flashcards')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
 
           if (error) throw error
 
-          // Transform from snake_case to camelCase and parse JSONB questions
-          const transformedTests: Test[] = (tests || []).map((test: any) => ({
-            id: test.id,
-            name: test.name,
-            folderId: test.folder_id || null,
-            noteId: test.note_id,
-            noteName: test.note_name,
-            questions: test.questions || [],
-            createdAt: test.created_at,
-            updatedAt: test.updated_at,
+          // Transform from snake_case to camelCase and parse JSONB cards
+          const transformedSets: FlashcardSet[] = (flashcardSets || []).map((set: any) => ({
+            id: set.id,
+            name: set.name,
+            folderId: set.folder_id || null,
+            noteId: set.note_id,
+            noteName: set.note_name,
+            cards: set.cards || [],
+            createdAt: set.created_at,
+            updatedAt: set.updated_at,
           }))
 
           set({
-            tests: transformedTests,
+            flashcardSets: transformedSets,
             isLoading: false,
           })
         } catch (error) {
@@ -78,21 +76,21 @@ export const useTestsStore = create<TestsStore>()(
         }
       },
 
-      addTest: async (testData) => {
+      addFlashcardSet: async (setData) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
           const { data, error } = await supabase
-            .from('tests')
+            .from('flashcards')
             .insert({
               user_id: user.id,
-              name: testData.name,
-              folder_id: testData.folderId || null,
-              note_id: testData.noteId,
-              note_name: testData.noteName,
-              questions: testData.questions, // JSONB handled automatically by Supabase
+              name: setData.name,
+              folder_id: setData.folderId || null,
+              note_id: setData.noteId,
+              note_name: setData.noteName,
+              cards: setData.cards, // JSONB handled automatically by Supabase
             })
             .select()
             .single()
@@ -100,63 +98,63 @@ export const useTestsStore = create<TestsStore>()(
           if (error) throw error
 
           // Transform to camelCase
-    const newTest: Test = {
+          const newSet: FlashcardSet = {
             id: data.id,
             name: data.name,
             folderId: data.folder_id || null,
             noteId: data.note_id,
             noteName: data.note_name,
-            questions: data.questions || [],
+            cards: data.cards || [],
             createdAt: data.created_at,
             updatedAt: data.updated_at,
-    }
+          }
 
-    set((state) => ({
-      tests: [...state.tests, newTest]
-    }))
+          set((state) => ({
+            flashcardSets: [...state.flashcardSets, newSet]
+          }))
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to add test'
+          const errorMessage = error instanceof Error ? error.message : 'Failed to add flashcard set'
           set({ error: errorMessage })
           throw error
         }
-  },
+      },
 
-      removeTest: async (id: string) => {
+      removeFlashcardSet: async (id: string) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
           const { error } = await supabase
-            .from('tests')
+            .from('flashcards')
             .delete()
             .eq('id', id)
             .eq('user_id', user.id)
 
           if (error) throw error
 
-    set((state) => ({
-      tests: state.tests.filter((test) => test.id !== id)
-    }))
+          set((state) => ({
+            flashcardSets: state.flashcardSets.filter((set) => set.id !== id)
+          }))
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to remove test'
+          const errorMessage = error instanceof Error ? error.message : 'Failed to remove flashcard set'
           set({ error: errorMessage })
           throw error
         }
-  },
-
-      getTestById: (id: string) => {
-        return get().tests.find((test) => test.id === id)
       },
 
-      moveTestToFolder: async (id: string, folderId: string | null) => {
+      getFlashcardSetById: (id: string) => {
+        return get().flashcardSets.find((set) => set.id === id)
+      },
+
+      moveFlashcardSetToFolder: async (id: string, folderId: string | null) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
           const { error } = await supabase
-            .from('tests')
+            .from('flashcards')
             .update({
               folder_id: folderId,
               updated_at: new Date().toISOString(),
@@ -167,22 +165,23 @@ export const useTestsStore = create<TestsStore>()(
           if (error) throw error
 
           set((state) => ({
-            tests: state.tests.map((test) =>
-              test.id === id
-                ? { ...test, folderId: folderId || null, updatedAt: new Date().toISOString() }
-                : test
+            flashcardSets: state.flashcardSets.map((set) =>
+              set.id === id
+                ? { ...set, folderId: folderId || null, updatedAt: new Date().toISOString() }
+                : set
             )
           }))
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to move test'
+          const errorMessage = error instanceof Error ? error.message : 'Failed to move flashcard set'
           set({ error: errorMessage })
           throw error
         }
       },
     }),
     {
-      name: 'tests-storage',
+      name: 'flashcards-storage',
       storage: createJSONStorage(() => getStorage()),
-  }
+    }
   )
 )
+

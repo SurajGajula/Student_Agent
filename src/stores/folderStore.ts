@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { getStorage } from '../lib/storage'
 
-export type FolderType = 'note' | 'class' | 'test'
+export type FolderType = 'note' | 'class' | 'test' | 'flashcard'
 
 export interface Folder {
   id: string
@@ -156,6 +157,14 @@ export const useFolderStore = create<FolderStore>()(
                 .eq('user_id', user.id)
                 .limit(1)
               hasChildren = (data && data.length > 0) || false
+            } else if (type === 'flashcard') {
+              const { data } = await supabase
+                .from('flashcards')
+                .select('id')
+                .eq('folder_id', id)
+                .eq('user_id', user.id)
+                .limit(1)
+              hasChildren = (data && data.length > 0) || false
             }
           }
 
@@ -264,7 +273,7 @@ export const useFolderStore = create<FolderStore>()(
     }),
     {
       name: 'folders-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => getStorage()),
     }
   )
 )

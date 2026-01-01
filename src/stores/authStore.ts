@@ -1,10 +1,14 @@
 import { create } from 'zustand'
+import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import { useFolderStore } from './folderStore'
 import { useClassesStore } from './classesStore'
 import { useNotesStore } from './notesStore'
 import { useTestsStore } from './testsStore'
+import { useFlashcardsStore } from './flashcardsStore'
+import { useUsageStore } from './usageStore'
 
 interface AuthStore {
   isLoggedIn: boolean
@@ -27,6 +31,8 @@ const syncAllStores = async () => {
       useClassesStore.getState().syncFromSupabase().catch(err => console.error('Classes sync error:', err)),
       useNotesStore.getState().syncFromSupabase().catch(err => console.error('Notes sync error:', err)),
       useTestsStore.getState().syncFromSupabase().catch(err => console.error('Tests sync error:', err)),
+      useFlashcardsStore.getState().syncFromSupabase().catch(err => console.error('Flashcards sync error:', err)),
+      useUsageStore.getState().fetchUsage().catch(err => console.error('Usage sync error:', err)),
     ])
   } catch (error) {
     console.error('Error syncing stores:', error)
@@ -34,14 +40,29 @@ const syncAllStores = async () => {
 }
 
 // Helper function to clear all stores on logout
-const clearAllStores = () => {
+const clearAllStores = async () => {
+  const storageKeys = [
+    'folders-storage',
+    'classes-storage',
+    'notes-storage',
+    'tests-storage',
+    'flashcards-storage',
+  ]
+
+  // Clear storage (platform-aware)
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    storageKeys.forEach(key => localStorage.removeItem(key))
+  } else {
+    // Native: use AsyncStorage
+    await Promise.all(storageKeys.map(key => AsyncStorage.removeItem(key)))
+  }
+
   // Reset folder store
   useFolderStore.setState({
     folders: [],
     isLoading: false,
     error: null,
   })
-  localStorage.removeItem('folders-storage')
 
   // Reset classes store
   useClassesStore.setState({
@@ -49,7 +70,6 @@ const clearAllStores = () => {
     isLoading: false,
     error: null,
   })
-  localStorage.removeItem('classes-storage')
 
   // Reset notes store
   useNotesStore.setState({
@@ -57,7 +77,6 @@ const clearAllStores = () => {
     isLoading: false,
     error: null,
   })
-  localStorage.removeItem('notes-storage')
 
   // Reset tests store
   useTestsStore.setState({
@@ -65,10 +84,16 @@ const clearAllStores = () => {
     isLoading: false,
     error: null,
   })
-  localStorage.removeItem('tests-storage')
+
+  // Reset flashcards store
+  useFlashcardsStore.setState({
+    flashcardSets: [],
+    isLoading: false,
+    error: null,
+  })
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   isLoggedIn: false,
   user: null,
   username: 'User',
@@ -146,7 +171,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (error) throw error
 
       // Clear all stores
-      clearAllStores()
+      await clearAllStores()
 
       set({
         isLoggedIn: false,
@@ -204,7 +229,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         } else {
           // Clear all stores on sign out event
           if (event === 'SIGNED_OUT') {
-            clearAllStores()
+            await clearAllStores()
           }
           set({
             isLoggedIn: false,

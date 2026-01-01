@@ -1,255 +1,287 @@
 import { useState } from 'react'
+import { View, Text, StyleSheet, Pressable, ScrollView, Platform, Dimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../stores/authStore'
-import LoginModal from './modals/LoginModal'
+import { useUsageStore } from '../stores/usageStore'
 import UpgradeModal from './modals/UpgradeModal'
+import { NotesIcon, TestsIcon, FlashcardsIcon, SettingsIcon, LogoutIcon, LoginIcon } from './icons'
 
 interface SidebarProps {
   onNavigate: (view: string) => void
+  onClose?: () => void
+  isOpen?: boolean
+  onOpenUpgradeModal?: () => void
+  onOpenLoginModal?: () => void
 }
 
-function Sidebar({ onNavigate }: SidebarProps) {
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginModal }: SidebarProps) {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
   const { isLoggedIn, username, signOut } = useAuthStore()
+  const { planName } = useUsageStore()
+  const windowWidth = Dimensions.get('window').width
+  const isMobile = windowWidth <= 768
+  const insets = useSafeAreaInsets()
 
-  const handleLogin = () => {
-    setIsLoginModalOpen(true)
-  }
 
   const handleLogout = async () => {
     await signOut()
   }
 
   const handleUpgrade = () => {
+    if (onOpenUpgradeModal) {
+      onOpenUpgradeModal()
+    } else {
     setIsUpgradeModalOpen(true)
+    }
   }
 
   const handleSettings = () => {
     onNavigate('settings')
+    onClose?.()
   }
 
+  const handleNavigate = (view: string) => {
+    onNavigate(view)
+    onClose?.()
+  }
+
+  const sidebarStyle = [
+    styles.sidebar,
+    isMobile && styles.sidebarMobile,
+    isMobile && isOpen && styles.sidebarOpen,
+    !isMobile && styles.sidebarDesktop,
+    Platform.OS === 'ios' && isMobile && { paddingTop: insets.top },
+  ]
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-nav">
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('classes')}
+    <View style={[sidebarStyle, isMobile && { flex: 1, height: '100%' }]}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.sidebarNav}>
+          <Pressable 
+            style={styles.sidebarButton}
+            onPress={() => handleNavigate('notes')}
         >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-          <span>Classes</span>
-        </button>
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('notes')}
+            <View style={styles.iconWrapper}>
+              <NotesIcon />
+            </View>
+            <Text style={styles.sidebarButtonText}>Notes</Text>
+          </Pressable>
+          
+          <Pressable 
+            style={styles.sidebarButton}
+            onPress={() => handleNavigate('tests')}
         >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          <span>Notes</span>
-        </button>
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('calendar')}
+            <View style={styles.iconWrapper}>
+              <TestsIcon />
+            </View>
+            <Text style={styles.sidebarButtonText}>Tests</Text>
+          </Pressable>
+          
+          <Pressable 
+            style={styles.sidebarButton}
+            onPress={() => handleNavigate('flashcards')}
         >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-            <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"></path>
-          </svg>
-          <span>Calendar</span>
-        </button>
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('tests')}
-        >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          <span>Tests</span>
-        </button>
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('jobs')}
-        >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-          </svg>
-          <span>Jobs</span>
-        </button>
-        <button 
-          className="sidebar-button"
-          onClick={() => onNavigate('events')}
-        >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-          <span>Events</span>
-        </button>
-      </div>
+            <View style={styles.iconWrapper}>
+              <FlashcardsIcon />
+            </View>
+            <Text style={styles.sidebarButtonText}>Flashcards</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+
+      <View style={styles.sidebarAuthSection}>
       {isLoggedIn ? (
-        <div className="sidebar-auth-section">
-          <div className="sidebar-user-info">
-            <span className="sidebar-username">{username}</span>
-            <button 
-              className="sidebar-upgrade-button"
-              onClick={handleUpgrade}
+          <>
+            <View style={styles.sidebarUserInfo}>
+              <Text style={styles.sidebarUsername}>{username}</Text>
+              <Pressable 
+                style={styles.sidebarUpgradeButton}
+                onPress={handleUpgrade}
             >
-              Upgrade
-            </button>
-          </div>
-          <button 
-            className="sidebar-settings-button"
-            onClick={handleSettings}
+                <Text style={styles.sidebarUpgradeButtonText}>
+              {planName === 'pro' ? 'Pro' : 'Upgrade'}
+                </Text>
+              </Pressable>
+            </View>
+            <Pressable 
+              style={styles.sidebarButton}
+              onPress={handleSettings}
           >
-            <svg 
-              className="sidebar-icon" 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            <span>Settings</span>
-          </button>
-          <button 
-            className="sidebar-login-button"
-            onClick={handleLogout}
+              <View style={styles.iconWrapper}>
+                <SettingsIcon />
+              </View>
+              <Text style={styles.sidebarButtonText}>Settings</Text>
+            </Pressable>
+            <Pressable 
+              style={styles.sidebarButton}
+              onPress={handleLogout}
           >
-            <svg 
-              className="sidebar-icon" 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            <span>Logout</span>
-          </button>
-        </div>
+              <View style={styles.iconWrapper}>
+                <LogoutIcon />
+              </View>
+              <Text style={styles.sidebarButtonText}>Logout</Text>
+            </Pressable>
+          </>
       ) : (
-        <button 
-          className="sidebar-login-button"
-          onClick={handleLogin}
+          <Pressable 
+            style={styles.sidebarButton}
+            onPress={() => {
+              if (onOpenLoginModal) {
+                onOpenLoginModal()
+              }
+            }}
         >
-          <svg 
-            className="sidebar-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-            <polyline points="10 17 15 12 10 7"></polyline>
-            <line x1="15" y1="12" x2="3" y2="12"></line>
-          </svg>
-          <span>Login</span>
-        </button>
-      )}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-      />
+            <View style={styles.iconWrapper}>
+              <LoginIcon />
+            </View>
+            <Text style={styles.sidebarButtonText}>Login</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* UpgradeModal is now rendered at App level for proper z-index */}
+      {!onOpenUpgradeModal && (
       <UpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
       />
-    </aside>
+      )}
+    </View>
   )
 }
 
-export default Sidebar
+const styles = StyleSheet.create({
+  sidebar: {
+    backgroundColor: '#e8e8e8',
+    borderRightWidth: 1,
+    borderRightColor: '#d0d0d0',
+    flexDirection: 'column',
+    ...(Platform.OS === 'web' && {
+      height: '100vh',
+    }),
+  },
+  sidebarDesktop: {
+    width: 250,
+    padding: 20,
+  },
+  sidebarMobile: {
+    position: 'absolute',
+    left: -250,
+    top: 0,
+    bottom: 0,
+    width: 250,
+    zIndex: 1000,
+    height: '100%',
+    ...(Platform.OS === 'web' && {
+      transition: 'left 0.3s ease',
+      boxShadow: '2px 0 10px rgba(0, 0, 0, 0.2)',
+      height: '100vh',
+    }),
+  },
+  sidebarOpen: {
+    left: 0,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  sidebarNav: {
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 20,
+    alignItems: 'flex-start',
+    ...(Platform.OS === 'ios' && {
+      paddingTop: 60,
+    }),
+    ...(Platform.OS !== 'web' && {
+      paddingLeft: 16, // Align with sidebar button (left: 16)
+      paddingRight: 16,
+    }),
+  },
+  sidebarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web' && {
+      paddingVertical: 18,
+      paddingHorizontal: 22,
+    }),
+  },
+  iconWrapper: {
+    ...(Platform.OS === 'web' && {
+      transform: [{ scale: 1.15 }],
+    }),
+  },
+  sidebarButtonText: {
+    color: '#0f0f0f',
+    fontSize: 16,
+    fontWeight: '300',
+    textAlign: 'left',
+    ...(Platform.OS === 'web' && {
+      fontSize: 19,
+    }),
+  },
+  sidebarAuthSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#d0d0d0',
+    padding: 20,
+    gap: 12,
+    backgroundColor: '#e8e8e8',
+    alignItems: 'flex-start',
+    ...(Platform.OS !== 'web' && {
+      paddingLeft: 16, // Align with sidebar button (left: 16)
+      paddingRight: 16,
+    }),
+  },
+  sidebarUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    width: '100%',
+    ...(Platform.OS === 'web' && {
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+    }),
+  },
+  sidebarUsername: {
+    color: '#0f0f0f',
+    fontSize: 15,
+    fontWeight: '300',
+    flex: 1,
+    textAlign: 'left',
+    ...(Platform.OS === 'web' && {
+      fontSize: 16,
+    }),
+  },
+  sidebarUpgradeButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 6,
+    ...(Platform.OS === 'web' && {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+    }),
+  },
+  sidebarUpgradeButtonText: {
+    color: '#f0f0f0',
+    fontSize: 14,
+    fontWeight: '300',
+    textAlign: 'center',
+    ...(Platform.OS === 'web' && {
+      fontSize: 15,
+    }),
+  },
+})
 
+export default Sidebar

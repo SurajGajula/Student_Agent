@@ -9,6 +9,13 @@ html, body {
     width: 100%;
     background-color: #f0f0f0;
     overflow: hidden; /* Disable scrolling */
+    margin: 0;
+    padding: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 body {
@@ -507,12 +514,14 @@ body {
     height: 100%;
     width: 100%;
     display: flex;
+    background-color: #f0f0f0;
 }
 
 .app {
     width: 100%;
     height: 100%;
     display: flex;
+    background-color: #f0f0f0;
 }
 
 .sidebar {
@@ -1140,6 +1149,16 @@ body {
     background-color: #f9f9f9;
 }
 
+.calendar-class-block {
+    cursor: pointer;
+    transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.calendar-class-block:hover {
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
 .add-note-button {
     display: flex;
     align-items: center;
@@ -1202,6 +1221,11 @@ body {
     box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.1);
 }
 
+.note-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
 .note-card h3 {
     color: #0f0f0f;
     font-size: 1.25rem;
@@ -1248,6 +1272,105 @@ body {
     display: none;
 }
 
+/* React Native Web TextInput styling - remove all borders and focus outlines */
+.note-editor-rn,
+.note-editor-rn:focus,
+.note-editor-rn:active,
+.note-editor-rn:focus-visible {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: transparent !important;
+}
+
+/* Also target textarea elements that react-native-web might render */
+textarea.note-editor-rn,
+textarea.note-editor-rn:focus,
+textarea.note-editor-rn:active {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    resize: none !important;
+    overflow: visible !important;
+}
+
+/* Hide scrollbars for ScrollView in note editor - ultra comprehensive rules */
+.note-editor-scroll,
+.note-editor-scroll *,
+.note-editor-scroll > *,
+.note-editor-scroll > div,
+.note-editor-scroll > div > div,
+.note-editor-scroll > div > div > div {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+    scrollbar-color: transparent transparent !important;
+}
+
+.note-editor-scroll::-webkit-scrollbar,
+.note-editor-scroll *::-webkit-scrollbar,
+.note-editor-scroll > *::-webkit-scrollbar,
+.note-editor-scroll > div::-webkit-scrollbar,
+.note-editor-scroll > div > div::-webkit-scrollbar,
+.note-editor-scroll > div > div > div::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    -webkit-appearance: none !important;
+    opacity: 0 !important;
+}
+
+/* Target all divs within the scroll container */
+.note-editor-scroll div,
+.note-editor-scroll div div,
+.note-editor-scroll div div div {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.note-editor-scroll div::-webkit-scrollbar,
+.note-editor-scroll div div::-webkit-scrollbar,
+.note-editor-scroll div div div::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Additional selectors for React Native Web ScrollView */
+[class*="ScrollView"],
+[data-rn-scroll],
+div[style*="overflow"],
+div[style*="overflow-y"],
+div[style*="overflowY"] {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+[class*="ScrollView"]::-webkit-scrollbar,
+[data-rn-scroll]::-webkit-scrollbar,
+div[style*="overflow"]::-webkit-scrollbar,
+div[style*="overflow-y"]::-webkit-scrollbar,
+div[style*="overflowY"]::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Nuclear option - hide scrollbars globally in note editor area */
+body .note-editor-scroll {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+body .note-editor-scroll::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
 .classes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -1284,6 +1407,11 @@ body {
 .class-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+.class-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
 }
 
 .class-card h3 {
@@ -1370,6 +1498,12 @@ body {
 .folder-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+.folder-card.drag-over {
+    background-color: #d0d0d0;
+    border: 2px dashed #0f0f0f;
+    transform: scale(1.05);
 }
 
 .folder-card svg {
@@ -1723,6 +1857,31 @@ body {
     padding-left: 20px;
 }
 
+.profile-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px;
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-top: 20px;
+}
+
+.profile-header h1 {
+    color: #0f0f0f;
+    font-size: 2rem;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    padding-left: 20px;
+}
+
 .tests-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -1893,6 +2052,31 @@ body {
     background-color: #f5f5f5;
     border-radius: 6px;
     border: 1px solid #e8e8e8;
+    transition: all 0.2s;
+}
+
+.question-option.clickable {
+    cursor: pointer;
+}
+
+.question-option.clickable:hover {
+    background-color: #e8e8e8;
+    border-color: #d0d0d0;
+}
+
+.question-option.selected {
+    background-color: #e3f2fd;
+    border-color: #90caf9;
+}
+
+.question-option.correct {
+    background-color: #e8f5e9;
+    border-color: #81c784;
+}
+
+.question-option.incorrect {
+    background-color: #ffebee;
+    border-color: #e57373;
 }
 
 .option-label {
@@ -1919,6 +2103,26 @@ body {
     border-radius: 4px;
 }
 
+.selected-indicator {
+    color: #0f0f0f;
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin-left: auto;
+    padding: 2px 8px;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+}
+
+.incorrect-indicator {
+    color: #c62828;
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin-left: auto;
+    padding: 2px 8px;
+    background-color: #ffcdd2;
+    border-radius: 4px;
+}
+
 .question-answer {
     padding: 12px;
     background-color: #f5f5f5;
@@ -1934,6 +2138,108 @@ body {
 .question-answer strong {
     font-weight: 400;
     color: #0f0f0f;
+}
+
+.test-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background-color: #0f0f0f;
+    color: #f0f0f0;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 300;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    letter-spacing: 0.01em;
+}
+
+.test-mode-toggle:hover {
+    opacity: 0.9;
+}
+
+.test-mode-toggle.active {
+    background-color: #666;
+}
+
+.question-input-container {
+    margin-top: 12px;
+}
+
+.question-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    background-color: #ffffff;
+    color: #0f0f0f;
+    font-size: 0.95rem;
+    font-weight: 300;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+    line-height: 1.5;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.question-input:focus {
+    outline: none;
+    border-color: #0f0f0f;
+}
+
+.question-answer-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.answer-section {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e8e8e8;
+}
+
+.answer-section.correct {
+    background-color: #e8f5e9;
+    border-color: #81c784;
+}
+
+.answer-section.incorrect {
+    background-color: #ffebee;
+    border-color: #e57373;
+}
+
+.answer-section strong {
+    display: block;
+    font-weight: 400;
+    color: #0f0f0f;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.answer-status {
+    font-weight: 400;
+    margin-left: 8px;
+}
+
+.answer-status.correct {
+    color: #155724;
+}
+
+.answer-status.incorrect {
+    color: #c62828;
+}
+
+.answer-section p {
+    color: #0f0f0f;
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    line-height: 1.5;
+    margin: 0;
 }
 
 .settings-view {
@@ -2082,5 +2388,748 @@ body {
     letter-spacing: 0.01em;
     opacity: 0.7;
     text-align: right;
+}
+
+/* Flashcards View Styles */
+.flashcards-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Allow overflow for study view animations */
+.flashcards-view:has(.flashcard-study-container) {
+    overflow: visible;
+}
+
+.flashcards-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-top: 20px;
+}
+
+.flashcards-header .header-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.flashcards-header .back-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #0f0f0f;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.flashcards-header .back-button:hover {
+    background-color: #e8e8e8;
+}
+
+.flashcards-header h1 {
+    color: #0f0f0f;
+    font-size: 2rem;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    margin: 0;
+    padding-left: 20px;
+}
+
+.flashcards-header .header-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.shuffle-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background-color: #0f0f0f;
+    color: #f0f0f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.shuffle-button:hover {
+    opacity: 0.9;
+}
+
+.shuffle-button.active {
+    background-color: #666;
+}
+
+.flashcards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-auto-rows: 250px;
+    gap: 20px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 10px;
+}
+
+.flashcards-grid::-webkit-scrollbar {
+    display: none;
+}
+
+.flashcards-grid {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.flashcard-set-card {
+    background-color: #e8e8e8;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #d0d0d0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.flashcard-set-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+.flashcard-set-card:hover .card-delete-button {
+    opacity: 1;
+}
+
+.flashcard-set-icon {
+    margin-bottom: 12px;
+    color: #0f0f0f;
+}
+
+.flashcard-set-card h3 {
+    color: #0f0f0f;
+    font-size: 1.25rem;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px 0;
+}
+
+.flashcard-set-meta {
+    color: #666;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    margin: 0;
+    margin-top: auto;
+}
+
+/* Flashcard Study View */
+.flashcard-study-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 80px;
+    gap: 30px;
+    overflow: visible;
+}
+
+.flashcard-progress {
+    color: #666;
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+}
+
+.flashcard-slide-container {
+    width: 100%;
+    max-width: 600px;
+    height: 400px;
+    position: relative;
+    overflow: visible;
+    margin: 0 100px;
+}
+
+.flashcard.slide-in-from-left {
+    animation: slideInFromLeft 0.6s ease-in-out;
+}
+
+.flashcard.slide-in-from-left .flashcard-inner {
+    transition: none; /* Disable flip transition during slide */
+}
+
+.flashcard.slide-in-from-right {
+    animation: slideInFromRight 0.6s ease-in-out;
+}
+
+.flashcard.slide-in-from-right .flashcard-inner {
+    transition: none; /* Disable flip transition during slide */
+}
+
+.flashcard.flashcard-exit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.flashcard.flashcard-exit.slide-out-right {
+    animation: slideOutRight 0.6s ease-in-out forwards;
+}
+
+.flashcard.flashcard-exit.slide-out-left {
+    animation: slideOutLeft 0.6s ease-in-out forwards;
+}
+
+@keyframes slideInFromLeft {
+    0% {
+        transform: translateX(-150%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideInFromRight {
+    0% {
+        transform: translateX(150%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(150%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideOutLeft {
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(-150%);
+        opacity: 0;
+    }
+}
+
+.flashcard {
+    width: 100%;
+    max-width: 600px;
+    height: 400px;
+    perspective: 1000px;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+}
+
+.flashcard.flashcard-exit {
+    z-index: 1;
+}
+
+.flashcard-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+}
+
+.flashcard.flipped .flashcard-inner {
+    transform: rotateY(180deg);
+}
+
+.flashcard-front,
+.flashcard-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    box-shadow: 0 0 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+.flashcard-front {
+    background-color: #ffffff;
+    border: 1px solid #d0d0d0;
+}
+
+.flashcard-back {
+    background-color: #f0f0f0;
+    border: 1px solid #d0d0d0;
+    transform: rotateY(180deg);
+}
+
+.flashcard-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.flashcard-content p {
+    color: #0f0f0f;
+    font-size: 1.25rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.flashcard-hint {
+    color: #666;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    margin-top: 20px;
+    opacity: 0.7;
+}
+
+.flashcard-navigation {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.nav-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background-color: #0f0f0f;
+    color: #f0f0f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.nav-button:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.nav-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE STYLES
+   ============================================ */
+
+/* Mobile menu button - hidden on desktop */
+.mobile-menu-button {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  html, body {
+    background-color: #f0f0f0;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  #root, .app {
+    background-color: #f0f0f0;
+    min-height: 100vh;
+    height: 100%;
+  }
+  
+  /* Mobile menu button */
+  .mobile-menu-button {
+    display: flex;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    background-color: #0f0f0f;
+    color: #f0f0f0;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
+  }
+
+  .mobile-menu-button:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+
+  .mobile-menu-button:active {
+    transform: scale(0.95);
+  }
+
+  /* Sidebar overlay */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* Sidebar on mobile - hidden by default, slides in when open */
+  .sidebar {
+    position: fixed;
+    left: -250px;
+    top: 0;
+    width: 250px;
+    max-height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    display: block;
+    padding: 0;
+    margin: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  /* Make scrollbar more visible on mobile */
+  .sidebar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .sidebar::-webkit-scrollbar-track {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .sidebar::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  /* Ensure sidebar content layout on mobile */
+  .sidebar-nav {
+    padding: 80px 20px 12px 20px;
+  }
+
+  .sidebar-auth-section {
+    padding: 20px;
+    border-top: 1px solid #d0d0d0;
+    background-color: #e8e8e8;
+  }
+
+  /* Login button when not in auth section (direct child of sidebar) */
+  .sidebar > .sidebar-login-button {
+    padding: 20px;
+    border-top: 1px solid #d0d0d0;
+    border-radius: 0;
+    width: 100%;
+    background-color: #e8e8e8;
+    box-sizing: border-box;
+  }
+
+  /* Main content adjusts for mobile */
+  .main-content {
+    width: 100%;
+    padding: 80px 12px 100px 12px;
+    margin-left: 0;
+    background-color: #f0f0f0;
+  }
+
+  /* Chatbar adjusts for mobile */
+  .chatbar {
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+  }
+
+  /* Grid layouts - single column on mobile */
+  .grid,
+  .classes-grid,
+  .notes-grid,
+  .tests-grid,
+  .flashcards-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    min-height: 60px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  /* Cards - responsive sizing */
+  .class-card,
+  .note-card,
+  .test-card,
+  .flashcard-set-card {
+    min-height: 50px;
+    padding: 8px;
+    max-height: 80px;
+    overflow: hidden;
+  }
+  
+  .class-card h3,
+  .note-card h3,
+  .test-card h3,
+  .flashcard-set-card h3 {
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+
+  /* Headers - smaller on mobile */
+  .header-title h1,
+  .classes-header h1,
+  .notes-header h1,
+  .tests-header h1,
+  .flashcards-header h1,
+  .calendar-header h1,
+  .profile-header h1 {
+    font-size: 1.5rem;
+    padding-left: 0;
+  }
+
+  .header-title,
+  .classes-header,
+  .notes-header,
+  .tests-header,
+  .flashcards-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Buttons - touch-friendly sizes */
+  .btn,
+  .sidebar-button,
+  .chatbar-button,
+  .add-class-button,
+  .add-note-button,
+  .create-folder-button,
+  .upload-schedule-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Modals - full width on mobile */
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 20px 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-form {
+    padding: 20px;
+  }
+
+  /* Calendar adjustments for mobile */
+  .calendar-view {
+    padding: 10px;
+  }
+
+  .calendar-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .calendar-days-header {
+    padding-left: 80px;
+    min-width: 600px;
+  }
+
+  .calendar-time-sidebar {
+    width: 80px;
+    min-width: 80px;
+  }
+
+  .calendar-scroll-container {
+    min-width: 600px;
+  }
+
+  /* Note editor - less padding on mobile */
+  .note-editor {
+    padding: 20px;
+  }
+
+  /* Flashcard study view - adjusted for mobile */
+  .flashcard-study-container {
+    padding: 20px 16px;
+    gap: 20px;
+  }
+
+  .flashcard-slide-container {
+    margin: 0;
+    max-width: 100%;
+    height: 300px;
+  }
+
+  .flashcard {
+    max-width: 100%;
+    height: 300px;
+  }
+
+  .flashcard-front,
+  .flashcard-back {
+    padding: 24px;
+  }
+
+  /* Test detail view */
+  .test-detail-container {
+    padding: 16px;
+  }
+
+  /* Settings view */
+  .settings-container {
+    padding: 16px;
+  }
+
+  /* Time inputs - stack vertically on mobile */
+  .time-range-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .time-input {
+    max-width: 100%;
+  }
+
+  /* Upgrade modal plans - stack on mobile */
+  .upgrade-plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small devices */
+  .main-content {
+    padding: 70px 8px 90px 8px;
+  }
+
+  .header-title h1,
+  .classes-header h1,
+  .notes-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .card,
+  .class-card,
+  .note-card,
+  .test-card,
+  .flashcard-set-card {
+    padding: 6px;
+    min-height: 45px;
+    max-height: 70px;
+    overflow: hidden;
+  }
+  
+  .class-card h3,
+  .note-card h3,
+  .test-card h3,
+  .flashcard-set-card h3 {
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+  }
+
+  .mobile-menu-button {
+    top: 12px;
+    left: 12px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .sidebar {
+    width: 220px;
+    left: -220px;
+  }
+  
+  .sidebar-nav {
+    padding: 70px 16px 12px 16px;
+  }
+  
+  .sidebar-auth-section {
+    padding: 16px;
+  }
+  
+  .sidebar > .sidebar-login-button {
+    padding: 16px;
+  }
+
+  .chatbar {
+    padding: 10px 12px;
+  }
+
+  .chatbar-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Flashcard smaller on very small screens */
+  .flashcard {
+    height: 250px;
+  }
+
+  .flashcard-slide-container {
+    height: 250px;
+  }
 }
 

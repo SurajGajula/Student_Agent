@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from './platform'
+
 export interface ParsedClass {
   name: string
   days: string[]
@@ -8,19 +10,41 @@ export interface ParsedClass {
  * API endpoint for the backend server
  * Can be configured via environment variable or defaults to localhost
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE_URL = getApiBaseUrl()
+
+/**
+ * Platform-aware image handling
+ */
+const createFormData = async (imageSource: File | Blob | string): Promise<FormData> => {
+  const formData = new FormData()
+  
+  // React Native - imageSource is a string URI
+  if (typeof imageSource === 'string') {
+    // @ts-ignore - React Native FormData accepts different types
+    formData.append('image', {
+      uri: imageSource,
+      type: 'image/jpeg',
+      name: 'photo.jpg',
+    } as any)
+  } 
+  // Web - imageSource is File or Blob
+  else {
+    formData.append('image', imageSource)
+  }
+  
+  return formData
+}
 
 /**
  * Calls the backend API to parse schedule image using service account credentials
- * @param imageFile - The image file containing the schedule
+ * @param imageSource - The image file (web) or URI (native) containing the schedule
  * @returns Promise resolving to array of parsed classes
  */
-async function extractClassesWithBackendAPI(imageFile: File | Blob): Promise<ParsedClass[]> {
-  const formData = new FormData()
-  formData.append('image', imageFile)
+async function extractClassesWithBackendAPI(imageSource: File | Blob | string): Promise<ParsedClass[]> {
+  const formData = await createFormData(imageSource)
 
   // Get auth token
-  const { supabase } = await import('./supabase.js')
+  const { supabase } = await import('./supabase')
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
@@ -112,23 +136,24 @@ async function checkBackendHealth(): Promise<boolean> {
   }
 }
 
-export async function parseScheduleImage(imageFile: File | Blob): Promise<ParsedClass[]> {
+/**
+ * Parse schedule image and extract classes
+ * @param imageSource - The image file (web) or URI (native) containing the schedule
+ * @returns Promise resolving to array of parsed classes
+ */
+export async function parseScheduleImage(imageSource: File | Blob | string): Promise<ParsedClass[]> {
   
   // Check backend health first
   const isHealthy = await checkBackendHealth()
   if (!isHealthy) {
     throw new Error(
       `Cannot connect to backend server at ${API_BASE_URL}. ` +
-      `Please ensure the backend server is running:\n` +
-      `  npm run dev:server\n\n` +
-      `Or start both frontend and backend together:\n` +
-      `  npm run dev:all`
+      `Please ensure the backend server is running.`
     )
   }
   
-  
   try {
-    const classes = await extractClassesWithBackendAPI(imageFile)
+    const classes = await extractClassesWithBackendAPI(imageSource)
     
     if (classes.length === 0) {
       console.warn('No classes found in schedule image')
@@ -142,7 +167,7 @@ export async function parseScheduleImage(imageFile: File | Blob): Promise<Parsed
     if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
       throw new Error(
         `Network error: Cannot connect to backend API at ${API_BASE_URL}. ` +
-        `Please ensure the backend server is running (npm run dev:server).`
+        `Please ensure the backend server is running.`
       )
     }
     

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { useUsageStore } from './usageStore'
+import { getStorage } from '../lib/storage'
 
 export interface Class {
   id: string
@@ -19,12 +21,13 @@ interface ClassesStore {
   syncFromSupabase: () => Promise<void>
   addClass: (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => Promise<void>
   removeClass: (id: string) => Promise<void>
+  moveClassToFolder: (id: string, folderId: string | null) => Promise<void>
 }
 
 export const useClassesStore = create<ClassesStore>()(
   persist(
     (set, get) => ({
-      classes: [],
+  classes: [],
       isLoading: false,
       error: null,
 
@@ -71,6 +74,15 @@ export const useClassesStore = create<ClassesStore>()(
 
         set({ error: null })
         try {
+          // Check plan limits for free users
+          const { planName } = useUsageStore.getState()
+          if (planName === 'free') {
+            const currentCount = get().classes.length
+            if (currentCount >= 10) {
+              throw new Error('Free plan limit reached: You can only have 10 classes. Upgrade to add more.')
+            }
+          }
+
           const { data, error } = await supabase
             .from('classes')
             .insert({
@@ -86,7 +98,7 @@ export const useClassesStore = create<ClassesStore>()(
           if (error) throw error
 
           // Transform to camelCase
-          const newClass: Class = {
+    const newClass: Class = {
             id: data.id,
             name: data.name,
             folderId: data.folder_id || null,
@@ -96,15 +108,15 @@ export const useClassesStore = create<ClassesStore>()(
             updatedAt: data.updated_at,
           }
 
-          set((state) => ({
-            classes: [...state.classes, newClass]
-          }))
+    set((state) => ({
+      classes: [...state.classes, newClass]
+    }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add class'
           set({ error: errorMessage })
           throw error
         }
-      },
+  },
 
       removeClass: async (id: string) => {
         const { data: { user } } = await supabase.auth.getUser()
@@ -129,10 +141,41 @@ export const useClassesStore = create<ClassesStore>()(
           throw error
         }
       },
+
+      moveClassToFolder: async (id: string, folderId: string | null) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        set({ error: null })
+        try {
+          const { error } = await supabase
+            .from('classes')
+            .update({
+              folder_id: folderId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+          if (error) throw error
+
+          set((state) => ({
+            classes: state.classes.map((classItem) =>
+              classItem.id === id
+                ? { ...classItem, folderId: folderId || null, updatedAt: new Date().toISOString() }
+                : classItem
+            )
+          }))
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to move class'
+          set({ error: errorMessage })
+          throw error
+        }
+      },
     }),
     {
       name: 'classes-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => getStorage()),
     }
   )
 )
