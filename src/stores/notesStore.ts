@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
-import { useUsageStore } from './usageStore'
+import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface Note {
   id: string
@@ -33,31 +35,26 @@ export const useNotesStore = create<NotesStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
         set({ isLoading: true, error: null })
         try {
-          const { data: notes, error } = await supabase
-            .from('notes')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('updated_at', { ascending: false })
+          const response = await fetch(`${API_BASE_URL}/api/notes/list`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || errorData.message || 'Failed to fetch notes')
+          }
 
-          // Transform from snake_case to camelCase
-          const transformedNotes: Note[] = (notes || []).map((note: any) => ({
-            id: note.id,
-            name: note.name,
-            folderId: note.folder_id || null,
-            content: note.content || '',
-            createdAt: note.created_at,
-            updatedAt: note.updated_at,
-          }))
+          const notes: Note[] = await response.json()
 
           set({
-            notes: transformedNotes,
+            notes,
             isLoading: false,
           })
         } catch (error) {
@@ -69,52 +66,37 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       addNote: async (name: string, folderId?: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          // Check plan limits for free users
-          const { planName } = useUsageStore.getState()
-          if (planName === 'free') {
-            const currentCount = get().notes.length
-            if (currentCount >= 10) {
-              throw new Error('Free plan limit reached: You can only have 10 notes. Upgrade to add more.')
-            }
+          const response = await fetch(`${API_BASE_URL}/api/notes/add`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ name, folderId })
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to add note'
+            throw new Error(errorMessage)
           }
 
-          const { data, error } = await supabase
-            .from('notes')
-            .insert({
-              user_id: user.id,
-              name: name.trim(),
-              folder_id: folderId || null,
-              content: '',
-            })
-            .select()
-            .single()
+          const newNote: Note = await response.json()
 
-          if (error) throw error
-
-          // Transform to camelCase
-    const newNote: Note = {
-            id: data.id,
-            name: data.name,
-            folderId: data.folder_id || null,
-            content: data.content || '',
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
-    }
-
-    set((state) => ({
-      notes: [...state.notes, newNote]
-    }))
+          set((state) => ({
+            notes: [...state.notes, newNote]
+          }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
           set({ error: errorMessage })
           throw error
         }
-  },
+      },
 
       updateNoteContentLocal: (id: string, content: string) => {
         // Optimistic update - update local state immediately
@@ -128,28 +110,32 @@ export const useNotesStore = create<NotesStore>()(
   },
 
       updateNoteContent: async (id: string, content: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('notes')
-            .update({
-              content,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/notes/update/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ content })
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to update note'
+            throw new Error(errorMessage)
+          }
 
-          // Update state to ensure it matches Supabase
+          const updatedNote: Note = await response.json()
+
+          // Update state to ensure it matches API response
           set((state) => ({
             notes: state.notes.map((note) =>
-              note.id === id
-                ? { ...note, content, updatedAt: new Date().toISOString() }
-                : note
+              note.id === id ? updatedNote : note
             )
           }))
         } catch (error) {
@@ -160,18 +146,23 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       removeNote: async (id: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('notes')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/notes/delete/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to remove note'
+            throw new Error(errorMessage)
+          }
 
           set((state) => ({
             notes: state.notes.filter((note) => note.id !== id)
@@ -184,27 +175,31 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       moveNoteToFolder: async (id: string, folderId: string | null) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('notes')
-            .update({
-              folder_id: folderId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/notes/move/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ folderId })
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to move note'
+            throw new Error(errorMessage)
+          }
+
+          const updatedNote: Note = await response.json()
 
           set((state) => ({
             notes: state.notes.map((note) =>
-              note.id === id
-                ? { ...note, folderId: folderId || null, updatedAt: new Date().toISOString() }
-                : note
+              note.id === id ? updatedNote : note
             )
           }))
         } catch (error) {

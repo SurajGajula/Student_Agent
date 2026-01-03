@@ -131,17 +131,17 @@ function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
 const styles = StyleSheet.create({
   modalContainer: {
     ...(Platform.OS === 'web' && {
-      position: 'fixed',
+      position: 'fixed' as any,
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       zIndex: 2147483647,
       pointerEvents: 'none',
-      width: '100vw',
-      height: '100vh',
+      width: '100vw' as any,
+      height: '100vh' as any,
     }),
-  },
+  } as any,
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     ...(Platform.OS === 'web' && {
-      position: 'fixed',
+      position: 'fixed' as any,
       top: 0,
       left: 0,
       right: 0,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       pointerEvents: 'auto',
     }),
-  },
+  } as any,
   overlayNative: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

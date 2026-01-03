@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     borderRightColor: '#d0d0d0',
     flexDirection: 'column',
     ...(Platform.OS === 'web' && {
-      height: '100vh',
+      height: '100vh' as any,
     }),
-  },
+  } as any,
   sidebarDesktop: {
     width: 250,
     padding: 20,
@@ -175,9 +175,9 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' && {
       transition: 'left 0.3s ease',
       boxShadow: '2px 0 10px rgba(0, 0, 0, 0.2)',
-      height: '100vh',
+      height: '100vh' as any,
     }),
-  },
+  } as any,
   sidebarOpen: {
     left: 0,
   },

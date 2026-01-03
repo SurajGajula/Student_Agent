@@ -23,10 +23,7 @@ interface UserUsage {
   last_monthly_reset: string | null
 }
 
-interface PlanLimits {
-  name: string
-  monthly_token_limit: number
-}
+// PlanLimits interface removed - not currently used
 
 /**
  * Get or create user usage record (defaults to free plan)

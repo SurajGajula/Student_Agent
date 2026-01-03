@@ -35,10 +35,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d0d0d0',
     ...(Platform.OS === 'web' && {
-      position: 'fixed',
+      position: 'fixed' as any,
       zIndex: 1002,
     }),
-  },
+  } as any,
   iconContainer: {
     width: 24,
     height: 24,

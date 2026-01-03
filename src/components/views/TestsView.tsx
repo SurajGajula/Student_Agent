@@ -131,6 +131,11 @@ function TestsView() {
             flex: 0,
             maxWidth: '100%',
           }]}>
+            {!isMobile && (
+              <Pressable style={styles.backButton} onPress={handleBackClick}>
+                <BackIcon />
+              </Pressable>
+            )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentTest.name}</Text>
           </View>
           <View style={styles.headerButtons}>
@@ -232,10 +237,9 @@ function TestsView() {
                         </View>
                       ) : (
                         <View style={styles.answerComparison}>
-                          <View style={[
-                            styles.answerSection,
-                            userResponse && (isCorrect ? styles.answerSectionCorrect : styles.answerSectionIncorrect)
-                          ]}>
+                          <View style={userResponse 
+                            ? [styles.answerSection, isCorrect ? styles.answerSectionCorrect : styles.answerSectionIncorrect]
+                            : styles.answerSection}>
                             <Text style={styles.answerSectionTitle}>
                               Your Answer:
                               {userResponse && (

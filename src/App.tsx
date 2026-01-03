@@ -140,10 +140,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#f0f0f0',
     ...(Platform.OS === 'web' && {
-      height: '100vh',
-      width: '100vw',
+      height: '100vh' as any,
+      width: '100vw' as any,
     }),
-  },
+  } as any,
   sidebarOverlay: {
     position: 'absolute',
     top: 0,

@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface Question {
   id: string
@@ -41,33 +44,26 @@ export const useTestsStore = create<TestsStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
         set({ isLoading: true, error: null })
         try {
-          const { data: tests, error } = await supabase
-            .from('tests')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
+          const response = await fetch(`${API_BASE_URL}/api/tests/list`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || errorData.message || 'Failed to fetch tests')
+          }
 
-          // Transform from snake_case to camelCase and parse JSONB questions
-          const transformedTests: Test[] = (tests || []).map((test: any) => ({
-            id: test.id,
-            name: test.name,
-            folderId: test.folder_id || null,
-            noteId: test.note_id,
-            noteName: test.note_name,
-            questions: test.questions || [],
-            createdAt: test.created_at,
-            updatedAt: test.updated_at,
-          }))
+          const tests: Test[] = await response.json()
 
           set({
-            tests: transformedTests,
+            tests,
             isLoading: false,
           })
         } catch (error) {
@@ -79,98 +75,103 @@ export const useTestsStore = create<TestsStore>()(
       },
 
       addTest: async (testData) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { data, error } = await supabase
-            .from('tests')
-            .insert({
-              user_id: user.id,
+          const response = await fetch(`${API_BASE_URL}/api/tests/add`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
               name: testData.name,
-              folder_id: testData.folderId || null,
-              note_id: testData.noteId,
-              note_name: testData.noteName,
-              questions: testData.questions, // JSONB handled automatically by Supabase
+              folderId: testData.folderId,
+              noteId: testData.noteId,
+              noteName: testData.noteName,
+              questions: testData.questions
             })
-            .select()
-            .single()
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to add test'
+            throw new Error(errorMessage)
+          }
 
-          // Transform to camelCase
-    const newTest: Test = {
-            id: data.id,
-            name: data.name,
-            folderId: data.folder_id || null,
-            noteId: data.note_id,
-            noteName: data.note_name,
-            questions: data.questions || [],
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
-    }
+          const newTest: Test = await response.json()
 
-    set((state) => ({
-      tests: [...state.tests, newTest]
-    }))
+          set((state) => ({
+            tests: [...state.tests, newTest]
+          }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add test'
           set({ error: errorMessage })
           throw error
         }
-  },
+      },
 
       removeTest: async (id: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('tests')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/tests/delete/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to remove test'
+            throw new Error(errorMessage)
+          }
 
-    set((state) => ({
-      tests: state.tests.filter((test) => test.id !== id)
-    }))
+          set((state) => ({
+            tests: state.tests.filter((test) => test.id !== id)
+          }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to remove test'
           set({ error: errorMessage })
           throw error
         }
-  },
+      },
 
       getTestById: (id: string) => {
         return get().tests.find((test) => test.id === id)
       },
 
       moveTestToFolder: async (id: string, folderId: string | null) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('tests')
-            .update({
-              folder_id: folderId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/tests/move/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ folderId })
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to move test'
+            throw new Error(errorMessage)
+          }
+
+          const updatedTest: Test = await response.json()
 
           set((state) => ({
             tests: state.tests.map((test) =>
-              test.id === id
-                ? { ...test, folderId: folderId || null, updatedAt: new Date().toISOString() }
-                : test
+              test.id === id ? updatedTest : test
             )
           }))
         } catch (error) {

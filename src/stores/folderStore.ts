@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
+
+const API_BASE_URL = getApiBaseUrl()
 
 export type FolderType = 'note' | 'class' | 'test' | 'flashcard'
 
@@ -33,31 +36,26 @@ export const useFolderStore = create<FolderStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
         set({ isLoading: true, error: null })
         try {
-          const { data: folders, error } = await supabase
-            .from('folders')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
+          const response = await fetch(`${API_BASE_URL}/api/folders/list`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || errorData.message || 'Failed to fetch folders')
+          }
 
-          // Transform from snake_case to camelCase
-          const transformedFolders: Folder[] = (folders || []).map((folder: any) => ({
-            id: folder.id,
-            name: folder.name,
-            type: folder.type || 'note', // Default to 'note' for backward compatibility
-            parentFolderId: folder.parent_folder_id || null,
-            createdAt: folder.created_at,
-            updatedAt: folder.updated_at,
-          }))
+          const folders: Folder[] = await response.json()
 
           set({
-            folders: transformedFolders,
+            folders,
             isLoading: false,
           })
         } catch (error) {
@@ -73,33 +71,27 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       addFolder: async (name: string, type: FolderType, parentFolderId?: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { data, error } = await supabase
-            .from('folders')
-            .insert({
-              user_id: user.id,
-              name: name.trim(),
-              type: type,
-              parent_folder_id: parentFolderId || null,
-            })
-            .select()
-            .single()
+          const response = await fetch(`${API_BASE_URL}/api/folders/add`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ name, type, parentFolderId })
+          })
 
-          if (error) throw error
-
-          // Transform to camelCase
-          const newFolder: Folder = {
-            id: data.id,
-            name: data.name,
-            type: data.type,
-            parentFolderId: data.parent_folder_id || null,
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to add folder'
+            throw new Error(errorMessage)
           }
+
+          const newFolder: Folder = await response.json()
 
           set((state) => ({
             folders: [...state.folders, newFolder]
@@ -112,74 +104,23 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       removeFolder: async (id: string, type: FolderType) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          // Check if folder has children (subfolders of same type or items of that type)
-          const folder = get().folders.find(f => f.id === id)
-          if (!folder || folder.type !== type) {
-            throw new Error('Folder type mismatch')
-          }
-
-          let hasChildren = false
-          
-          // Check for subfolders of the same type
-          const subfolders = get().folders.filter(f => f.parentFolderId === id && f.type === type)
-          if (subfolders.length > 0) {
-            hasChildren = true
-          }
-
-          // Check for items based on type
-          if (!hasChildren) {
-            if (type === 'class') {
-              const { data } = await supabase
-                .from('classes')
-                .select('id')
-                .eq('folder_id', id)
-                .eq('user_id', user.id)
-                .limit(1)
-              hasChildren = (data && data.length > 0) || false
-            } else if (type === 'note') {
-              const { data } = await supabase
-                .from('notes')
-                .select('id')
-                .eq('folder_id', id)
-                .eq('user_id', user.id)
-                .limit(1)
-              hasChildren = (data && data.length > 0) || false
-            } else if (type === 'test') {
-              const { data } = await supabase
-                .from('tests')
-                .select('id')
-                .eq('folder_id', id)
-                .eq('user_id', user.id)
-                .limit(1)
-              hasChildren = (data && data.length > 0) || false
-            } else if (type === 'flashcard') {
-              const { data } = await supabase
-                .from('flashcards')
-                .select('id')
-                .eq('folder_id', id)
-                .eq('user_id', user.id)
-                .limit(1)
-              hasChildren = (data && data.length > 0) || false
+          const response = await fetch(`${API_BASE_URL}/api/folders/delete/${id}?type=${type}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
             }
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to remove folder'
+            throw new Error(errorMessage)
           }
-
-          if (hasChildren) {
-            throw new Error('Cannot delete folder: it contains items or subfolders')
-          }
-
-          const { error } = await supabase
-            .from('folders')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id)
-            .eq('type', type)
-
-          if (error) throw error
 
           set((state) => ({
             folders: state.folders.filter((folder) => folder.id !== id)
@@ -192,72 +133,27 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       updateFolder: async (id: string, name: string, type: FolderType, parentFolderId?: string | null) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const folder = get().folders.find(f => f.id === id)
-          if (!folder || folder.type !== type) {
-            throw new Error('Folder type mismatch')
+          const response = await fetch(`${API_BASE_URL}/api/folders/update/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ name, type, parentFolderId })
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to update folder'
+            throw new Error(errorMessage)
           }
 
-          // Prevent self-reference
-          if (parentFolderId === id) {
-            throw new Error('Folder cannot be its own parent')
-          }
-
-          // Check for circular reference in parent chain (only within same type)
-          if (parentFolderId) {
-            let currentParentId = parentFolderId
-            const visited = new Set([id])
-
-            while (currentParentId) {
-              if (visited.has(currentParentId)) {
-                throw new Error('Cannot create circular folder reference')
-              }
-              visited.add(currentParentId)
-
-              const { data: parentFolder } = await supabase
-                .from('folders')
-                .select('parent_folder_id, type')
-                .eq('id', currentParentId)
-                .eq('user_id', user.id)
-                .eq('type', type)
-                .single()
-
-              if (!parentFolder || parentFolder.type !== type) {
-                break
-              }
-
-              currentParentId = parentFolder?.parent_folder_id || null
-            }
-          }
-
-          const { data, error } = await supabase
-            .from('folders')
-            .update({
-              name: name.trim(),
-              parent_folder_id: parentFolderId || null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
-            .eq('type', type)
-            .select()
-            .single()
-
-          if (error) throw error
-
-          // Transform to camelCase
-          const updatedFolder: Folder = {
-            id: data.id,
-            name: data.name,
-            type: data.type,
-            parentFolderId: data.parent_folder_id || null,
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
-          }
+          const updatedFolder: Folder = await response.json()
 
           set((state) => ({
             folders: state.folders.map((folder) =>

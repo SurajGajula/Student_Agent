@@ -9,7 +9,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { parseNotesImage } from '../../lib/notesParser'
 import { BackIcon, FolderIcon, DeleteIcon, NotesIcon, UploadIcon, AddIcon } from '../icons'
 import { pickImage, showConfirm } from '../../lib/platformHelpers'
-import { Svg, Circle, Path, Line } from 'react-native-svg'
+import { Svg, Circle, Path } from 'react-native-svg'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -447,6 +447,11 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             flex: 0,
             maxWidth: '100%',
           }]}>
+            {!isMobile && (
+              <Pressable style={styles.backButton} onPress={handleBackClick}>
+                <BackIcon />
+              </Pressable>
+            )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentNote.name}</Text>
           </View>
         </View>

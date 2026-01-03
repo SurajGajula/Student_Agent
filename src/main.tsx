@@ -1,6 +1,5 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { AppRegistry } from 'react-native-web'
 import App from './App'
 import './styles.css'
 import { useAuthStore } from './stores/authStore'

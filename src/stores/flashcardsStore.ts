@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
+import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface FlashcardCard {
   id: string
@@ -39,33 +42,26 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
         set({ isLoading: true, error: null })
         try {
-          const { data: flashcardSets, error } = await supabase
-            .from('flashcards')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
+          const response = await fetch(`${API_BASE_URL}/api/flashcards/list`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || errorData.message || 'Failed to fetch flashcard sets')
+          }
 
-          // Transform from snake_case to camelCase and parse JSONB cards
-          const transformedSets: FlashcardSet[] = (flashcardSets || []).map((set: any) => ({
-            id: set.id,
-            name: set.name,
-            folderId: set.folder_id || null,
-            noteId: set.note_id,
-            noteName: set.note_name,
-            cards: set.cards || [],
-            createdAt: set.created_at,
-            updatedAt: set.updated_at,
-          }))
+          const flashcardSets: FlashcardSet[] = await response.json()
 
           set({
-            flashcardSets: transformedSets,
+            flashcardSets,
             isLoading: false,
           })
         } catch (error) {
@@ -77,37 +73,33 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       addFlashcardSet: async (setData) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { data, error } = await supabase
-            .from('flashcards')
-            .insert({
-              user_id: user.id,
+          const response = await fetch(`${API_BASE_URL}/api/flashcards/add`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
               name: setData.name,
-              folder_id: setData.folderId || null,
-              note_id: setData.noteId,
-              note_name: setData.noteName,
-              cards: setData.cards, // JSONB handled automatically by Supabase
+              folderId: setData.folderId,
+              noteId: setData.noteId,
+              noteName: setData.noteName,
+              cards: setData.cards
             })
-            .select()
-            .single()
+          })
 
-          if (error) throw error
-
-          // Transform to camelCase
-          const newSet: FlashcardSet = {
-            id: data.id,
-            name: data.name,
-            folderId: data.folder_id || null,
-            noteId: data.note_id,
-            noteName: data.note_name,
-            cards: data.cards || [],
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to add flashcard set'
+            throw new Error(errorMessage)
           }
+
+          const newSet: FlashcardSet = await response.json()
 
           set((state) => ({
             flashcardSets: [...state.flashcardSets, newSet]
@@ -120,18 +112,23 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       removeFlashcardSet: async (id: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('flashcards')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/flashcards/delete/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to remove flashcard set'
+            throw new Error(errorMessage)
+          }
 
           set((state) => ({
             flashcardSets: state.flashcardSets.filter((set) => set.id !== id)
@@ -148,27 +145,31 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       moveFlashcardSetToFolder: async (id: string, folderId: string | null) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('flashcards')
-            .update({
-              folder_id: folderId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/flashcards/move/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ folderId })
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to move flashcard set'
+            throw new Error(errorMessage)
+          }
+
+          const updatedSet: FlashcardSet = await response.json()
 
           set((state) => ({
             flashcardSets: state.flashcardSets.map((set) =>
-              set.id === id
-                ? { ...set, folderId: folderId || null, updatedAt: new Date().toISOString() }
-                : set
+              set.id === id ? updatedSet : set
             )
           }))
         } catch (error) {

@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
-import { useUsageStore } from './usageStore'
+import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface Class {
   id: string
@@ -32,32 +34,26 @@ export const useClassesStore = create<ClassesStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
         set({ isLoading: true, error: null })
         try {
-          const { data: classes, error } = await supabase
-            .from('classes')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
+          const response = await fetch(`${API_BASE_URL}/api/classes/list`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || errorData.message || 'Failed to fetch classes')
+          }
 
-          // Transform from snake_case to camelCase
-          const transformedClasses: Class[] = (classes || []).map((classItem: any) => ({
-            id: classItem.id,
-            name: classItem.name,
-            folderId: classItem.folder_id || null,
-            days: classItem.days || null,
-            timeRange: classItem.time_range || null,
-            createdAt: classItem.created_at,
-            updatedAt: classItem.updated_at,
-          }))
+          const classes: Class[] = await response.json()
 
           set({
-            classes: transformedClasses,
+            classes,
             isLoading: false,
           })
         } catch (error) {
@@ -69,68 +65,56 @@ export const useClassesStore = create<ClassesStore>()(
       },
 
       addClass: async (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          // Check plan limits for free users
-          const { planName } = useUsageStore.getState()
-          if (planName === 'free') {
-            const currentCount = get().classes.length
-            if (currentCount >= 10) {
-              throw new Error('Free plan limit reached: You can only have 10 classes. Upgrade to add more.')
-            }
+          const response = await fetch(`${API_BASE_URL}/api/classes/add`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ name, folderId, days: time?.days, timeRange: time?.timeRange })
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to add class'
+            throw new Error(errorMessage)
           }
 
-          const { data, error } = await supabase
-            .from('classes')
-            .insert({
-              user_id: user.id,
-              name: name.trim(),
-              folder_id: folderId || null,
-              days: time?.days || null,
-              time_range: time?.timeRange || null,
-            })
-            .select()
-            .single()
+          const newClass: Class = await response.json()
 
-          if (error) throw error
-
-          // Transform to camelCase
-    const newClass: Class = {
-            id: data.id,
-            name: data.name,
-            folderId: data.folder_id || null,
-            days: data.days || null,
-            timeRange: data.time_range || null,
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
-          }
-
-    set((state) => ({
-      classes: [...state.classes, newClass]
-    }))
+          set((state) => ({
+            classes: [...state.classes, newClass]
+          }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add class'
           set({ error: errorMessage })
           throw error
         }
-  },
+      },
 
       removeClass: async (id: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('classes')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/classes/delete/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to remove class'
+            throw new Error(errorMessage)
+          }
 
           set((state) => ({
             classes: state.classes.filter((classItem) => classItem.id !== id)
@@ -143,27 +127,31 @@ export const useClassesStore = create<ClassesStore>()(
       },
 
       moveClassToFolder: async (id: string, folderId: string | null) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Not authenticated')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
-          const { error } = await supabase
-            .from('classes')
-            .update({
-              folder_id: folderId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .eq('user_id', user.id)
+          const response = await fetch(`${API_BASE_URL}/api/classes/move/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ folderId })
+          })
 
-          if (error) throw error
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to move class'
+            throw new Error(errorMessage)
+          }
+
+          const updatedClass: Class = await response.json()
 
           set((state) => ({
             classes: state.classes.map((classItem) =>
-              classItem.id === id
-                ? { ...classItem, folderId: folderId || null, updatedAt: new Date().toISOString() }
-                : classItem
+              classItem.id === id ? updatedClass : classItem
             )
           }))
         } catch (error) {

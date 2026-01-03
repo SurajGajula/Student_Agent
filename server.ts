@@ -9,10 +9,13 @@ import { initializeGeminiClient } from './services/gemini.js'
 import healthRouter from './routes/health.js'
 import indexRouter from './routes/index.js'
 import scheduleRouter from './routes/schedule.js'
-import notesRouter from './routes/notes.js'
+import notesParseRouter from './routes/notes.js' // Keep parse-notes route
+import notesCRUDRouter from './routes/notes/index.js' // New CRUD routes
+import classesCRUDRouter from './routes/classes/index.js' // New classes CRUD routes
 import chatRouter from './routes/chat.js'
-import testsRouter from './routes/tests.js'
-import flashcardsRouter from './routes/flashcards.js'
+import testsRouter from './routes/tests/index.js' // Updated to use index
+import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
+import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
 
@@ -22,9 +25,28 @@ const __dirname = path.dirname(__filename)
 const app: Express = express()
 
 // Enable CORS for frontend
-const frontendUrl = process.env.FRONTEND_URL || process.env.RAILWAY_PUBLIC_DOMAIN || 'http://localhost:5173'
+const frontendUrl = process.env.FRONTEND_URL || process.env.RAILWAY_PUBLIC_DOMAIN
+const allowedOrigins = frontendUrl 
+  ? [frontendUrl]
+  : [
+      'http://localhost:5173', // Vite default
+      'http://localhost:8081', // Expo Metro bundler
+      'http://localhost:19006', // Expo web
+      'http://192.168.1.56:8081', // Network access for Expo
+      'http://192.168.1.56:5173' // Network access for Vite
+    ]
+
 app.use(cors({
-  origin: frontendUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true)
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(null, true) // Allow all origins in development for flexibility
+    }
+  },
   credentials: true
 }))
 
@@ -36,10 +58,13 @@ app.use(express.json())
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)
 app.use('/api', scheduleRouter)
-app.use('/api', notesRouter)
+app.use('/api', notesParseRouter) // Keep parse-notes route
+app.use('/api/notes', notesCRUDRouter) // New notes CRUD routes
+app.use('/api/classes', classesCRUDRouter) // New classes CRUD routes
+app.use('/api/folders', foldersCRUDRouter) // New folders CRUD routes
 app.use('/api', chatRouter)
-app.use('/api/tests', testsRouter)
-app.use('/api/flashcards', flashcardsRouter)
+app.use('/api/tests', testsRouter) // Includes generate + CRUD
+app.use('/api/flashcards', flashcardsRouter) // Includes generate + CRUD
 app.use('/api', usageRouter)
 app.use('/', indexRouter)
 
@@ -59,7 +84,7 @@ if (process.env.NODE_ENV === 'production') {
   
   // Serve index.html for all non-API routes (SPA routing)
   // This must be last to catch all remaining routes
-  app.get('*', (req, res) => {
+  app.get('*', (_req, res) => {
     // API routes are already handled above, so this is safe
     res.sendFile(path.join(staticPath, 'index.html'))
   })

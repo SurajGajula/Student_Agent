@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, FlatList, Dimensions, Animated, Platform } from 'react-native'
+import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, Animated, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CreateFolderModal from '../modals/CreateFolderModal'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
@@ -16,10 +16,8 @@ function FlashcardsView() {
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isShuffled, setIsShuffled] = useState(false)
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
-  const [prevCardFlipped, setPrevCardFlipped] = useState(false)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
   
@@ -253,6 +251,11 @@ function FlashcardsView() {
             flex: 0,
             maxWidth: '100%',
           }]}>
+            {!isMobile && (
+              <Pressable style={styles.backButton} onPress={handleBackFromStudy}>
+                <BackIcon />
+              </Pressable>
+            )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentSet.name}</Text>
           </View>
           <View style={styles.headerButtons}>

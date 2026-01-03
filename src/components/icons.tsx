@@ -1,4 +1,4 @@
-import { Svg, Path, Polyline, Line, Rect, Circle, Polygon } from 'react-native-svg'
+import { Svg, Path, Polyline, Line, Rect, Circle } from 'react-native-svg'
 
 // Icon components for React Native
 export const NotesIcon = () => (

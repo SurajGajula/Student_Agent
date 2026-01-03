@@ -281,7 +281,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 const styles = StyleSheet.create({
   modalContainer: {
     ...(Platform.OS === 'web' && {
-      position: 'fixed',
+      position: 'fixed' as any,
       top: 0,
       left: 0,
       right: 0,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
       zIndex: 2147483647,
       pointerEvents: 'none',
     }),
-  },
+  } as any,
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     ...(Platform.OS === 'web' && {
-      position: 'fixed',
+      position: 'fixed' as any,
       top: 0,
       left: 0,
       right: 0,
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       pointerEvents: 'auto',
     }),
-  },
+  } as any,
   overlayNative: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
