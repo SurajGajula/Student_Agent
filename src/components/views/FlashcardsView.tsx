@@ -122,8 +122,6 @@ function FlashcardsView() {
     if (currentCardIndex < cards.length - 1 && !isTransitioning) {
       setIsTransitioning(true)
       setPrevCardIndex(currentCardIndex)
-      setPrevCardFlipped(isFlipped)
-      setSlideDirection('right')
       
       // Update card index immediately so the incoming card's text is set
       const nextIndex = currentCardIndex + 1
@@ -146,7 +144,6 @@ function FlashcardsView() {
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setTimeout(() => {
-          setSlideDirection(null)
           setPrevCardIndex(null)
           setIsTransitioning(false)
           prevSlideAnim.setValue(0)
@@ -160,8 +157,6 @@ function FlashcardsView() {
     if (currentCardIndex > 0 && !isTransitioning) {
       setIsTransitioning(true)
       setPrevCardIndex(currentCardIndex)
-      setPrevCardFlipped(isFlipped)
-      setSlideDirection('left')
       
       // Update card index immediately so the incoming card's text is set
       const prevIndex = currentCardIndex - 1
@@ -184,7 +179,6 @@ function FlashcardsView() {
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setTimeout(() => {
-          setSlideDirection(null)
           setPrevCardIndex(null)
           setIsTransitioning(false)
           prevSlideAnim.setValue(0)
