@@ -5,6 +5,7 @@ import express, { Express } from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 import { initializeGeminiClient } from './services/gemini.js'
 import healthRouter from './routes/health.js'
 import indexRouter from './routes/index.js'
@@ -71,7 +72,6 @@ app.use('/', indexRouter)
 // Serve static files from Expo web-build directory in production
 if (process.env.NODE_ENV === 'production') {
   // Check for Expo web build first, fallback to dist for backward compatibility
-  const fs = require('fs')
   const webBuildPath = path.join(__dirname, 'web-build')
   const distPath = path.join(__dirname, 'dist')
   
