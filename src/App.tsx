@@ -21,11 +21,21 @@ function AppContent() {
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const { isInDetailMode } = useDetailMode()
 
-  // Initialize auth on all platforms
+  // Initialize Supabase and auth on all platforms
   useEffect(() => {
-    useAuthStore.getState().initializeAuth().catch(err => {
-      console.error('Auth initialization error:', err)
-    })
+    const init = async () => {
+      try {
+        // Initialize Supabase with runtime config first
+        const { initSupabase } = await import('./lib/supabase')
+        await initSupabase()
+        
+        // Then initialize auth
+        await useAuthStore.getState().initializeAuth()
+      } catch (err) {
+        console.error('Initialization error:', err)
+      }
+    }
+    init()
   }, [])
 
   // Handle window resize for responsive behavior

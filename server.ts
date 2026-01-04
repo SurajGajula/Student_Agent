@@ -19,6 +19,7 @@ import flashcardsRouter from './routes/flashcards/index.js' // Updated to use in
 import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
+import configRouter from './routes/config.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -55,6 +56,9 @@ app.use(cors({
 app.use('/api/stripe', stripeRouter)
 
 app.use(express.json())
+
+// Config endpoint (public, no auth required)
+app.use(configRouter)
 
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)
