@@ -84,8 +84,13 @@ if (process.env.NODE_ENV === 'production') {
   
   // Serve index.html for all non-API routes (SPA routing)
   // This must be last to catch all remaining routes
-  app.get('*', (_req, res) => {
-    // API routes are already handled above, so this is safe
+  // Express 5: Use a function to match all routes not starting with /api
+  app.use((req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+      return next()
+    }
+    // Serve index.html for all other routes
     res.sendFile(path.join(staticPath, 'index.html'))
   })
 }
