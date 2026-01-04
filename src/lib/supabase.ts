@@ -52,10 +52,21 @@ const getEnvVar = (key: string): string | undefined => {
 const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
 const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
 
+// Debug logging to help diagnose environment variable issues
+if (typeof window !== 'undefined') {
+  console.log('[supabase.ts] Debug - Constants.expoConfig?.extra:', Constants.expoConfig?.extra)
+  console.log('[supabase.ts] Debug - supabaseUrl from getEnvVar:', supabaseUrl ? 'SET (' + supabaseUrl.substring(0, 30) + '...)' : 'MISSING')
+  console.log('[supabase.ts] Debug - supabasePublishableKey from getEnvVar:', supabasePublishableKey ? 'SET (length: ' + supabasePublishableKey.length + ')' : 'MISSING')
+}
+
 if (!supabaseUrl || !supabasePublishableKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY as environment variables (or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY).'
-  )
+  const errorMsg = `Missing Supabase environment variables. 
+    SUPABASE_URL: ${supabaseUrl ? 'SET' : 'MISSING'}
+    SUPABASE_PUBLISHABLE_KEY: ${supabasePublishableKey ? 'SET' : 'MISSING'}
+    Constants.expoConfig?.extra: ${JSON.stringify(Constants.expoConfig?.extra || {})}
+    Please set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY as environment variables (or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_ANON_KEY).`
+  console.error('[supabase.ts]', errorMsg)
+  throw new Error(errorMsg)
 }
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey)

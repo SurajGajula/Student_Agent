@@ -18,7 +18,12 @@ frontend:
         - npm cache clean --force
         - npm install
         - export AMPLIFY_BUILD=true
-        - SUPABASE_URL="${SUPABASE_URL}" SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" npm run build:web
+        - export SUPABASE_URL="${SUPABASE_URL}"
+        - export SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}"
+        - echo "Verifying exports before build:"
+        - 'echo "SUPABASE_URL exported: ${SUPABASE_URL:+SET}"'
+        - 'echo "SUPABASE_PUBLISHABLE_KEY exported: ${SUPABASE_PUBLISHABLE_KEY:+SET}"'
+        - npm run build:web
   artifacts:
     baseDirectory: dist
     files:

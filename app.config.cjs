@@ -12,13 +12,14 @@ const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || p
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:3001';
 
 // Debug logging during build (always log in app.config.cjs since it only runs at build time)
-console.log('[app.config.cjs] Environment variables check:');
-console.log('[app.config.cjs] EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓' : '✗');
-console.log('[app.config.cjs] SUPABASE_URL:', process.env.SUPABASE_URL ? '✓' : '✗');
-console.log('[app.config.cjs] EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓' : '✗');
-console.log('[app.config.cjs] SUPABASE_PUBLISHABLE_KEY:', process.env.SUPABASE_PUBLISHABLE_KEY ? '✓' : '✗');
-console.log('[app.config.cjs] Resolved supabaseUrl:', supabaseUrl ? '✓ (' + supabaseUrl.substring(0, 20) + '...)' : '✗');
-console.log('[app.config.cjs] Resolved supabaseAnonKey:', supabaseAnonKey ? '✓ (length: ' + supabaseAnonKey.length + ')' : '✗');
+console.error('[app.config.cjs] ===== ENVIRONMENT VARIABLES CHECK =====');
+console.error('[app.config.cjs] EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓' : '✗');
+console.error('[app.config.cjs] SUPABASE_URL:', process.env.SUPABASE_URL ? '✓ (' + (process.env.SUPABASE_URL || '').substring(0, 30) + '...)' : '✗');
+console.error('[app.config.cjs] EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓' : '✗');
+console.error('[app.config.cjs] SUPABASE_PUBLISHABLE_KEY:', process.env.SUPABASE_PUBLISHABLE_KEY ? '✓ (length: ' + (process.env.SUPABASE_PUBLISHABLE_KEY || '').length + ')' : '✗');
+console.error('[app.config.cjs] Resolved supabaseUrl:', supabaseUrl ? '✓ (' + supabaseUrl.substring(0, 30) + '...)' : '✗ EMPTY');
+console.error('[app.config.cjs] Resolved supabaseAnonKey:', supabaseAnonKey ? '✓ (length: ' + supabaseAnonKey.length + ')' : '✗ EMPTY');
+console.error('[app.config.cjs] ======================================');
 
 const expoConfig = {
   name: "Student Agent",
@@ -64,6 +65,7 @@ module.exports = {
     web: {
       ...(fs.existsSync('./assets/favicon.png') && { favicon: "./assets/favicon.png" }),
       bundler: "metro",
+      entryPoint: "./index.web.js",
     },
     experiments: {
       typedRoutes: false
@@ -71,9 +73,9 @@ module.exports = {
     scheme: "studentagent",
     extra: {
       // Support both old VITE_/EXPO_PUBLIC_ prefixes and new SUPABASE_ prefix
-      // Only include keys if they have values (Expo may filter out undefined/empty)
-      ...(supabaseUrl && { supabaseUrl }),
-      ...(supabaseAnonKey && { supabaseAnonKey }),
+      // Always include these keys (even if empty) so we can debug
+      supabaseUrl: supabaseUrl || '',
+      supabaseAnonKey: supabaseAnonKey || '',
       ...(stripePublishableKey && { stripePublishableKey }),
       apiUrl: apiUrl,
       eas: {
