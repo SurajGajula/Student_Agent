@@ -1,16 +1,10 @@
 const path = require('path');
 const fs = require('fs');
-const dotenv = require('dotenv');
 
-// Load environment variables from frontend.env
-const frontendEnvPath = path.join(__dirname, 'frontend.env');
-dotenv.config({ path: frontendEnvPath });
+// Environment variables must be set directly (via export, Railway, Docker, etc.)
+// No .env file loading - use environment variables only
 
-// Also try loading from .env if it exists (for backward compatibility)
-const dotEnvPath = path.join(__dirname, '.env');
-dotenv.config({ path: dotEnvPath });
-
-// Store the values to ensure they're available
+// Read values directly from environment variables
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY || process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;

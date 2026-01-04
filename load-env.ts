@@ -1,19 +1,15 @@
 // This file must be imported FIRST before any other imports
-import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+// Environment variables must be set directly (via export, Railway, Docker, etc.)
+// No .env file loading - use environment variables only
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-// Load backend.env file
-dotenv.config({ path: join(__dirname, 'backend.env') })
-
-// Verify required variables are loaded
+// Verify required variables are loaded from environment
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
   console.error('Missing required environment variables:')
   console.error('SUPABASE_URL:', process.env.SUPABASE_URL ? '✓' : '✗')
   console.error('SUPABASE_SECRET_KEY:', process.env.SUPABASE_SECRET_KEY ? '✓' : '✗')
-  throw new Error('Missing Supabase environment variables. Please check backend.env file.')
+  throw new Error(
+    'Missing Supabase environment variables. ' +
+    'Please set SUPABASE_URL and SUPABASE_SECRET_KEY as environment variables.'
+  )
 }
 
