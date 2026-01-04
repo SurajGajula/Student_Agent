@@ -9,8 +9,8 @@ const __dirname = dirname(__filename);
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Add support for .web.js extensions for React Native Web
-config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx');
+// Add support for .web.js and .web.mjs extensions for React Native Web
+config.resolver.sourceExts.push('web.mjs', 'web.js', 'web.ts', 'web.tsx');
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
 // Exclude native entry files from web builds
@@ -47,8 +47,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return defaultResolveRequest(context, moduleName, platform);
 };
 
-// Don't override transformer - let Expo's default config handle ES modules
-// The default Expo Metro config should handle ES modules correctly
+// Configure transformer to handle ES modules correctly for web builds
+config.transformer = {
+  ...config.transformer,
+  // Disable module wrapping for web builds to prevent minification issues with ES modules
+  unstable_disableModuleWrapping: true,
+  getTransformOptions: async () => ({
+    transform: {
+      experimentalImportSupport: false,
+      inlineRequires: false, // Disable inline requires to avoid wrapping issues
+    },
+  }),
+};
 
 // Explicitly disable expo-router detection
 config.server = {

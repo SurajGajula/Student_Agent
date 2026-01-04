@@ -55,7 +55,7 @@ module.exports = {
     web: {
       ...(fs.existsSync('./assets/favicon.png') && { favicon: "./assets/favicon.png" }),
       bundler: "metro",
-      entryPoint: "./index.web.js",
+      entryPoint: "./index.web.mjs",
       build: {
         babel: {
           include: ["**"]
