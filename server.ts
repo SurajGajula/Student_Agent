@@ -35,7 +35,8 @@ const allowedOrigins = frontendUrl
       'http://localhost:8081', // Expo Metro bundler
       'http://localhost:19006', // Expo web
       'http://192.168.1.56:8081', // Network access for Expo
-      'http://192.168.1.56:5173' // Network access for Vite
+      'http://192.168.1.56:5173', // Network access for Vite
+      'https://main.d295pany09fs1r.amplifyapp.com' // Amplify frontend
     ]
 
 app.use(cors({
@@ -43,13 +44,22 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or Postman)
     if (!origin) return callback(null, true)
     
+    // Allow all Amplify domains
+    if (origin.includes('.amplifyapp.com')) {
+      return callback(null, true)
+    }
+    
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
-      callback(null, true) // Allow all origins in development for flexibility
+      // In production, be more permissive to avoid CORS issues
+      // You can restrict this later if needed
+      callback(null, true)
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
 // Stripe webhook must be before JSON parser (it uses raw body)
