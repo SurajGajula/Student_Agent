@@ -18,6 +18,9 @@ config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 // Metro blockList uses regex patterns that match against absolute file paths
 if (!config.resolver.blockList) {
   config.resolver.blockList = [];
+} else if (!Array.isArray(config.resolver.blockList)) {
+  // If blockList is not an array (e.g., it's a RegExp), convert it to an array
+  config.resolver.blockList = [config.resolver.blockList];
 }
 // Block the native entry file - Metro will match this against absolute paths
 config.resolver.blockList.push(/[\/\\]src[\/\\]native[\/\\]index\.js$/);
