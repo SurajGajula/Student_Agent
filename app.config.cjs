@@ -14,7 +14,7 @@ const expoConfig = {
   name: "Student Agent",
   slug: "student-agent",
   version: "1.0.0",
-  main: "./index.native.js",
+  main: "./src/native/index.js",
   orientation: "portrait",
   userInterfaceStyle: "light",
   splash: {
