@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
+import { getApiBaseUrl as getPlatformApiBaseUrl } from './platform'
 
 // Runtime configuration interface
 interface AppConfig {
@@ -16,14 +17,27 @@ let configPromise: Promise<AppConfig> | null = null
 
 /**
  * Get API base URL - works in both browser and Node.js
+ * Tries multiple sources in order of preference
  */
 function getApiBaseUrl(): string {
+  // 1. Try window.__API_URL__ (set via script tag in index.html)
+  if (typeof window !== 'undefined' && (window as any).__API_URL__) {
+    return (window as any).__API_URL__
+  }
+  
+  // 2. Try environment variables (set at build time or runtime)
+  const envApiUrl = getPlatformApiBaseUrl()
+  if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
+    return envApiUrl
+  }
+  
+  // 3. In browser, try window.location.origin (for same-origin setups)
   if (typeof window !== 'undefined') {
-    // In browser, use the current origin
     return window.location.origin
   }
-  // Fallback for server-side rendering
-  return process.env.API_URL || 'http://localhost:3001'
+  
+  // 4. Fallback for server-side rendering
+  return 'http://localhost:3001'
 }
 
 /**
@@ -40,41 +54,79 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
   }
 
   configPromise = (async (): Promise<AppConfig> => {
-    try {
-      const apiUrl = getApiBaseUrl()
-      const response = await fetch(`${apiUrl}/api/config`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`)
-      }
-
-      const config = await response.json()
-      
-      if (!config.supabaseUrl || !config.supabasePublishableKey) {
-        throw new Error('Config missing required Supabase credentials')
-      }
-
-      runtimeConfig = config
-      return config
-    } catch (error) {
-      console.error('[supabase.ts] Failed to fetch runtime config:', error)
-      
-      // Fallback to build-time config if available
-      const fallbackUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
-      const fallbackKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-      
-      if (fallbackUrl && fallbackKey) {
-        console.warn('[supabase.ts] Using fallback build-time config')
-        runtimeConfig = {
-          supabaseUrl: fallbackUrl,
-          supabasePublishableKey: fallbackKey,
-          apiUrl: getApiBaseUrl()
-        }
-        return runtimeConfig
-      }
-      
-      throw error
+    // Try multiple API URLs in order of preference
+    const apiUrlsToTry: string[] = []
+    
+    // 1. Try environment variable first (if set in Amplify)
+    const envApiUrl = getPlatformApiBaseUrl()
+    if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
+      apiUrlsToTry.push(envApiUrl)
     }
+    
+    // 2. Try window.location.origin (for same-origin setups)
+    if (typeof window !== 'undefined') {
+      apiUrlsToTry.push(window.location.origin)
+    }
+    
+    // 3. If we have a cached apiUrl from previous config, try that
+    if (runtimeConfig?.apiUrl) {
+      apiUrlsToTry.unshift(runtimeConfig.apiUrl)
+    }
+    
+    let lastError: Error | null = null
+    
+    for (const apiUrl of apiUrlsToTry) {
+      try {
+        console.log(`[supabase.ts] Trying to fetch config from: ${apiUrl}/api/config`)
+        const response = await fetch(`${apiUrl}/api/config`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`)
+        }
+
+        const config = await response.json()
+        
+        if (!config.supabaseUrl || !config.supabasePublishableKey) {
+          throw new Error('Config missing required Supabase credentials')
+        }
+
+        // Use the apiUrl from the config response if provided, otherwise use the one we tried
+        runtimeConfig = {
+          ...config,
+          apiUrl: config.apiUrl || apiUrl
+        }
+        console.log(`[supabase.ts] Successfully fetched config from: ${apiUrl}`)
+        return runtimeConfig
+      } catch (error) {
+        console.warn(`[supabase.ts] Failed to fetch from ${apiUrl}:`, error)
+        lastError = error as Error
+        // Continue to next URL
+        continue
+      }
+    }
+    
+    // If all URLs failed, try fallback to build-time config
+    console.error('[supabase.ts] Failed to fetch runtime config from all URLs:', lastError)
+    
+    const fallbackUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
+    const fallbackKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
+    
+    if (fallbackUrl && fallbackKey) {
+      console.warn('[supabase.ts] Using fallback build-time config')
+      runtimeConfig = {
+        supabaseUrl: fallbackUrl,
+        supabasePublishableKey: fallbackKey,
+        apiUrl: getApiBaseUrl()
+      }
+      return runtimeConfig
+    }
+    
+    throw lastError || new Error('Failed to fetch config from all available URLs')
   })()
 
   return configPromise

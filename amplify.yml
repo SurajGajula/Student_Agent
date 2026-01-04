@@ -28,6 +28,13 @@ frontend:
         - 'echo "EXPO_PUBLIC_SUPABASE_URL exported: ${EXPO_PUBLIC_SUPABASE_URL:+SET}"'
         - 'echo "EXPO_PUBLIC_SUPABASE_ANON_KEY exported: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:+SET}"'
         - SUPABASE_URL="${SUPABASE_URL}" SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" EXPO_PUBLIC_SUPABASE_URL="${SUPABASE_URL}" EXPO_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_PUBLISHABLE_KEY}" npm run build:web
+        - |
+          # Inject API URL into index.html
+          if [ -f dist/index.html ]; then
+            API_URL="${API_URL:-http://localhost:3001}"
+            sed -i "s|<head>|<head><script>window.__API_URL__='${API_URL}';</script>|" dist/index.html
+            echo "Injected API_URL into index.html: ${API_URL}"
+          fi
   artifacts:
     baseDirectory: dist
     files:
