@@ -13,8 +13,10 @@ const config = getDefaultConfig(__dirname, {
 });
 
 // 1. Support for web extensions and CSS
-config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx', 'mjs', 'css');
-config.resolver.assetExts.push('css');
+// We use a spread to ensure we don't accidentally mutate the original array in a weird way
+// and we add 'css' to the BEGINNING to prioritize it.
+config.resolver.sourceExts = ['css', 'web.js', 'web.ts', 'web.tsx', 'mjs', ...config.resolver.sourceExts];
+config.resolver.assetExts = config.resolver.assetExts.filter(ext => ext !== 'css');
 
 // 2. Block native entry files from web builds
 if (!config.resolver.blockList) {
