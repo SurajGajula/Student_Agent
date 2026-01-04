@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './src/App';
 
-// Render app immediately - initialization happens in App component via useEffect
 const rootElement = document.getElementById('root');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
@@ -11,4 +10,3 @@ if (rootElement) {
     )
   );
 }
-
