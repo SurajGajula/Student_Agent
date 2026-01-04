@@ -1,6 +1,10 @@
-// metro.config.js
-const { getDefaultConfig } = require('expo/metro-config');
-const path = require('path');
+// metro.config.js (ES module)
+import { getDefaultConfig } from '@expo/metro-config';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
@@ -41,4 +45,4 @@ config.transformer.getTransformOptions = async () => ({
   },
 });
 
-module.exports = config;
+export default config;
