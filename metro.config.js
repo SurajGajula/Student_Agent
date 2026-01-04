@@ -47,16 +47,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return defaultResolveRequest(context, moduleName, platform);
 };
 
-// Configure transformer for ES modules
-config.transformer = {
-  ...config.transformer,
-  getTransformOptions: async () => ({
-    transform: {
-      experimentalImportSupport: true, // Enable ES module import support
-      inlineRequires: true,
-    },
-  }),
-};
+// Don't override transformer - let Expo's default config handle ES modules
+// The default Expo Metro config should handle ES modules correctly
 
 // Explicitly disable expo-router detection
 config.server = {
