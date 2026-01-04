@@ -7,10 +7,10 @@ frontend:
     build:
       commands:
         - echo "Checking environment variables..."
-        - echo "EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL:+SET}"
-        - echo "SUPABASE_URL: ${SUPABASE_URL:+SET}"
-        - echo "EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:+SET}"
-        - echo "SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:+SET}"
+        - 'echo "EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL:+SET}"'
+        - 'echo "SUPABASE_URL: ${SUPABASE_URL:+SET}"'
+        - 'echo "EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:+SET}"'
+        - 'echo "SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:+SET}"'
         - echo "Forcing cache clear"
         - rm -rf node_modules
         - rm -rf /tmp/metro-cache
