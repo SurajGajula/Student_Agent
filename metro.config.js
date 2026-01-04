@@ -23,7 +23,29 @@ if (!config.resolver.blockList) {
   config.resolver.blockList = [config.resolver.blockList];
 }
 // Block the native entry file - Metro will match this against absolute paths
+// Match both forward and backslashes, and match anywhere in the path
 config.resolver.blockList.push(/[\/\\]src[\/\\]native[\/\\]index\.js$/);
+config.resolver.blockList.push(/src[\/\\]native[\/\\]index\.js$/);
+
+// Also use a custom resolver to explicitly prevent resolving this file for web
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Block native entry file for web builds
+  if (platform === 'web') {
+    const normalizedModuleName = moduleName.replace(/\\/g, '/');
+    if (
+      normalizedModuleName === './src/native/index.js' ||
+      normalizedModuleName === 'src/native/index.js' ||
+      normalizedModuleName.endsWith('/src/native/index.js') ||
+      normalizedModuleName.includes('src/native/index.js')
+    ) {
+      // Throw an error that Metro can handle - this will prevent the file from being resolved
+      throw new Error(`Module ${moduleName} is not available for web platform`);
+    }
+  }
+  // Use default resolver for everything else
+  return defaultResolveRequest(context, moduleName, platform);
+};
 
 // Configure transformer for ES modules
 config.transformer = {
