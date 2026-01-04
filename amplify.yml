@@ -32,8 +32,21 @@ frontend:
           # Inject API URL into index.html
           if [ -f dist/index.html ]; then
             API_URL="${API_URL:-http://localhost:3001}"
-            sed -i "s|<head>|<head><script>window.__API_URL__='${API_URL}';</script>|" dist/index.html
+            echo "API_URL to inject: ${API_URL}"
+            # Inject script tag before the closing </head> tag or before <body>
+            if grep -q "</head>" dist/index.html; then
+              sed -i "s|</head>|<script>window.__API_URL__='${API_URL}';</script></head>|" dist/index.html
+            elif grep -q "<body>" dist/index.html; then
+              sed -i "s|<body>|<script>window.__API_URL__='${API_URL}';</script><body>|" dist/index.html
+            else
+              # Fallback: inject at the beginning of the file
+              sed -i "1i<script>window.__API_URL__='${API_URL}';</script>" dist/index.html
+            fi
             echo "Injected API_URL into index.html: ${API_URL}"
+            # Verify injection
+            grep -o "window.__API_URL__" dist/index.html && echo "✓ API_URL injection verified" || echo "✗ API_URL injection failed"
+          else
+            echo "Warning: dist/index.html not found"
           fi
   artifacts:
     baseDirectory: dist

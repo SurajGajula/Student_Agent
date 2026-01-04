@@ -31,12 +31,22 @@ function getApiBaseUrl(): string {
     return envApiUrl
   }
   
-  // 3. In browser, try window.location.origin (for same-origin setups)
+  // 3. Hardcoded EC2 backend URL (fallback if env vars don't work)
+  // TODO: Replace with your actual EC2 public IP or domain
+  const EC2_BACKEND_URL = 'http://34.221.98.251:3001'
+  
+  // 4. In browser, try window.location.origin (for same-origin setups)
   if (typeof window !== 'undefined') {
-    return window.location.origin
+    // Only use window.location.origin if we're in development
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    if (isDevelopment) {
+      return window.location.origin
+    }
+    // In production (Amplify), use EC2 backend
+    return EC2_BACKEND_URL
   }
   
-  // 4. Fallback for server-side rendering
+  // 5. Fallback for server-side rendering
   return 'http://localhost:3001'
 }
 
@@ -57,20 +67,25 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     // Try multiple API URLs in order of preference
     const apiUrlsToTry: string[] = []
     
-    // 1. Try environment variable first (if set in Amplify)
+    // 1. Try window.__API_URL__ (injected by build script)
+    if (typeof window !== 'undefined' && (window as any).__API_URL__) {
+      apiUrlsToTry.push((window as any).__API_URL__)
+    }
+    
+    // 2. Try environment variable (if set in Amplify)
     const envApiUrl = getPlatformApiBaseUrl()
     if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
       apiUrlsToTry.push(envApiUrl)
     }
     
-    // 2. Try window.location.origin (for same-origin setups)
-    if (typeof window !== 'undefined') {
-      apiUrlsToTry.push(window.location.origin)
-    }
-    
     // 3. If we have a cached apiUrl from previous config, try that
     if (runtimeConfig?.apiUrl) {
       apiUrlsToTry.unshift(runtimeConfig.apiUrl)
+    }
+    
+    // 4. Try window.location.origin LAST (for same-origin setups, but usually won't work for EC2)
+    if (typeof window !== 'undefined') {
+      apiUrlsToTry.push(window.location.origin)
     }
     
     let lastError: Error | null = null
@@ -101,6 +116,7 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
           apiUrl: config.apiUrl || apiUrl
         }
         console.log(`[supabase.ts] Successfully fetched config from: ${apiUrl}`)
+        console.log(`[supabase.ts] Config apiUrl: ${runtimeConfig.apiUrl}`)
         return runtimeConfig
       } catch (error) {
         console.warn(`[supabase.ts] Failed to fetch from ${apiUrl}:`, error)
