@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './src/App';
-import './src/styles.css';
 
 // Render app immediately - initialization happens in App component via useEffect
 const rootElement = document.getElementById('root');

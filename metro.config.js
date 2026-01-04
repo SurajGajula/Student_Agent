@@ -10,9 +10,9 @@ const __dirname = dirname(__filename);
 const config = getDefaultConfig(__dirname);
 
 // 1. Add support for web extensions and CSS
-// We push to the end to avoid overriding default behavior
 const extensions = ['web.js', 'web.ts', 'web.tsx', 'mjs', 'css'];
 config.resolver.sourceExts = [...config.resolver.sourceExts, ...extensions];
+config.resolver.platforms = ['ios', 'android', 'web'];
 
 // 2. Block native entry files from web builds using a simpler pattern
 if (!config.resolver.blockList) {
