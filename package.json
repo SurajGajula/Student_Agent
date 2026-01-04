@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
+    "start": "NODE_ENV=production node dist/server.js",
     "start:web": "expo start --web",
     "start:ios": "expo start --ios",
     "start:android": "expo start --android",
