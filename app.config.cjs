@@ -6,8 +6,13 @@ const fs = require('fs');
 
 // Read values directly from environment variables
 // Try EXPO_PUBLIC_ prefix first (standard for Expo web), then fallback to others
+// IMPORTANT: For Amplify builds, variables must be available to the Node.js process
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Force output to stderr (which Amplify shows) to verify this file is being executed
+process.stderr.write('[app.config.cjs] FILE IS BEING EXECUTED\n');
+process.stderr.write('[app.config.cjs] process.env keys: ' + Object.keys(process.env).filter(k => k.includes('SUPABASE') || k.includes('STRIPE')).join(', ') + '\n');
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:3001';
 
