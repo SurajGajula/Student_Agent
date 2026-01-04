@@ -9,39 +9,22 @@ const __dirname = dirname(__filename);
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Add support for web extensions
-config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx');
+// 1. Support for web extensions
+config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx', 'mjs');
 
-// Ensure platforms are correct
-config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+// 2. Block native entry files from web builds
+if (!config.resolver.blockList) {
+  config.resolver.blockList = [];
+} else if (!Array.isArray(config.resolver.blockList)) {
+  config.resolver.blockList = [config.resolver.blockList];
+}
+config.resolver.blockList.push(/src\/native\/index\.js$/);
 
-// Block native entry files from web builds
-config.resolver.blockList = [
-  ...(Array.isArray(config.resolver.blockList)
-    ? config.resolver.blockList
-    : config.resolver.blockList
-    ? [config.resolver.blockList]
-    : []),
-  /[\/\\]src[\/\\]native[\/\\]index\.js$/,
-];
-
-// Custom resolver guard (safe)
-const defaultResolveRequest = config.resolver.resolveRequest;
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (
-    platform === 'web' &&
-    moduleName.replace(/\\/g, '/').includes('src/native/index.js')
-  ) {
-    throw new Error(`Module ${moduleName} is not available for web`);
-  }
-  return defaultResolveRequest(context, moduleName, platform);
-};
-
-// Transformer options (keep minimal)
+// 3. Ensure the transformer handles ES modules correctly
 config.transformer.getTransformOptions = async () => ({
   transform: {
     experimentalImportSupport: false,
-    inlineRequires: false,
+    inlineRequires: true,
   },
 });
 
