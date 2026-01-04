@@ -1,5 +1,9 @@
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Environment variables must be set directly (via export, EC2, Docker, etc.)
 // No .env file loading - use environment variables only
@@ -33,7 +37,7 @@ if (fs.existsSync('./assets/splash.png')) {
   expoConfig.splash.image = "./assets/splash.png";
 }
 
-module.exports = {
+export default {
   expo: {
     ...expoConfig,
     assetBundlePatterns: [
