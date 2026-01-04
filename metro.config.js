@@ -9,8 +9,8 @@ const __dirname = dirname(__filename);
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// 1. Support for web extensions
-config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx', 'mjs');
+// 1. Support for web extensions and CSS
+config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx', 'mjs', 'css');
 
 // 2. Block native entry files from web builds
 if (!config.resolver.blockList) {
