@@ -6,6 +6,11 @@ frontend:
         - npm ci
     build:
       commands:
+        - echo "Forcing cache clear"
+        - rm -rf node_modules
+        - rm -rf /tmp/metro-cache
+        - rm -rf $HOME/.cache
+        - npm cache clean --force
         - npm run build:web
   artifacts:
     baseDirectory: dist
