@@ -18,6 +18,8 @@ frontend:
         - npm cache clean --force
         - npm install
         - export AMPLIFY_BUILD=true
+        - export SUPABASE_URL="${SUPABASE_URL}"
+        - export SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}"
         - npm run build:web
   artifacts:
     baseDirectory: dist
