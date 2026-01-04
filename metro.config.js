@@ -13,12 +13,12 @@ const config = getDefaultConfig(__dirname);
 config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx');
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
-// Disable router transforms (we're not using expo-router)
+// Configure transformer for ES modules
 config.transformer = {
   ...config.transformer,
   getTransformOptions: async () => ({
     transform: {
-      experimentalImportSupport: false,
+      experimentalImportSupport: true, // Enable ES module import support
       inlineRequires: true,
     },
   }),
