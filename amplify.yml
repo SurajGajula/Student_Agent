@@ -11,6 +11,7 @@ frontend:
         - rm -rf /tmp/metro-cache
         - rm -rf $HOME/.cache
         - npm cache clean --force
+        - npm install
         - npm run build:web
   artifacts:
     baseDirectory: dist
