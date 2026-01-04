@@ -20,10 +20,14 @@ frontend:
         - export AMPLIFY_BUILD=true
         - export SUPABASE_URL="${SUPABASE_URL}"
         - export SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}"
+        - export EXPO_PUBLIC_SUPABASE_URL="${SUPABASE_URL}"
+        - export EXPO_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_PUBLISHABLE_KEY}"
         - echo "Verifying exports before build:"
         - 'echo "SUPABASE_URL exported: ${SUPABASE_URL:+SET}"'
         - 'echo "SUPABASE_PUBLISHABLE_KEY exported: ${SUPABASE_PUBLISHABLE_KEY:+SET}"'
-        - SUPABASE_URL="${SUPABASE_URL}" SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" npm run build:web
+        - 'echo "EXPO_PUBLIC_SUPABASE_URL exported: ${EXPO_PUBLIC_SUPABASE_URL:+SET}"'
+        - 'echo "EXPO_PUBLIC_SUPABASE_ANON_KEY exported: ${EXPO_PUBLIC_SUPABASE_ANON_KEY:+SET}"'
+        - SUPABASE_URL="${SUPABASE_URL}" SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" EXPO_PUBLIC_SUPABASE_URL="${SUPABASE_URL}" EXPO_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_PUBLISHABLE_KEY}" npm run build:web
   artifacts:
     baseDirectory: dist
     files:
