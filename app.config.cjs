@@ -11,16 +11,14 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:3001';
 
-// Debug logging (only in build, not in runtime)
-if (process.env.NODE_ENV !== 'production' || process.env.AMPLIFY_BUILD) {
-  console.log('Environment variables check:');
-  console.log('EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓' : '✗');
-  console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✓' : '✗');
-  console.log('EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓' : '✗');
-  console.log('SUPABASE_PUBLISHABLE_KEY:', process.env.SUPABASE_PUBLISHABLE_KEY ? '✓' : '✗');
-  console.log('Resolved supabaseUrl:', supabaseUrl ? '✓' : '✗');
-  console.log('Resolved supabaseAnonKey:', supabaseAnonKey ? '✓' : '✗');
-}
+// Debug logging during build (always log in app.config.cjs since it only runs at build time)
+console.log('[app.config.cjs] Environment variables check:');
+console.log('[app.config.cjs] EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓' : '✗');
+console.log('[app.config.cjs] SUPABASE_URL:', process.env.SUPABASE_URL ? '✓' : '✗');
+console.log('[app.config.cjs] EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓' : '✗');
+console.log('[app.config.cjs] SUPABASE_PUBLISHABLE_KEY:', process.env.SUPABASE_PUBLISHABLE_KEY ? '✓' : '✗');
+console.log('[app.config.cjs] Resolved supabaseUrl:', supabaseUrl ? '✓ (' + supabaseUrl.substring(0, 20) + '...)' : '✗');
+console.log('[app.config.cjs] Resolved supabaseAnonKey:', supabaseAnonKey ? '✓ (length: ' + supabaseAnonKey.length + ')' : '✗');
 
 const expoConfig = {
   name: "Student Agent",
