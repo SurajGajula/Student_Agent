@@ -58,3 +58,6 @@ android/
 # Metro
 .metro-health-check*
 
+# PM2 ecosystem config (contains secrets)
+ecosystem.config.js
+

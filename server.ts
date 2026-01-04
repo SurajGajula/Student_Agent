@@ -25,7 +25,7 @@ const __dirname = path.dirname(__filename)
 const app: Express = express()
 
 // Enable CORS for frontend
-const frontendUrl = process.env.FRONTEND_URL || process.env.RAILWAY_PUBLIC_DOMAIN
+const frontendUrl = process.env.FRONTEND_URL || process.env.AMPLIFY_URL
 const allowedOrigins = frontendUrl 
   ? [frontendUrl]
   : [

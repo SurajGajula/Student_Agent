@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 
-// Environment variables must be set directly (via export, Railway, Docker, etc.)
+// Environment variables must be set directly (via export, EC2, Docker, etc.)
 // No .env file loading - use environment variables only
 
 // Read values directly from environment variables

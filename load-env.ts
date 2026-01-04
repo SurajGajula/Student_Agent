@@ -1,5 +1,5 @@
 // This file must be imported FIRST before any other imports
-// Environment variables must be set directly (via export, Railway, Docker, etc.)
+// Environment variables must be set directly (via export, EC2, Docker, etc.)
 // No .env file loading - use environment variables only
 
 // Verify required variables are loaded from environment
