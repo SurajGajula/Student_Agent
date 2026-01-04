@@ -14,7 +14,6 @@ const expoConfig = {
   name: "Student Agent",
   slug: "student-agent",
   version: "1.0.0",
-  main: "./src/native/index.js",
   orientation: "portrait",
   userInterfaceStyle: "light",
   splash: {
@@ -55,7 +54,6 @@ module.exports = {
     web: {
       ...(fs.existsSync('./assets/favicon.png') && { favicon: "./assets/favicon.png" }),
       bundler: "metro",
-      entryPoint: "./index.web.js",
     },
     experiments: {
       typedRoutes: false
