@@ -36,7 +36,8 @@ const allowedOrigins = frontendUrl
       'http://localhost:19006', // Expo web
       'http://192.168.1.56:8081', // Network access for Expo
       'http://192.168.1.56:5173', // Network access for Vite
-      'https://main.d295pany09fs1r.amplifyapp.com' // Amplify frontend
+      'https://main.d295pany09fs1r.amplifyapp.com', // Amplify frontend
+      'https://studentagent.site' // Backend domain (for same-origin requests)
     ]
 
 app.use(cors({

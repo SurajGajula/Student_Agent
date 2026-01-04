@@ -15,7 +15,7 @@ router.get('/config', (_req: Request, res: Response) => {
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
     stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
-    apiUrl: process.env.API_URL || process.env.FRONTEND_URL || process.env.AMPLIFY_URL || 'http://localhost:3001',
+    apiUrl: process.env.API_URL || 'https://studentagent.site',
     // Debug info (remove in production)
     _debug: {
       hasSupabaseUrl: !!process.env.SUPABASE_URL,

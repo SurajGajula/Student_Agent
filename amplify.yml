@@ -31,7 +31,7 @@ frontend:
         - |
           # Inject API URL into index.html
           if [ -f dist/index.html ]; then
-            API_URL="${API_URL:-http://localhost:3001}"
+            API_URL="${API_URL:-https://studentagent.site}"
             echo "API_URL to inject: ${API_URL}"
             # Inject script tag before the closing </head> tag or before <body>
             if grep -q "</head>" dist/index.html; then

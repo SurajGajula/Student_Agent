@@ -32,8 +32,8 @@ function getApiBaseUrl(): string {
   }
   
   // 3. Hardcoded EC2 backend URL (fallback if env vars don't work)
-  // TODO: Replace with your actual EC2 public IP or domain
-  const EC2_BACKEND_URL = 'http://34.221.98.251:3001'
+  // Using HTTPS domain for production
+  const EC2_BACKEND_URL = 'https://studentagent.site'
   
   // 4. In browser, try window.location.origin (for same-origin setups)
   if (typeof window !== 'undefined') {
@@ -84,7 +84,8 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     }
     
     // 4. Hardcoded EC2 backend URL (fallback for production)
-    const EC2_BACKEND_URL = 'http://34.221.98.251:3001'
+    // Using HTTPS domain for production
+    const EC2_BACKEND_URL = 'https://studentagent.site'
     if (typeof window !== 'undefined') {
       // Only skip EC2 URL if we're in local development
       const isLocalDev = window.location.hostname === 'localhost' || 
@@ -112,11 +113,16 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     for (const apiUrl of apiUrlsToTry) {
       try {
         console.log(`[supabase.ts] Trying to fetch config from: ${apiUrl}/api/config`)
+        
+        // Note: If you get "Mixed Content" errors, it's because HTTPS pages (Amplify) 
+        // cannot access HTTP backends. You'll need to set up HTTPS on EC2.
         const response = await fetch(`${apiUrl}/api/config`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
+          // Use 'omit' to avoid sending credentials in cross-origin requests
+          credentials: 'omit',
         })
         
         if (!response.ok) {
