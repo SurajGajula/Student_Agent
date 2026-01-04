@@ -58,7 +58,7 @@ app.use('/api/stripe', stripeRouter)
 app.use(express.json())
 
 // Config endpoint (public, no auth required)
-app.use(configRouter)
+app.use('/api', configRouter)
 
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)

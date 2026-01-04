@@ -4,7 +4,7 @@ const router = express.Router()
 
 // Public endpoint to serve frontend configuration
 // This allows the frontend to get environment variables at runtime
-router.get('/api/config', (_req: Request, res: Response) => {
+router.get('/config', (_req: Request, res: Response) => {
   res.json({
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',

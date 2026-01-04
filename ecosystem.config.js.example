@@ -18,7 +18,6 @@ module.exports = {
       STRIPE_PRICE_ID_PRO: 'your-stripe-price-id-here',
       STRIPE_WEBHOOK_SECRET: 'your-stripe-webhook-secret-here',
       FRONTEND_URL: 'https://your-amplify-url.amplifyapp.com',
-      AMPLIFY_URL: 'https://your-amplify-url.amplifyapp.com'
     }
   }]
 }
