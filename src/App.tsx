@@ -21,13 +21,11 @@ function AppContent() {
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const { isInDetailMode } = useDetailMode()
 
-  // Initialize auth on native platforms (web does this in index.web.js)
+  // Initialize auth on all platforms
   useEffect(() => {
-    if (Platform.OS !== 'web') {
-      useAuthStore.getState().initializeAuth().catch(err => {
-        console.error('Auth initialization error:', err)
-      })
-    }
+    useAuthStore.getState().initializeAuth().catch(err => {
+      console.error('Auth initialization error:', err)
+    })
   }, [])
 
   // Handle window resize for responsive behavior
