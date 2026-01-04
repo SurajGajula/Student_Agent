@@ -83,9 +83,28 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       apiUrlsToTry.unshift(runtimeConfig.apiUrl)
     }
     
-    // 4. Try window.location.origin LAST (for same-origin setups, but usually won't work for EC2)
+    // 4. Hardcoded EC2 backend URL (fallback for production)
+    const EC2_BACKEND_URL = 'http://34.221.98.251:3001'
     if (typeof window !== 'undefined') {
-      apiUrlsToTry.push(window.location.origin)
+      // Only skip EC2 URL if we're in local development
+      const isLocalDev = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname.startsWith('192.168.')
+      if (!isLocalDev) {
+        // In production (Amplify), try EC2 backend first
+        apiUrlsToTry.push(EC2_BACKEND_URL)
+      }
+    }
+    
+    // 5. Try window.location.origin LAST (for same-origin setups, but usually won't work for EC2)
+    if (typeof window !== 'undefined') {
+      const isLocalDev = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname.startsWith('192.168.')
+      if (isLocalDev) {
+        // Only use window.location.origin in local development
+        apiUrlsToTry.push(window.location.origin)
+      }
     }
     
     let lastError: Error | null = null
