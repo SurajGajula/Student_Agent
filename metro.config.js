@@ -7,10 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname, {
+  // [Web-only]: Enables CSS support in Metro.
+  isCSSEnabled: true,
+});
 
 // 1. Support for web extensions and CSS
 config.resolver.sourceExts.push('web.js', 'web.ts', 'web.tsx', 'mjs', 'css');
+config.resolver.assetExts.push('css');
 
 // 2. Block native entry files from web builds
 if (!config.resolver.blockList) {
