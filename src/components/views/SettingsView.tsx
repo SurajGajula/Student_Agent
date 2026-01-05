@@ -137,10 +137,30 @@ function SettingsView() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      fetchUsage()
+      console.log('[SettingsView] Calling fetchUsage and fetchSubscriptionDetails')
+      fetchUsage().catch(err => {
+        console.error('[SettingsView] fetchUsage failed:', err)
+      })
       fetchSubscriptionDetails()
     }
   }, [isLoggedIn, fetchUsage])
+
+  // Safety timeout: if isLoading is true for more than 15 seconds, log a warning
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        console.warn('[SettingsView] ⚠️ isLoading has been true for 15+ seconds, this may indicate a stuck API call')
+        // Force a re-fetch attempt
+        if (isLoggedIn) {
+          console.log('[SettingsView] Attempting to force refresh usage data')
+          fetchUsage().catch(err => {
+            console.error('[SettingsView] Force refresh failed:', err)
+          })
+        }
+      }, 15000)
+      return () => clearTimeout(timeout)
+    }
+  }, [isLoading, isLoggedIn, fetchUsage])
 
   // Check for success/cancel parameters in URL (web only)
   useEffect(() => {

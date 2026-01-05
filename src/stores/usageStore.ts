@@ -44,21 +44,45 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
       })
 
       const API_BASE_URL = getApiBaseUrl()
-      const response = await fetch(`${API_BASE_URL}/api/usage`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
+      console.log('[usageStore] Fetching usage from:', `${API_BASE_URL}/api/usage`)
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 10000) // 10 second timeout
+      
+      let response: Response
+      try {
+        response = await fetch(`${API_BASE_URL}/api/usage`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - API took too long to respond')
         }
-      })
+        throw fetchError
+      }
+
+      console.log('[usageStore] Usage API response status:', response.status, response.statusText)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || errorData.error || `HTTP ${response.status} ${response.statusText}`
+        console.error('[usageStore] Usage API error:', errorMessage)
         throw new Error(errorMessage)
       }
 
       const data = await response.json()
+      console.log('[usageStore] Usage API response data:', data)
       
       if (data.success) {
+        console.log('[usageStore] Setting usage data and marking as not loading')
         set({
           planName: data.planName || 'free',
           tokensUsed: data.tokensUsed || 0,
@@ -67,12 +91,16 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
           isLoading: false,
           error: null
         })
+        console.log('[usageStore] Usage data set, isLoading should be false now')
       } else {
+        console.error('[usageStore] Usage API returned success: false', data)
         throw new Error(data.error || data.message || 'Failed to fetch usage data')
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch usage'
+      console.error('[usageStore] fetchUsage caught error:', errorMessage, error)
       set({ isLoading: false, error: errorMessage })
+      console.log('[usageStore] Error handled, isLoading set to false')
     }
   },
 
