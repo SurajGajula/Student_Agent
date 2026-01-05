@@ -25,7 +25,14 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
     console.log('[usageStore] fetchUsage called, setting isLoading to true')
     set({ isLoading: true, error: null })
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // Ensure Supabase is initialized before getting session
+      const { initSupabase, getSupabase } = await import('../lib/supabase')
+      await initSupabase()
+      const supabaseClient = getSupabase()
+      
+      console.log('[usageStore] Getting session from Supabase...')
+      const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+      console.log('[usageStore] Session check completed', { hasSession: !!session, hasError: !!sessionError })
       
       if (sessionError) {
         console.error('[usageStore] Error getting session:', sessionError)

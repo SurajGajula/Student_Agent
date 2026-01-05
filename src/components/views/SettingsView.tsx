@@ -70,7 +70,14 @@ function SettingsView() {
 
     setLoadingSubscription(true)
     try {
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Ensure Supabase is initialized before getting session
+      const { initSupabase, getSupabase } = await import('../../lib/supabase')
+      await initSupabase()
+      const supabaseClient = getSupabase()
+      
+      console.log('[SettingsView] Getting session for subscription details...')
+      const { data: { session }, error } = await supabaseClient.auth.getSession()
+      console.log('[SettingsView] Session check completed', { hasSession: !!session, hasError: !!error })
       
       if (error) {
         console.error('[SettingsView] Error getting session in fetchSubscriptionDetails:', error)
