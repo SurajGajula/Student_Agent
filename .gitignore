@@ -62,3 +62,7 @@ android/
 ecosystem.config.js
 ecosystem.config.cjs
 
+# Personal deployment templates (keep locally, don't commit)
+deployment/
+*.example
+
