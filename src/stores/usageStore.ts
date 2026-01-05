@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { getApiBaseUrl } from '../lib/platform'
 
@@ -24,6 +25,15 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
   fetchUsage: async () => {
     console.log('[usageStore] fetchUsage called, setting isLoading to true')
     set({ isLoading: true, error: null })
+    
+    // Set a global timeout - if this takes too long, reload the page
+    const globalTimeout = setTimeout(() => {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        console.warn('[usageStore] ⚠️ fetchUsage timed out, reloading page')
+        window.location.reload()
+      }
+    }, 8000) // 8 second timeout
+    
     try {
       // Try to get session - if Supabase isn't initialized, it will throw and we'll catch it
       console.log('[usageStore] Getting session from Supabase...')
@@ -113,13 +123,16 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
           error: null
         })
         console.log('[usageStore] Usage data set, isLoading should be false now')
+        clearTimeout(globalTimeout)
       } else {
         console.error('[usageStore] Usage API returned success: false', data)
+        clearTimeout(globalTimeout)
         throw new Error(data.error || data.message || 'Failed to fetch usage data')
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch usage'
       console.error('[usageStore] fetchUsage caught error:', errorMessage, error)
+      clearTimeout(globalTimeout)
       set({ isLoading: false, error: errorMessage })
       console.log('[usageStore] Error handled, isLoading set to false')
     }
