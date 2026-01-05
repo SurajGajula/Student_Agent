@@ -40,25 +40,60 @@ function AppContent() {
 
   // Sync auth state from actual session when tab becomes visible (web only)
   // This prevents phantom logouts by always checking the real Supabase session
+  // If session check hangs, reload the page to reset state
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
+    let visibilityTimeout: NodeJS.Timeout | null = null
+
     const handleVisibilityChange = async () => {
       if (!document.hidden) {
-        // Sync auth state from actual Supabase session
+        console.log('[App] Tab/window became visible, syncing auth state...')
+        
+        // Set a timeout - if session sync takes too long, reload the page
+        visibilityTimeout = setTimeout(() => {
+          console.warn('[App] ⚠️ Session sync timed out after tab change, reloading page to reset state')
+          window.location.reload()
+        }, 5000) // 5 second timeout
+        
         try {
           const { initSupabase } = await import('./lib/supabase')
           await initSupabase()
           // Sync Zustand state with actual session to prevent phantom logouts
           await useAuthStore.getState().syncFromSession()
+          
+          // Clear timeout if sync completed successfully
+          if (visibilityTimeout) {
+            clearTimeout(visibilityTimeout)
+            visibilityTimeout = null
+          }
+          console.log('[App] ✓ Auth state synced successfully after tab change')
         } catch (err) {
-          console.error('Error syncing auth on visibility change:', err)
+          console.error('[App] Error syncing auth on visibility change:', err)
+          // Clear timeout and reload on error
+          if (visibilityTimeout) {
+            clearTimeout(visibilityTimeout)
+            visibilityTimeout = null
+          }
+          console.warn('[App] Reloading page due to auth sync error')
+          window.location.reload()
+        }
+      } else {
+        // Tab became hidden, clear any pending timeout
+        if (visibilityTimeout) {
+          clearTimeout(visibilityTimeout)
+          visibilityTimeout = null
         }
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (visibilityTimeout) {
+        clearTimeout(visibilityTimeout)
+      }
+    }
   }, [])
 
   // Handle window resize for responsive behavior
