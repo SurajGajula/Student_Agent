@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
@@ -21,12 +21,6 @@ interface SubscriptionDetails {
 function SettingsView() {
   const { planName, tokensUsed, monthlyLimit, remaining, isLoading, error, fetchUsage } = useUsageStore()
   const { isLoggedIn } = useAuthStore()
-  
-  // Store fetchUsage in a ref to ensure stable reference
-  const fetchUsageRef = useRef(fetchUsage)
-  useEffect(() => {
-    fetchUsageRef.current = fetchUsage
-  }, [fetchUsage])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [cancelMessage, setCancelMessage] = useState<string | null>(null)
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null)
@@ -159,9 +153,8 @@ function SettingsView() {
     
     if (isLoggedIn) {
       console.log('[SettingsView] isLoggedIn is true, calling fetchUsage and fetchSubscriptionDetails')
-      const fetchFn = fetchUsageRef.current || fetchUsage
-      // Always call fetchUsage, even if isLoading is true (it might be stuck)
-      fetchFn().then(() => {
+      // Use the current fetchUsage directly (Zustand functions are stable)
+      fetchUsage().then(() => {
         console.log('[SettingsView] fetchUsage completed successfully')
       }).catch(err => {
         console.error('[SettingsView] fetchUsage failed:', err)
@@ -170,7 +163,8 @@ function SettingsView() {
     } else {
       console.log('[SettingsView] isLoggedIn is false, skipping API calls')
     }
-  }, [isLoggedIn, fetchUsage, isLoading]) // Add isLoading to dependencies to trigger when it changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]) // Only depend on isLoggedIn - fetchUsage is stable from Zustand
 
   // Also trigger fetch when component becomes visible (for tab switching)
   useEffect(() => {
@@ -181,9 +175,8 @@ function SettingsView() {
         console.log('[SettingsView] Tab/window became visible, refreshing data', {
           currentIsLoading: isLoading
         })
-        const fetchFn = fetchUsageRef.current || fetchUsage
-        // Force a fresh fetch when tab becomes visible
-        fetchFn().then(() => {
+        // Use the current fetchUsage directly
+        fetchUsage().then(() => {
           console.log('[SettingsView] fetchUsage on visibility change completed')
         }).catch(err => {
           console.error('[SettingsView] fetchUsage on visibility change failed:', err)
@@ -192,19 +185,10 @@ function SettingsView() {
       }
     }
 
-    // Also trigger immediately if component is already visible when mounted
-    if (!document.hidden && isLoggedIn) {
-      console.log('[SettingsView] Component mounted while visible, triggering immediate fetch')
-      const fetchFn = fetchUsageRef.current || fetchUsage
-      fetchFn().catch(err => {
-        console.error('[SettingsView] Immediate fetch on mount failed:', err)
-      })
-      fetchSubscriptionDetails()
-    }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [isLoggedIn, fetchUsage, isLoading])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]) // Only depend on isLoggedIn
 
   // Safety timeout: if isLoading is true for more than 15 seconds, log a warning
   useEffect(() => {
