@@ -38,77 +38,25 @@ function AppContent() {
     init()
   }, [])
 
-  // Refresh session when window/tab regains focus or becomes visible (web only)
+  // Ensure Supabase is initialized when tab becomes visible (web only)
+  // The onAuthStateChange listener handles cross-tab synchronization automatically
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
-    const refreshSession = async () => {
-      try {
-        // Ensure Supabase is initialized
-        const { initSupabase, getSupabase } = await import('./lib/supabase')
-        await initSupabase()
-        
-        const supabase = getSupabase()
-        
-        // Refresh the session token to ensure it's still valid
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.warn('Session refresh error:', error)
-          // If session is invalid, clear auth state
-          if (useAuthStore.getState().isLoggedIn) {
-            useAuthStore.getState().signOut().catch(console.error)
-          }
-          return
-        }
-
-        // If we have a valid session
-        if (session?.user) {
-          // Update auth store if it's out of sync
-          const authState = useAuthStore.getState()
-          if (!authState.isLoggedIn || authState.user?.id !== session.user.id) {
-            const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-            useAuthStore.setState({
-              isLoggedIn: true,
-              user: session.user,
-              username: name,
-              email: session.user.email || null,
-            })
-          }
-        } else {
-          // No session - clear auth state if we think we're logged in
-          if (useAuthStore.getState().isLoggedIn) {
-            useAuthStore.setState({
-              isLoggedIn: false,
-              user: null,
-              username: 'User',
-              email: null,
-            })
-          }
-        }
-      } catch (err) {
-        console.error('Error refreshing session:', err)
-      }
-    }
-
-    // Handle both focus and visibility change events
-    const handleFocus = () => {
-      refreshSession()
-    }
-
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (!document.hidden) {
-        refreshSession()
+        // Just ensure Supabase is initialized - onAuthStateChange handles cross-tab sync
+        try {
+          const { initSupabase } = await import('./lib/supabase')
+          await initSupabase()
+        } catch (err) {
+          console.error('Error initializing Supabase on visibility change:', err)
+        }
       }
     }
 
-    window.addEventListener('focus', handleFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // Handle window resize for responsive behavior

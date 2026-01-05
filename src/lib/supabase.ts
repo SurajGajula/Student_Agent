@@ -235,30 +235,30 @@ function getEnvVar(key: string): string | undefined {
  */
 export async function initSupabase(): Promise<SupabaseClient> {
   if (supabaseClient) {
-    // If client exists, refresh session to ensure it's still valid
-    try {
-      await supabaseClient.auth.getSession()
-    } catch (error) {
-      console.warn('[supabase.ts] Session check failed, reinitializing client')
-      supabaseClient = null
-    }
+    return supabaseClient  // Return existing client, don't recreate
   }
 
-  if (!supabaseClient) {
-    const config = await fetchRuntimeConfig()
-    
-    supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-      }
-    })
-    
-    if (typeof window !== 'undefined') {
-      console.log('[supabase.ts] Supabase client initialized with runtime config')
-      console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
+  const config = await fetchRuntimeConfig()
+  
+  // For web, explicitly use localStorage for cross-tab synchronization
+  // For mobile/native, use default storage (AsyncStorage)
+  const storage = typeof window !== 'undefined' && window.localStorage 
+    ? window.localStorage 
+    : undefined
+  
+  supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
+    auth: {
+      storage: storage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
     }
+  })
+  
+  if (typeof window !== 'undefined') {
+    console.log('[supabase.ts] Supabase client initialized with runtime config')
+    console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
+    console.log('[supabase.ts] Using localStorage for session persistence:', !!storage)
   }
   
   return supabaseClient

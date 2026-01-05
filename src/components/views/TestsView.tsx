@@ -132,9 +132,9 @@ function TestsView() {
             maxWidth: '100%',
           }]}>
             {!isMobile && (
-              <Pressable style={styles.backButton} onPress={handleBackClick}>
-                <BackIcon />
-              </Pressable>
+            <Pressable style={styles.backButton} onPress={handleBackClick}>
+              <BackIcon />
+            </Pressable>
             )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentTest.name}</Text>
           </View>

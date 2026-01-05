@@ -246,9 +246,9 @@ function FlashcardsView() {
             maxWidth: '100%',
           }]}>
             {!isMobile && (
-              <Pressable style={styles.backButton} onPress={handleBackFromStudy}>
-                <BackIcon />
-              </Pressable>
+            <Pressable style={styles.backButton} onPress={handleBackFromStudy}>
+              <BackIcon />
+            </Pressable>
             )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentSet.name}</Text>
           </View>
