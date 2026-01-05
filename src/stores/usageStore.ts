@@ -13,8 +13,6 @@ interface UsageStore {
   refreshUsage: () => Promise<void>
 }
 
-const API_BASE_URL = getApiBaseUrl()
-
 export const useUsageStore = create<UsageStore>((set, get) => ({
   planName: 'free',
   tokensUsed: 0,
@@ -33,6 +31,7 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
         return
       }
 
+      const API_BASE_URL = getApiBaseUrl()
       const response = await fetch(`${API_BASE_URL}/api/usage`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`

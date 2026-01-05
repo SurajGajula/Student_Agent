@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase'
 import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
 
-const API_BASE_URL = getApiBaseUrl()
-
 export type FolderType = 'note' | 'class' | 'test' | 'flashcard'
 
 export interface Folder {
@@ -41,6 +39,7 @@ export const useFolderStore = create<FolderStore>()(
 
         set({ isLoading: true, error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/folders/list`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`
@@ -76,6 +75,7 @@ export const useFolderStore = create<FolderStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/folders/add`, {
             method: 'POST',
             headers: {
@@ -109,6 +109,7 @@ export const useFolderStore = create<FolderStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/folders/delete/${id}?type=${type}`, {
             method: 'DELETE',
             headers: {
@@ -138,6 +139,7 @@ export const useFolderStore = create<FolderStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/folders/update/${id}`, {
             method: 'PUT',
             headers: {

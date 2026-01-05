@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase'
 import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
 
-const API_BASE_URL = getApiBaseUrl()
-
 export interface Class {
   id: string
   name: string
@@ -39,6 +37,7 @@ export const useClassesStore = create<ClassesStore>()(
 
         set({ isLoading: true, error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/classes/list`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`
@@ -70,6 +69,7 @@ export const useClassesStore = create<ClassesStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/classes/add`, {
             method: 'POST',
             headers: {
@@ -103,6 +103,7 @@ export const useClassesStore = create<ClassesStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/classes/delete/${id}`, {
             method: 'DELETE',
             headers: {
@@ -132,6 +133,7 @@ export const useClassesStore = create<ClassesStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/classes/move/${id}`, {
             method: 'PUT',
             headers: {

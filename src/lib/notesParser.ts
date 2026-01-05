@@ -1,12 +1,6 @@
 import { getApiBaseUrl } from './platform'
 
 /**
- * API endpoint for the backend server
- * Can be configured via environment variable or defaults to localhost
- */
-const API_BASE_URL = getApiBaseUrl()
-
-/**
  * Platform-aware image handling
  */
 const createFormData = async (imageSource: File | Blob | string): Promise<FormData> => {
@@ -50,6 +44,7 @@ async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Pr
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180 second (3 minute) timeout
 
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/api/parse-notes`, {
       method: 'POST',
       headers: {
@@ -120,6 +115,7 @@ async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Pr
  */
 async function checkBackendHealth(): Promise<boolean> {
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000), // 5 second timeout for health check

@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase'
 import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
 
-const API_BASE_URL = getApiBaseUrl()
-
 export interface FlashcardCard {
   id: string
   front: string
@@ -47,6 +45,7 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
 
         set({ isLoading: true, error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/flashcards/list`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`
@@ -78,6 +77,7 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/flashcards/add`, {
             method: 'POST',
             headers: {
@@ -117,6 +117,7 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/flashcards/delete/${id}`, {
             method: 'DELETE',
             headers: {
@@ -150,6 +151,7 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/flashcards/move/${id}`, {
             method: 'PUT',
             headers: {

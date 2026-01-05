@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase'
 import { getApiBaseUrl } from '../lib/platform'
 import { getStorage } from '../lib/storage'
 
-const API_BASE_URL = getApiBaseUrl()
-
 export interface Question {
   id: string
   question: string
@@ -49,6 +47,7 @@ export const useTestsStore = create<TestsStore>()(
 
         set({ isLoading: true, error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/tests/list`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`
@@ -80,6 +79,7 @@ export const useTestsStore = create<TestsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/tests/add`, {
             method: 'POST',
             headers: {
@@ -119,6 +119,7 @@ export const useTestsStore = create<TestsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/tests/delete/${id}`, {
             method: 'DELETE',
             headers: {
@@ -152,6 +153,7 @@ export const useTestsStore = create<TestsStore>()(
 
         set({ error: null })
         try {
+          const API_BASE_URL = getApiBaseUrl()
           const response = await fetch(`${API_BASE_URL}/api/tests/move/${id}`, {
             method: 'PUT',
             headers: {
