@@ -38,16 +38,31 @@ function SettingsView() {
     : Math.max(54, 20)
 
   const fetchSubscriptionDetails = async () => {
-    if (!isLoggedIn) return
+    if (!isLoggedIn) {
+      console.log('[SettingsView] fetchSubscriptionDetails called but isLoggedIn is false')
+      return
+    }
 
     setLoadingSubscription(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error } = await supabase.auth.getSession()
       
-      if (!session) {
+      if (error) {
+        console.error('[SettingsView] Error getting session in fetchSubscriptionDetails:', error)
         setLoadingSubscription(false)
         return
       }
+      
+      if (!session) {
+        console.warn('[SettingsView] ⚠️ fetchSubscriptionDetails: NO SESSION/TOKEN found')
+        setLoadingSubscription(false)
+        return
+      }
+      
+      console.log('[SettingsView] ✓ fetchSubscriptionDetails: Session found', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
+      })
 
       const API_BASE_URL = getApiBaseUrl()
       

@@ -24,12 +24,24 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
   fetchUsage: async () => {
     set({ isLoading: true, error: null })
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('[usageStore] Error getting session:', sessionError)
+        set({ isLoading: false, error: 'Session error: ' + sessionError.message })
+        return
+      }
       
       if (!session) {
+        console.warn('[usageStore] ⚠️ fetchUsage: NO SESSION/TOKEN found')
         set({ isLoading: false, error: 'Not authenticated' })
         return
       }
+      
+      console.log('[usageStore] ✓ fetchUsage: Session found', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
+      })
 
       const API_BASE_URL = getApiBaseUrl()
       const response = await fetch(`${API_BASE_URL}/api/usage`, {
