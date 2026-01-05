@@ -26,10 +26,18 @@ function TestsView() {
     ? tests.filter(t => t.folderId === currentFolderId)
     : tests.filter(t => !t.folderId)
   const displayedFolders = currentFolderId ? [] : folders
-  const windowWidth = Dimensions.get('window').width
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const insets = useSafeAreaInsets()
   const isMobile = windowWidth <= 768
+
+  // Update window width on resize
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setWindowWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
   const handleTestClick = (testId: string) => {
     setCurrentTestId(testId)

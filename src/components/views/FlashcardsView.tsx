@@ -37,11 +37,19 @@ function FlashcardsView() {
   const cards = currentSet ? (isShuffled ? [...currentSet.cards].sort(() => Math.random() - 0.5) : currentSet.cards) : []
   const currentCard = cards[currentCardIndex]
   const prevCard = prevCardIndex !== null ? cards[prevCardIndex] : null
-  const windowWidth = Dimensions.get('window').width
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const insets = useSafeAreaInsets()
   const isMobile = windowWidth <= 768
   const { setIsInDetailMode } = useDetailMode()
+
+  // Update window width on resize
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setWindowWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
   // Handle flip animation
   useEffect(() => {

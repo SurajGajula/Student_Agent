@@ -50,9 +50,17 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     ? notes.filter(n => n.folderId === currentFolderId)
     : notes.filter(n => !n.folderId)
   const displayedFolders = currentFolderId ? [] : folders
-  const windowWidth = Dimensions.get('window').width
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const isMobile = windowWidth <= 768
+
+  // Update window width on resize
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setWindowWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
   // Initialize file input for web
   useEffect(() => {
