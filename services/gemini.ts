@@ -43,13 +43,19 @@ export async function initializeGeminiClient(): Promise<boolean> {
     const serviceAccountBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64
     if (serviceAccountBase64) {
       try {
+        console.log('Attempting to decode service account from GOOGLE_SERVICE_ACCOUNT_BASE64 (length:', serviceAccountBase64.length, ')')
         const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf8')
         loadedServiceAccountKey = JSON.parse(serviceAccountJson) as ServiceAccountKey
-        console.log('Loaded service account from GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable')
+        console.log('Loaded service account from GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable (project:', loadedServiceAccountKey.project_id, ')')
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         console.error('Failed to decode service account from environment variable:', errorMessage)
+        if (error instanceof Error && error.stack) {
+          console.error('Stack trace:', error.stack)
+        }
       }
+    } else {
+      console.log('GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable not set')
     }
     
     // Fallback to file if env var not available (for local development)
