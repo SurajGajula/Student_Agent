@@ -32,7 +32,7 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
         console.warn('[usageStore] ⚠️ fetchUsage timed out, reloading page')
         window.location.reload()
       }
-    }, 8000) // 8 second timeout
+    }, 3000) // 3 second timeout
     
     try {
       // Try to get session - if Supabase isn't initialized, it will throw and we'll catch it

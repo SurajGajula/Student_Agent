@@ -66,7 +66,7 @@ function AppContent() {
         visibilityTimeout = setTimeout(() => {
           console.warn('[App] ⚠️ Session sync timed out after tab change, reloading page to reset state')
           window.location.reload()
-        }, 5000) // 5 second timeout
+        }, 2000) // 2 second timeout
         
         try {
           const { initSupabase } = await import('./lib/supabase')
