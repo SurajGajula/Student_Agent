@@ -247,8 +247,8 @@ export async function initSupabase(): Promise<SupabaseClient> {
 
   // Start initialization
   initPromise = (async () => {
-    const config = await fetchRuntimeConfig()
-    
+  const config = await fetchRuntimeConfig()
+  
     // For web, explicitly use localStorage for cross-tab synchronization
     // For mobile/native, use default storage (AsyncStorage)
     const storage = typeof window !== 'undefined' && window.localStorage 
@@ -272,14 +272,14 @@ export async function initSupabase(): Promise<SupabaseClient> {
         detectSessionInUrl: false,
       }
     })
-    
-    if (typeof window !== 'undefined') {
-      console.log('[supabase.ts] Supabase client initialized with runtime config')
-      console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
+  
+  if (typeof window !== 'undefined') {
+    console.log('[supabase.ts] Supabase client initialized with runtime config')
+    console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
       console.log('[supabase.ts] Using localStorage for session persistence:', !!storage)
-    }
-    
-    return supabaseClient
+  }
+  
+  return supabaseClient
   })()
 
   return initPromise
@@ -406,7 +406,7 @@ function getLegacySupabase(): SupabaseClient {
   if (!supabaseClient) {
     const buildTimeUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
     const buildTimeKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-    
+
     if (buildTimeUrl && buildTimeKey) {
       console.warn('[supabase.ts] Creating client from build-time config (fallback)')
       const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined
@@ -418,9 +418,9 @@ function getLegacySupabase(): SupabaseClient {
           detectSessionInUrl: false,
         }
       })
-      return supabaseClient
-    }
-    
+    return supabaseClient
+  }
+
     // No config available - this should not happen if initSupabase() was called
     throw new Error(
       'Supabase client not initialized. Please ensure initSupabase() has been called and completed.'

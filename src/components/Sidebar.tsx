@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, Pressable, ScrollView, Platform, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../stores/authStore'
@@ -18,9 +18,17 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
   const { isLoggedIn, username, signOut } = useAuthStore()
   const { planName } = useUsageStore()
-  const windowWidth = Dimensions.get('window').width
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const isMobile = windowWidth <= 768
   const insets = useSafeAreaInsets()
+
+  // Update window width on resize
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setWindowWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
 
   const handleLogout = async () => {

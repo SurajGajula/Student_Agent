@@ -75,12 +75,27 @@ function AppContent() {
   useEffect(() => {
     if (Platform.OS === 'web') {
       const updateDimensions = () => {
-        setWindowWidth(window.innerWidth)
+        const newWidth = window.innerWidth
+        setWindowWidth(newWidth)
+        // Close sidebar when switching from mobile to desktop
+        if (newWidth > 768 && isSidebarOpen) {
+          setIsSidebarOpen(false)
+        }
       }
       window.addEventListener('resize', updateDimensions)
       return () => window.removeEventListener('resize', updateDimensions)
+    } else {
+      // For native platforms, use Dimensions API
+      const subscription = Dimensions.addEventListener('change', ({ window }) => {
+        setWindowWidth(window.width)
+        // Close sidebar when switching from mobile to desktop
+        if (window.width > 768 && isSidebarOpen) {
+          setIsSidebarOpen(false)
+        }
+      })
+      return () => subscription?.remove()
     }
-  }, [])
+  }, [isSidebarOpen])
 
   // Close sidebar when view changes on mobile (but not on initial render)
   const prevViewRef = React.useRef<string | null>(null)

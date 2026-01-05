@@ -192,8 +192,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Sync state from actual session (don't trust the response data alone)
       await syncStateFromSession(set)
       
-      // Sync all stores after successful signup
-      await syncAllStores()
+        // Sync all stores after successful signup
+        await syncAllStores()
       
       set({ isLoading: false, error: null })
     } catch (error) {
@@ -232,13 +232,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       
       // Sync state from actual session (always check the real session)
       await syncStateFromSession(set)
-      
+
       // If we have a session, sync all stores
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         await syncAllStores()
       }
-      
+
       set({ isLoading: false, error: null })
 
       // Listen for auth state changes - this handles cross-tab synchronization
