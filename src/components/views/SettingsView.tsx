@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
@@ -21,6 +21,12 @@ interface SubscriptionDetails {
 function SettingsView() {
   const { planName, tokensUsed, monthlyLimit, remaining, isLoading, error, fetchUsage } = useUsageStore()
   const { isLoggedIn } = useAuthStore()
+  
+  // Store fetchUsage in a ref to ensure stable reference
+  const fetchUsageRef = useRef(fetchUsage)
+  useEffect(() => {
+    fetchUsageRef.current = fetchUsage
+  }, [fetchUsage])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [cancelMessage, setCancelMessage] = useState<string | null>(null)
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null)
@@ -136,13 +142,41 @@ function SettingsView() {
   }, [])
 
   useEffect(() => {
+    console.log('[SettingsView] useEffect for fetchUsage triggered', {
+      isLoggedIn,
+      fetchUsageExists: !!fetchUsage,
+      timestamp: new Date().toISOString()
+    })
+    
     if (isLoggedIn) {
-      console.log('[SettingsView] Calling fetchUsage and fetchSubscriptionDetails')
-      fetchUsage().catch(err => {
+      console.log('[SettingsView] isLoggedIn is true, calling fetchUsage and fetchSubscriptionDetails')
+      const fetchFn = fetchUsageRef.current || fetchUsage
+      fetchFn().catch(err => {
         console.error('[SettingsView] fetchUsage failed:', err)
       })
       fetchSubscriptionDetails()
+    } else {
+      console.log('[SettingsView] isLoggedIn is false, skipping API calls')
     }
+  }, [isLoggedIn, fetchUsage])
+
+  // Also trigger fetch when component becomes visible (for tab switching)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isLoggedIn) {
+        console.log('[SettingsView] Tab/window became visible, refreshing data')
+        const fetchFn = fetchUsageRef.current || fetchUsage
+        fetchFn().catch(err => {
+          console.error('[SettingsView] fetchUsage on visibility change failed:', err)
+        })
+        fetchSubscriptionDetails()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [isLoggedIn, fetchUsage])
 
   // Safety timeout: if isLoading is true for more than 15 seconds, log a warning
