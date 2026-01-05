@@ -70,13 +70,26 @@ function SettingsView() {
 
     setLoadingSubscription(true)
     try {
-      // Ensure Supabase is initialized before getting session
-      const { initSupabase, getSupabase } = await import('../../lib/supabase')
-      await initSupabase()
-      const supabaseClient = getSupabase()
-      
+      // Try to get session - if Supabase isn't initialized, it will throw and we'll catch it
       console.log('[SettingsView] Getting session for subscription details...')
-      const { data: { session }, error } = await supabaseClient.auth.getSession()
+      let session, error
+      
+      try {
+        // Try using the existing supabase client first (faster)
+        const result = await supabase.auth.getSession()
+        session = result.data.session
+        error = result.error
+      } catch (err: any) {
+        // If that fails, ensure Supabase is initialized
+        console.log('[SettingsView] Existing client failed, initializing Supabase...', err.message)
+        const { initSupabase, getSupabase } = await import('../../lib/supabase')
+        await initSupabase()
+        const supabaseClient = getSupabase()
+        const result = await supabaseClient.auth.getSession()
+        session = result.data.session
+        error = result.error
+      }
+      
       console.log('[SettingsView] Session check completed', { hasSession: !!session, hasError: !!error })
       
       if (error) {

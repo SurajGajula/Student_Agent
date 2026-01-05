@@ -25,13 +25,26 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
     console.log('[usageStore] fetchUsage called, setting isLoading to true')
     set({ isLoading: true, error: null })
     try {
-      // Ensure Supabase is initialized before getting session
-      const { initSupabase, getSupabase } = await import('../lib/supabase')
-      await initSupabase()
-      const supabaseClient = getSupabase()
-      
+      // Try to get session - if Supabase isn't initialized, it will throw and we'll catch it
       console.log('[usageStore] Getting session from Supabase...')
-      const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+      let session, sessionError
+      
+      try {
+        // Try using the existing supabase client first (faster)
+        const result = await supabase.auth.getSession()
+        session = result.data.session
+        sessionError = result.error
+      } catch (err: any) {
+        // If that fails, ensure Supabase is initialized
+        console.log('[usageStore] Existing client failed, initializing Supabase...', err.message)
+        const { initSupabase, getSupabase } = await import('../lib/supabase')
+        await initSupabase()
+        const supabaseClient = getSupabase()
+        const result = await supabaseClient.auth.getSession()
+        session = result.data.session
+        sessionError = result.error
+      }
+      
       console.log('[usageStore] Session check completed', { hasSession: !!session, hasError: !!sessionError })
       
       if (sessionError) {
