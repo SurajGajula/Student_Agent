@@ -22,6 +22,7 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
   error: null,
 
   fetchUsage: async () => {
+    console.log('[usageStore] fetchUsage called, setting isLoading to true')
     set({ isLoading: true, error: null })
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()

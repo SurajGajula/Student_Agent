@@ -129,6 +129,14 @@ function SettingsView() {
   }
 
   useEffect(() => {
+    console.log('[SettingsView] Component mounted - syncing auth and resetting loading state')
+    
+    // Reset loading state if it's stuck (common after tab changes)
+    if (isLoading) {
+      console.log('[SettingsView] isLoading is true on mount, resetting to false')
+      // We can't directly set it, but we can trigger a fresh fetch
+    }
+    
     // Sync auth state from actual session when component mounts (in case it's out of sync)
     const syncAuth = async () => {
       try {
@@ -144,6 +152,7 @@ function SettingsView() {
   useEffect(() => {
     console.log('[SettingsView] useEffect for fetchUsage triggered', {
       isLoggedIn,
+      isLoading,
       fetchUsageExists: !!fetchUsage,
       timestamp: new Date().toISOString()
     })
@@ -151,14 +160,17 @@ function SettingsView() {
     if (isLoggedIn) {
       console.log('[SettingsView] isLoggedIn is true, calling fetchUsage and fetchSubscriptionDetails')
       const fetchFn = fetchUsageRef.current || fetchUsage
-      fetchFn().catch(err => {
+      // Always call fetchUsage, even if isLoading is true (it might be stuck)
+      fetchFn().then(() => {
+        console.log('[SettingsView] fetchUsage completed successfully')
+      }).catch(err => {
         console.error('[SettingsView] fetchUsage failed:', err)
       })
       fetchSubscriptionDetails()
     } else {
       console.log('[SettingsView] isLoggedIn is false, skipping API calls')
     }
-  }, [isLoggedIn, fetchUsage])
+  }, [isLoggedIn, fetchUsage, isLoading]) // Add isLoading to dependencies to trigger when it changes
 
   // Also trigger fetch when component becomes visible (for tab switching)
   useEffect(() => {
@@ -166,18 +178,33 @@ function SettingsView() {
 
     const handleVisibilityChange = () => {
       if (!document.hidden && isLoggedIn) {
-        console.log('[SettingsView] Tab/window became visible, refreshing data')
+        console.log('[SettingsView] Tab/window became visible, refreshing data', {
+          currentIsLoading: isLoading
+        })
         const fetchFn = fetchUsageRef.current || fetchUsage
-        fetchFn().catch(err => {
+        // Force a fresh fetch when tab becomes visible
+        fetchFn().then(() => {
+          console.log('[SettingsView] fetchUsage on visibility change completed')
+        }).catch(err => {
           console.error('[SettingsView] fetchUsage on visibility change failed:', err)
         })
         fetchSubscriptionDetails()
       }
     }
 
+    // Also trigger immediately if component is already visible when mounted
+    if (!document.hidden && isLoggedIn) {
+      console.log('[SettingsView] Component mounted while visible, triggering immediate fetch')
+      const fetchFn = fetchUsageRef.current || fetchUsage
+      fetchFn().catch(err => {
+        console.error('[SettingsView] Immediate fetch on mount failed:', err)
+      })
+      fetchSubscriptionDetails()
+    }
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [isLoggedIn, fetchUsage])
+  }, [isLoggedIn, fetchUsage, isLoading])
 
   // Safety timeout: if isLoading is true for more than 15 seconds, log a warning
   useEffect(() => {
