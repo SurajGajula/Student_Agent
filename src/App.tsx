@@ -13,8 +13,20 @@ import LoginModal from './components/modals/LoginModal'
 import UpgradeModal from './components/modals/UpgradeModal'
 import { DetailModeProvider, useDetailMode } from './contexts/DetailModeContext'
 
+// Helper function to get view from URL
+const getViewFromUrl = (): string => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const path = window.location.pathname
+    if (path === '/settings') return 'settings'
+    if (path === '/tests') return 'tests'
+    if (path === '/flashcards') return 'flashcards'
+    if (path === '/notes' || path === '/') return 'notes'
+  }
+  return 'notes'
+}
+
 function AppContent() {
-  const [currentView, setCurrentView] = useState<string>('notes')
+  const [currentView, setCurrentView] = useState<string>(getViewFromUrl())
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -163,7 +175,27 @@ function AppContent() {
     console.log('[App] handleNavigate called with view:', view)
     setCurrentView(view)
     console.log('[App] currentView set to:', view)
+    
+    // Update URL to reflect current view (web only)
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const path = view === 'notes' ? '/' : `/${view}`
+      window.history.pushState({ view }, '', path)
+    }
   }
+
+  // Listen for browser back/forward buttons
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return
+
+    const handlePopState = (event: PopStateEvent) => {
+      const view = getViewFromUrl()
+      console.log('[App] Browser navigation detected, switching to view:', view)
+      setCurrentView(view)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   return (
     <SafeAreaProvider>
