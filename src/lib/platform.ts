@@ -48,9 +48,31 @@ export const getEnvVar = (key: string): string | undefined => {
 
 // API URL getter
 export const getApiBaseUrl = (): string => {
-  return getEnvVar('API_URL') || 
-         getEnvVar('VITE_API_URL') || 
-         getEnvVar('EXPO_PUBLIC_API_URL') || 
-         'http://localhost:3001'
+  // Try environment variables first
+  const envApiUrl = getEnvVar('API_URL') || 
+                    getEnvVar('VITE_API_URL') || 
+                    getEnvVar('EXPO_PUBLIC_API_URL')
+  
+  if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
+    return envApiUrl
+  }
+  
+  // In browser, use window.location.origin for same-origin setups
+  if (typeof window !== 'undefined') {
+    // If on the same domain (production), use same origin
+    if (window.location.hostname === 'studentagent.site' || 
+        window.location.hostname === 'www.studentagent.site') {
+      return window.location.origin // Same domain - use relative paths
+    }
+    // Development - use localhost
+    if (window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.startsWith('192.168.')) {
+      return window.location.origin
+    }
+  }
+  
+  // Fallback
+  return 'http://localhost:3001'
 }
 
