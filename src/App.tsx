@@ -125,7 +125,9 @@ function AppContent() {
   }
 
   const handleNavigate = (view: string) => {
+    console.log('[App] handleNavigate called with view:', view)
     setCurrentView(view)
+    console.log('[App] currentView set to:', view)
   }
 
   return (
