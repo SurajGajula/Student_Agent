@@ -80,6 +80,8 @@ module.exports = {
       ...(fs.existsSync('./assets/favicon.png') && { favicon: "./assets/favicon.png" }),
       bundler: "metro",
       entryPoint: "./index.web.js",
+      // Disable service worker to avoid cache errors
+      serviceWorker: false,
     },
     experiments: {
       typedRoutes: false
