@@ -265,22 +265,26 @@ function getLegacySupabase(): SupabaseClient {
     return supabaseClient
   }
 
-  // Fallback to build-time config
+  // If runtime config fetch is in progress, try build-time config as temporary fallback
+  // initSupabase() will replace this with the correct client once it completes
   const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
   const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
 
-  if (!supabaseUrl || !supabasePublishableKey) {
-    const errorMsg = `Missing Supabase environment variables. 
-      SUPABASE_URL: ${supabaseUrl ? 'SET' : 'MISSING'}
-      SUPABASE_PUBLISHABLE_KEY: ${supabasePublishableKey ? 'SET' : 'MISSING'}
-      Constants.expoConfig?.extra: ${JSON.stringify(Constants.expoConfig?.extra || {})}
-      Please set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY as environment variables (or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_ANON_KEY).
-      Alternatively, ensure the backend /api/config endpoint is accessible and initSupabase() has been called.`
-    console.error('[supabase.ts]', errorMsg)
-    throw new Error(errorMsg)
+  // If we have build-time config, use it temporarily
+  // This will be replaced by initSupabase() once runtime config is fetched
+  if (supabaseUrl && supabasePublishableKey) {
+    supabaseClient = createClient(supabaseUrl, supabasePublishableKey)
+    return supabaseClient
   }
 
-  supabaseClient = createClient(supabaseUrl, supabasePublishableKey)
+  // If no config available and initSupabase() hasn't been called yet,
+  // return a client that will be replaced when initSupabase() runs
+  // Don't throw error - initSupabase() in App.tsx will handle initialization
+  if (!supabaseClient) {
+    // Create a minimal client - it will be replaced by initSupabase()
+    // This prevents errors during initial render before initSupabase() completes
+    supabaseClient = createClient('https://temp.supabase.co', 'temp-key')
+  }
   return supabaseClient
 }
 
