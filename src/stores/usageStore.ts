@@ -30,7 +30,7 @@ export const useUsageStore = create<UsageStore>((set, get) => ({
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.location.reload()
       }
-    }, 5000) // 5 second timeout
+    }, 2500) // 2.5 second timeout
     
     try {
       let session, sessionError
