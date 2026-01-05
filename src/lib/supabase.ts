@@ -31,19 +31,19 @@ function getApiBaseUrl(): string {
     return envApiUrl
   }
   
-  // 3. Hardcoded EC2 backend URL (fallback if env vars don't work)
-  // Using HTTPS domain for production
-  const EC2_BACKEND_URL = 'https://studentagent.site'
-  
-  // 4. In browser, try window.location.origin (for same-origin setups)
+  // 3. In browser, use window.location.origin for same-origin setups (frontend and backend on same domain)
   if (typeof window !== 'undefined') {
-    // Only use window.location.origin if we're in development
-    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    if (isDevelopment) {
+    // If we're on the same domain (production), use relative URLs
+    if (window.location.hostname === 'studentagent.site' || 
+        window.location.hostname === 'www.studentagent.site') {
+      return window.location.origin // Same domain - use relative paths
+    }
+    // Development - use localhost
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return window.location.origin
     }
-    // In production (Amplify), use EC2 backend
-    return EC2_BACKEND_URL
+    // Fallback for other cases
+    return 'https://studentagent.site'
   }
   
   // 5. Fallback for server-side rendering
@@ -83,27 +83,17 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       apiUrlsToTry.unshift(runtimeConfig.apiUrl)
     }
     
-    // 4. Hardcoded EC2 backend URL (fallback for production)
-    // Using HTTPS domain for production
-    const EC2_BACKEND_URL = 'https://studentagent.site'
+    // 4. For same-domain setups, use window.location.origin FIRST (same domain = no CORS)
     if (typeof window !== 'undefined') {
-      // Only skip EC2 URL if we're in local development
-      const isLocalDev = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1' ||
-                         window.location.hostname.startsWith('192.168.')
-      if (!isLocalDev) {
-        // In production (Amplify), try EC2 backend first
-        apiUrlsToTry.push(EC2_BACKEND_URL)
+      // If on the same domain (production), use same origin
+      if (window.location.hostname === 'studentagent.site' || 
+          window.location.hostname === 'www.studentagent.site') {
+        apiUrlsToTry.unshift(window.location.origin) // Add to front of array (highest priority)
       }
-    }
-    
-    // 5. Try window.location.origin LAST (for same-origin setups, but usually won't work for EC2)
-    if (typeof window !== 'undefined') {
-      const isLocalDev = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1' ||
-                         window.location.hostname.startsWith('192.168.')
-      if (isLocalDev) {
-        // Only use window.location.origin in local development
+      // Development - use localhost origin
+      else if (window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1' ||
+               window.location.hostname.startsWith('192.168.')) {
         apiUrlsToTry.push(window.location.origin)
       }
     }
