@@ -38,6 +38,38 @@ function AppContent() {
     init()
   }, [])
 
+  // Refresh session when window regains focus (web only)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+
+    const handleFocus = async () => {
+      try {
+        // Ensure Supabase is initialized
+        const { initSupabase, getSupabase } = await import('./lib/supabase')
+        await initSupabase()
+        
+        // Refresh the session to ensure it's still valid
+        const supabase = getSupabase()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.warn('Session refresh error on focus:', error)
+          return
+        }
+
+        // If we have a session but auth store says we're not logged in, refresh auth
+        if (session?.user && !useAuthStore.getState().isLoggedIn) {
+          await useAuthStore.getState().initializeAuth()
+        }
+      } catch (err) {
+        console.error('Error refreshing session on focus:', err)
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
+
   // Handle window resize for responsive behavior
   useEffect(() => {
     if (Platform.OS === 'web') {
