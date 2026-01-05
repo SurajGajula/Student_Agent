@@ -191,6 +191,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initializeAuth: async () => {
     set({ isLoading: true })
     try {
+      // Ensure Supabase is initialized before using it
+      const { initSupabase } = await import('../lib/supabase')
+      await initSupabase()
+      
       // Check for existing session
       const { data: { session }, error } = await supabase.auth.getSession()
       

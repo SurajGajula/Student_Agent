@@ -294,13 +294,40 @@ function getLegacySupabase(): SupabaseClient {
   }
 
   // If no config available and initSupabase() hasn't been called yet,
-  // return a client that will be replaced when initSupabase() runs
-  // Don't throw error - initSupabase() in App.tsx will handle initialization
-  if (!supabaseClient) {
-    // Create a minimal client - it will be replaced by initSupabase()
-    // This prevents errors during initial render before initSupabase() completes
-    supabaseClient = createClient('https://temp.supabase.co', 'temp-key')
+  // wait for configPromise if it exists, otherwise use build-time config
+  if (configPromise && !supabaseClient) {
+    // Config fetch is in progress, but we need a client now
+    // Use build-time config if available, otherwise throw error
+    const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
+    const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
+    
+    if (supabaseUrl && supabasePublishableKey) {
+      supabaseClient = createClient(supabaseUrl, supabasePublishableKey)
+      return supabaseClient
+    }
+    
+    // If no build-time config, throw error - don't create temporary client
+    throw new Error(
+      'Supabase client not initialized. Please ensure initSupabase() has been called and completed before using the supabase client.'
+    )
   }
+
+  // If we still don't have a client, try build-time config one more time
+  if (!supabaseClient) {
+    const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
+    const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
+    
+    if (supabaseUrl && supabasePublishableKey) {
+      supabaseClient = createClient(supabaseUrl, supabasePublishableKey)
+      return supabaseClient
+    }
+    
+    // No config available at all - throw error
+    throw new Error(
+      'Supabase client not initialized. Please ensure initSupabase() has been called and completed before using the supabase client.'
+    )
+  }
+  
   return supabaseClient
 }
 
