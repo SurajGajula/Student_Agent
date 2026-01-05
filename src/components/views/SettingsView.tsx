@@ -28,31 +28,6 @@ function SettingsView() {
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
   const isMobile = windowWidth <= 768
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[SettingsView] Component mounted/updated', {
-      isLoggedIn,
-      isLoading,
-      error,
-      hasSession: 'checking...'
-    })
-    
-    // Check actual session
-    ;(async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        console.log('[SettingsView] Actual session check:', {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          isLoggedIn,
-          mismatch: !!session !== isLoggedIn
-        })
-      } catch (err) {
-        console.error('[SettingsView] Error checking session:', err)
-      }
-    })()
-  }, [isLoggedIn, isLoading, error])
   // Button center calculation: button is at top (insets.top + 8 on iOS, 50 on web), height is 40px (8px padding + 24px icon + 8px padding)
   // Button center = (insets.top + 8) + 20 = insets.top + 28 on iOS, or 50 + 20 = 70 on web
   // Title is 32px tall, so half-height is 16px
@@ -63,25 +38,17 @@ function SettingsView() {
     : Math.max(54, 20)
 
   const fetchSubscriptionDetails = async () => {
-    if (!isLoggedIn) {
-      console.log('[SettingsView] fetchSubscriptionDetails called but isLoggedIn is false')
-      return
-    }
+    if (!isLoggedIn) return
 
     setLoadingSubscription(true)
     try {
-      // Try to get session - if Supabase isn't initialized, it will throw and we'll catch it
-      console.log('[SettingsView] Getting session for subscription details...')
       let session, error
       
       try {
-        // Try using the existing supabase client first (faster)
         const result = await supabase.auth.getSession()
         session = result.data.session
         error = result.error
       } catch (err: any) {
-        // If that fails, ensure Supabase is initialized
-        console.log('[SettingsView] Existing client failed, initializing Supabase...', err.message)
         const { initSupabase, getSupabase } = await import('../../lib/supabase')
         await initSupabase()
         const supabaseClient = getSupabase()
@@ -90,24 +57,15 @@ function SettingsView() {
         error = result.error
       }
       
-      console.log('[SettingsView] Session check completed', { hasSession: !!session, hasError: !!error })
-      
       if (error) {
-        console.error('[SettingsView] Error getting session in fetchSubscriptionDetails:', error)
         setLoadingSubscription(false)
         return
       }
       
       if (!session) {
-        console.warn('[SettingsView] ⚠️ fetchSubscriptionDetails: NO SESSION/TOKEN found')
         setLoadingSubscription(false)
         return
       }
-      
-      console.log('[SettingsView] ✓ fetchSubscriptionDetails: Session found', {
-        userId: session.user?.id,
-        expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
-      })
 
       const API_BASE_URL = getApiBaseUrl()
       
@@ -185,47 +143,6 @@ function SettingsView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]) // Only depend on isLoggedIn - fetchUsage is stable from Zustand
-
-  // Also trigger fetch when component becomes visible (for tab switching)
-  useEffect(() => {
-    if (Platform.OS !== 'web') return
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && isLoggedIn) {
-        console.log('[SettingsView] Tab/window became visible, refreshing data', {
-          currentIsLoading: isLoading
-        })
-        // Use the current fetchUsage directly
-        fetchUsage().then(() => {
-          console.log('[SettingsView] fetchUsage on visibility change completed')
-        }).catch(err => {
-          console.error('[SettingsView] fetchUsage on visibility change failed:', err)
-        })
-        fetchSubscriptionDetails()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn]) // Only depend on isLoggedIn
-
-  // Safety timeout: if isLoading is true for more than 15 seconds, log a warning
-  useEffect(() => {
-    if (isLoading) {
-      const timeout = setTimeout(() => {
-        console.warn('[SettingsView] ⚠️ isLoading has been true for 15+ seconds, this may indicate a stuck API call')
-        // Force a re-fetch attempt
-        if (isLoggedIn) {
-          console.log('[SettingsView] Attempting to force refresh usage data')
-          fetchUsage().catch(err => {
-            console.error('[SettingsView] Force refresh failed:', err)
-          })
-        }
-      }, 15000)
-      return () => clearTimeout(timeout)
-    }
-  }, [isLoading, isLoggedIn, fetchUsage])
 
   // Check for success/cancel parameters in URL (web only)
   useEffect(() => {
@@ -311,10 +228,7 @@ function SettingsView() {
 
   const usagePercentage = monthlyLimit > 0 ? (tokensUsed / monthlyLimit) * 100 : 0
 
-  console.log('[SettingsView] Rendering with isLoggedIn:', isLoggedIn, 'isLoading:', isLoading)
-
   if (!isLoggedIn) {
-    console.log('[SettingsView] Rendering logged-out view')
     return (
       <View style={styles.container}>
         <View style={[
@@ -335,8 +249,6 @@ function SettingsView() {
     )
   }
 
-  console.log('[SettingsView] Rendering logged-in view')
-  
   return (
     <ScrollView 
       style={styles.container} 

@@ -52,60 +52,23 @@ function AppContent() {
 
   // Sync auth state from actual session when tab becomes visible (web only)
   // This prevents phantom logouts by always checking the real Supabase session
-  // If session check hangs, reload the page to reset state
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
-    let visibilityTimeout: NodeJS.Timeout | null = null
-
     const handleVisibilityChange = async () => {
       if (!document.hidden) {
-        console.log('[App] Tab/window became visible, syncing auth state...')
-        
-        // Set a timeout - if session sync takes too long, reload the page
-        visibilityTimeout = setTimeout(() => {
-          console.warn('[App] ⚠️ Session sync timed out after tab change, reloading page to reset state')
-          window.location.reload()
-        }, 2000) // 2 second timeout
-        
         try {
           const { initSupabase } = await import('./lib/supabase')
           await initSupabase()
-          // Sync Zustand state with actual session to prevent phantom logouts
           await useAuthStore.getState().syncFromSession()
-          
-          // Clear timeout if sync completed successfully
-          if (visibilityTimeout) {
-            clearTimeout(visibilityTimeout)
-            visibilityTimeout = null
-          }
-          console.log('[App] ✓ Auth state synced successfully after tab change')
         } catch (err) {
-          console.error('[App] Error syncing auth on visibility change:', err)
-          // Clear timeout and reload on error
-          if (visibilityTimeout) {
-            clearTimeout(visibilityTimeout)
-            visibilityTimeout = null
-          }
-          console.warn('[App] Reloading page due to auth sync error')
-          window.location.reload()
-        }
-      } else {
-        // Tab became hidden, clear any pending timeout
-        if (visibilityTimeout) {
-          clearTimeout(visibilityTimeout)
-          visibilityTimeout = null
+          console.error('Error syncing auth on visibility change:', err)
         }
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (visibilityTimeout) {
-        clearTimeout(visibilityTimeout)
-      }
-    }
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // Handle window resize for responsive behavior
@@ -172,9 +135,7 @@ function AppContent() {
   }
 
   const handleNavigate = (view: string) => {
-    console.log('[App] handleNavigate called with view:', view)
     setCurrentView(view)
-    console.log('[App] currentView set to:', view)
     
     // Update URL to reflect current view (web only)
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -187,9 +148,8 @@ function AppContent() {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return
 
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       const view = getViewFromUrl()
-      console.log('[App] Browser navigation detected, switching to view:', view)
       setCurrentView(view)
     }
 
@@ -224,10 +184,7 @@ function AppContent() {
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
         {currentView === 'tests' && <TestsView />}
         {currentView === 'flashcards' && <FlashcardsView />}
-        {currentView === 'settings' && (() => {
-          console.log('[App] Rendering SettingsView, currentView:', currentView)
-          return <SettingsView />
-        })()}
+        {currentView === 'settings' && <SettingsView />}
         <ChatBar onOpenLoginModal={openLoginModal} />
       </View>
       <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />

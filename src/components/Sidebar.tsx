@@ -36,35 +36,8 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
   }
 
   const handleSettings = () => {
-    // Log when settings is accessed and check for session (async, don't block navigation)
-    console.log('[Sidebar] Settings button pressed')
-    
-    // Navigate immediately, don't wait for session check
-    console.log('[Sidebar] Navigating to settings view...')
     onNavigate('settings')
     onClose?.()
-    console.log('[Sidebar] Navigation called')
-    
-    // Check session asynchronously without blocking navigation
-    ;(async () => {
-      try {
-        const { supabase } = await import('../lib/supabase')
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.warn('[Sidebar] Error getting session when accessing settings:', error)
-        } else if (!session) {
-          console.warn('[Sidebar] ⚠️ Settings accessed but NO SESSION/TOKEN found')
-        } else {
-          console.log('[Sidebar] ✓ Settings accessed with valid session', {
-            userId: session.user?.id,
-            expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
-          })
-        }
-      } catch (err) {
-        console.error('[Sidebar] Error checking session:', err)
-      }
-    })()
   }
 
   const handleNavigate = (view: string) => {
