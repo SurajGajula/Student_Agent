@@ -21,6 +21,7 @@ interface AuthStore {
   signUp: (email: string, password: string, name: string) => Promise<void>
   signOut: () => Promise<void>
   initializeAuth: () => Promise<void>
+  syncFromSession: () => Promise<void> // Always syncs Zustand state with actual Supabase session
 }
 
 // Helper function to sync all stores from Supabase
@@ -93,13 +94,64 @@ const clearAllStores = async () => {
   })
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
+// Helper function to sync Zustand state with actual Supabase session
+const syncStateFromSession = async (set: any) => {
+  try {
+    // Ensure Supabase is initialized
+    const { initSupabase } = await import('../lib/supabase')
+    await initSupabase()
+    
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.warn('[authStore] Error getting session:', error)
+      set({
+        isLoggedIn: false,
+        user: null,
+        username: 'User',
+        email: null,
+      })
+      return
+    }
+
+    if (session?.user) {
+      const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
+      set({
+        isLoggedIn: true,
+        user: session.user,
+        username: name,
+        email: session.user.email || null,
+      })
+    } else {
+      set({
+        isLoggedIn: false,
+        user: null,
+        username: 'User',
+        email: null,
+      })
+    }
+  } catch (error) {
+    console.error('[authStore] Error syncing from session:', error)
+    set({
+      isLoggedIn: false,
+      user: null,
+      username: 'User',
+      email: null,
+    })
+  }
+}
+
+export const useAuthStore = create<AuthStore>((set, get) => ({
   isLoggedIn: false,
   user: null,
   username: 'User',
   email: null,
   isLoading: false,
   error: null,
+
+  syncFromSession: async () => {
+    await syncStateFromSession(set)
+  },
 
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, error: null })
@@ -111,17 +163,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       if (error) throw error
 
-      if (data.user && data.session) {
-        const name = data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User'
-        set({
-          isLoggedIn: true,
-          user: data.user,
-          username: name,
-          email: data.user.email || null,
-          isLoading: false,
-          error: null,
-        })
-      }
+      // Sync state from actual session (don't trust the response data alone)
+      await syncStateFromSession(set)
+      
+      set({ isLoading: false, error: null })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in'
       set({ isLoading: false, error: errorMessage })
@@ -144,19 +189,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       if (error) throw error
 
-      if (data.user && data.session) {
-        const name = data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User'
-        set({
-          isLoggedIn: true,
-          user: data.user,
-          username: name,
-          email: data.user.email || null,
-          isLoading: false,
-          error: null,
-        })
-        // Sync all stores after successful signup
-        await syncAllStores()
-      }
+      // Sync state from actual session (don't trust the response data alone)
+      await syncStateFromSession(set)
+      
+      // Sync all stores after successful signup
+      await syncAllStores()
+      
+      set({ isLoading: false, error: null })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up'
       set({ isLoading: false, error: errorMessage })
@@ -173,14 +212,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
       // Clear all stores
       await clearAllStores()
 
-      set({
-        isLoggedIn: false,
-        user: null,
-        username: 'User',
-        email: null,
-        isLoading: false,
-        error: null,
-      })
+      // Sync state from actual session to ensure it's cleared
+      await syncStateFromSession(set)
+      
+      set({ isLoading: false, error: null })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out'
       set({ isLoading: false, error: errorMessage })
@@ -195,29 +230,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const { initSupabase } = await import('../lib/supabase')
       await initSupabase()
       
-      // Check for existing session
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Sync state from actual session (always check the real session)
+      await syncStateFromSession(set)
       
-      if (error) throw error
-
+      // If we have a session, sync all stores
+      const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-        set({
-          isLoggedIn: true,
-          user: session.user,
-          username: name,
-          email: session.user.email || null,
-          isLoading: false,
-          error: null,
-        })
-        // Sync all stores after successful auth initialization
         await syncAllStores()
-      } else {
-        set({ isLoading: false })
       }
+      
+      set({ isLoading: false, error: null })
 
-      // Listen for auth state changes
+      // Listen for auth state changes - this handles cross-tab synchronization
       supabase.auth.onAuthStateChange(async (event, session) => {
+        // Always sync from the actual session passed to the listener
         if (session?.user) {
           const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
           set({

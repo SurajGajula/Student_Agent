@@ -38,19 +38,21 @@ function AppContent() {
     init()
   }, [])
 
-  // Ensure Supabase is initialized when tab becomes visible (web only)
-  // The onAuthStateChange listener handles cross-tab synchronization automatically
+  // Sync auth state from actual session when tab becomes visible (web only)
+  // This prevents phantom logouts by always checking the real Supabase session
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
     const handleVisibilityChange = async () => {
       if (!document.hidden) {
-        // Just ensure Supabase is initialized - onAuthStateChange handles cross-tab sync
+        // Sync auth state from actual Supabase session
         try {
           const { initSupabase } = await import('./lib/supabase')
           await initSupabase()
+          // Sync Zustand state with actual session to prevent phantom logouts
+          await useAuthStore.getState().syncFromSession()
         } catch (err) {
-          console.error('Error initializing Supabase on visibility change:', err)
+          console.error('Error syncing auth on visibility change:', err)
         }
       }
     }
