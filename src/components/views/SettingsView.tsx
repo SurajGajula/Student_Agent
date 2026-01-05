@@ -28,6 +28,31 @@ function SettingsView() {
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
   const isMobile = windowWidth <= 768
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[SettingsView] Component mounted/updated', {
+      isLoggedIn,
+      isLoading,
+      error,
+      hasSession: 'checking...'
+    })
+    
+    // Check actual session
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[SettingsView] Actual session check:', {
+          hasSession: !!session,
+          userId: session?.user?.id,
+          isLoggedIn,
+          mismatch: !!session !== isLoggedIn
+        })
+      } catch (err) {
+        console.error('[SettingsView] Error checking session:', err)
+      }
+    })()
+  }, [isLoggedIn, isLoading, error])
   // Button center calculation: button is at top (insets.top + 8 on iOS, 50 on web), height is 40px (8px padding + 24px icon + 8px padding)
   // Button center = (insets.top + 8) + 20 = insets.top + 28 on iOS, or 50 + 20 = 70 on web
   // Title is 32px tall, so half-height is 16px
@@ -96,6 +121,19 @@ function SettingsView() {
       setLoadingSubscription(false)
     }
   }
+
+  useEffect(() => {
+    // Sync auth state from actual session when component mounts (in case it's out of sync)
+    const syncAuth = async () => {
+      try {
+        const { useAuthStore } = await import('../../stores/authStore')
+        await useAuthStore.getState().syncFromSession()
+      } catch (err) {
+        console.error('[SettingsView] Error syncing auth state:', err)
+      }
+    }
+    syncAuth()
+  }, [])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -188,7 +226,10 @@ function SettingsView() {
 
   const usagePercentage = monthlyLimit > 0 ? (tokensUsed / monthlyLimit) * 100 : 0
 
+  console.log('[SettingsView] Rendering with isLoggedIn:', isLoggedIn, 'isLoading:', isLoading)
+
   if (!isLoggedIn) {
+    console.log('[SettingsView] Rendering logged-out view')
     return (
       <View style={styles.container}>
         <View style={[
@@ -209,6 +250,8 @@ function SettingsView() {
     )
   }
 
+  console.log('[SettingsView] Rendering logged-in view')
+  
   return (
     <ScrollView 
       style={styles.container} 

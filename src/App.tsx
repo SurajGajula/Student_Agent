@@ -157,7 +157,10 @@ function AppContent() {
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
         {currentView === 'tests' && <TestsView />}
         {currentView === 'flashcards' && <FlashcardsView />}
-        {currentView === 'settings' && <SettingsView />}
+        {currentView === 'settings' && (() => {
+          console.log('[App] Rendering SettingsView, currentView:', currentView)
+          return <SettingsView />
+        })()}
         <ChatBar onOpenLoginModal={openLoginModal} />
       </View>
       <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />
