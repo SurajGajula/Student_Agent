@@ -235,16 +235,30 @@ function getEnvVar(key: string): string | undefined {
  */
 export async function initSupabase(): Promise<SupabaseClient> {
   if (supabaseClient) {
-    return supabaseClient
+    // If client exists, refresh session to ensure it's still valid
+    try {
+      await supabaseClient.auth.getSession()
+    } catch (error) {
+      console.warn('[supabase.ts] Session check failed, reinitializing client')
+      supabaseClient = null
+    }
   }
 
-  const config = await fetchRuntimeConfig()
-  
-  supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey)
-  
-  if (typeof window !== 'undefined') {
-    console.log('[supabase.ts] Supabase client initialized with runtime config')
-    console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
+  if (!supabaseClient) {
+    const config = await fetchRuntimeConfig()
+    
+    supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      }
+    })
+    
+    if (typeof window !== 'undefined') {
+      console.log('[supabase.ts] Supabase client initialized with runtime config')
+      console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
+    }
   }
   
   return supabaseClient
@@ -262,6 +276,42 @@ export function getSupabase(): SupabaseClient {
     )
   }
   return supabaseClient
+}
+
+/**
+ * Get a fresh session, refreshing if necessary
+ * This ensures the session token is valid before making API calls
+ */
+export async function getFreshSession() {
+  await initSupabase()
+  const client = getSupabase()
+  
+  // Get current session
+  const { data: { session }, error } = await client.auth.getSession()
+  
+  if (error) {
+    throw new Error(`Failed to get session: ${error.message}`)
+  }
+  
+  if (!session) {
+    throw new Error('No active session')
+  }
+  
+  // Check if session is expired or about to expire (within 5 minutes)
+  const expiresAt = session.expires_at
+  if (expiresAt) {
+    const expiresIn = expiresAt - Math.floor(Date.now() / 1000)
+    if (expiresIn < 300) { // Less than 5 minutes
+      // Try to refresh the session
+      const { data: { session: refreshedSession }, error: refreshError } = await client.auth.refreshSession()
+      if (refreshError || !refreshedSession) {
+        throw new Error('Session expired and could not be refreshed')
+      }
+      return refreshedSession
+    }
+  }
+  
+  return session
 }
 
 /**

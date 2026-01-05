@@ -38,36 +38,77 @@ function AppContent() {
     init()
   }, [])
 
-  // Refresh session when window regains focus (web only)
+  // Refresh session when window/tab regains focus or becomes visible (web only)
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
-    const handleFocus = async () => {
+    const refreshSession = async () => {
       try {
         // Ensure Supabase is initialized
         const { initSupabase, getSupabase } = await import('./lib/supabase')
         await initSupabase()
         
-        // Refresh the session to ensure it's still valid
         const supabase = getSupabase()
+        
+        // Refresh the session token to ensure it's still valid
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.warn('Session refresh error on focus:', error)
+          console.warn('Session refresh error:', error)
+          // If session is invalid, clear auth state
+          if (useAuthStore.getState().isLoggedIn) {
+            useAuthStore.getState().signOut().catch(console.error)
+          }
           return
         }
 
-        // If we have a session but auth store says we're not logged in, refresh auth
-        if (session?.user && !useAuthStore.getState().isLoggedIn) {
-          await useAuthStore.getState().initializeAuth()
+        // If we have a valid session
+        if (session?.user) {
+          // Update auth store if it's out of sync
+          const authState = useAuthStore.getState()
+          if (!authState.isLoggedIn || authState.user?.id !== session.user.id) {
+            const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
+            useAuthStore.setState({
+              isLoggedIn: true,
+              user: session.user,
+              username: name,
+              email: session.user.email || null,
+            })
+          }
+        } else {
+          // No session - clear auth state if we think we're logged in
+          if (useAuthStore.getState().isLoggedIn) {
+            useAuthStore.setState({
+              isLoggedIn: false,
+              user: null,
+              username: 'User',
+              email: null,
+            })
+          }
         }
       } catch (err) {
-        console.error('Error refreshing session on focus:', err)
+        console.error('Error refreshing session:', err)
+      }
+    }
+
+    // Handle both focus and visibility change events
+    const handleFocus = () => {
+      refreshSession()
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshSession()
       }
     }
 
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   // Handle window resize for responsive behavior
