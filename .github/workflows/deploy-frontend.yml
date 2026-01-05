@@ -52,6 +52,7 @@ jobs:
           source: "dist/"
           target: "/home/${{ secrets.EC2_USERNAME }}/Student_Agent/"
           strip_components: 0
+          timeout: 60s
       
       - name: Set permissions and reload Nginx
         uses: appleboy/ssh-action@master
@@ -65,4 +66,5 @@ jobs:
             sudo chmod -R 755 dist
             sudo systemctl reload nginx
             echo "Frontend deployed successfully!"
+          timeout: 60s
 

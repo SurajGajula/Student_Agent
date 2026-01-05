@@ -72,18 +72,7 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       apiUrlsToTry.push((window as any).__API_URL__)
     }
     
-    // 2. Try environment variable (if set in Amplify)
-    const envApiUrl = getPlatformApiBaseUrl()
-    if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
-      apiUrlsToTry.push(envApiUrl)
-    }
-    
-    // 3. If we have a cached apiUrl from previous config, try that
-    if (runtimeConfig?.apiUrl) {
-      apiUrlsToTry.unshift(runtimeConfig.apiUrl)
-    }
-    
-    // 4. For same-domain setups, use window.location.origin FIRST (same domain = no CORS)
+    // 2. For same-domain setups, use window.location.origin FIRST (same domain = no CORS)
     if (typeof window !== 'undefined') {
       // If on the same domain (production), use same origin
       if (window.location.hostname === 'studentagent.site' || 
@@ -97,6 +86,33 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
         apiUrlsToTry.push(window.location.origin)
       }
     }
+    
+    // 3. Try environment variable (if set in Amplify)
+    const envApiUrl = getPlatformApiBaseUrl()
+    if (envApiUrl && envApiUrl !== 'http://localhost:3001') {
+      // Only add if not already in the list
+      if (!apiUrlsToTry.includes(envApiUrl)) {
+        apiUrlsToTry.push(envApiUrl)
+      }
+    }
+    
+    // 4. If we have a cached apiUrl from previous config, try that
+    if (runtimeConfig?.apiUrl) {
+      if (!apiUrlsToTry.includes(runtimeConfig.apiUrl)) {
+        apiUrlsToTry.unshift(runtimeConfig.apiUrl)
+      }
+    }
+    
+    // 5. Ensure we have at least one URL to try (fallback)
+    if (apiUrlsToTry.length === 0) {
+      // Fallback: use the local getApiBaseUrl function
+      const fallbackUrl = getApiBaseUrl()
+      if (fallbackUrl && !apiUrlsToTry.includes(fallbackUrl)) {
+        apiUrlsToTry.push(fallbackUrl)
+      }
+    }
+    
+    console.log(`[supabase.ts] Will try ${apiUrlsToTry.length} API URLs:`, apiUrlsToTry)
     
     let lastError: Error | null = null
     
