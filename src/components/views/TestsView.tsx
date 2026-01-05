@@ -325,6 +325,7 @@ function TestsView() {
         </View>
       ) : (
         <FlatList
+          key={`tests-grid-${numColumns}`}
           data={gridData}
           numColumns={numColumns}
           keyExtractor={(item) => item.id}

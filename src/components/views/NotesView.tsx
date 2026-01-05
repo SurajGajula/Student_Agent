@@ -601,6 +601,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
           })}
         >
           <FlatList
+            key={`notes-grid-${numColumns}`}
             data={gridData}
             numColumns={numColumns}
             keyExtractor={(item) => item.id}

@@ -404,6 +404,7 @@ function FlashcardsView() {
         </View>
       ) : (
         <FlatList
+          key={`flashcards-grid-${numColumns}`}
           data={gridData}
           numColumns={numColumns}
           keyExtractor={(item) => item.id}
