@@ -60,10 +60,42 @@ export async function initializeGeminiClient(): Promise<boolean> {
     
     // Fallback to file if env var not available (for local development)
     if (!loadedServiceAccountKey) {
-      const serviceAccountPath = join(__dirname, '..', 'studentagent.json')
-      if (existsSync(serviceAccountPath)) {
-        loadedServiceAccountKey = JSON.parse(readFileSync(serviceAccountPath, 'utf8')) as ServiceAccountKey
-        console.log('Loaded service account from studentagent.json file')
+      // Try multiple possible paths (in order of preference)
+      const possiblePaths = [
+        join(process.cwd(), 'studentagent.json'), // Project root (most reliable)
+        join(__dirname, '..', 'studentagent.json'), // Relative to compiled file
+        'studentagent.json', // Current directory
+      ]
+      
+      console.log(`[gemini.ts] Looking for studentagent.json file...`)
+      console.log(`[gemini.ts] process.cwd(): ${process.cwd()}`)
+      console.log(`[gemini.ts] __dirname: ${__dirname}`)
+      
+      let foundPath: string | null = null
+      for (const serviceAccountPath of possiblePaths) {
+        console.log(`[gemini.ts] Checking: ${serviceAccountPath} (exists: ${existsSync(serviceAccountPath)})`)
+        if (existsSync(serviceAccountPath)) {
+          foundPath = serviceAccountPath
+          break
+        }
+      }
+      
+      if (foundPath) {
+        try {
+          console.log(`[gemini.ts] ✓ Found file at: ${foundPath}`)
+          const fileContent = readFileSync(foundPath, 'utf8')
+          loadedServiceAccountKey = JSON.parse(fileContent) as ServiceAccountKey
+          console.log(`[gemini.ts] ✓ Loaded service account from studentagent.json file (project: ${loadedServiceAccountKey.project_id})`)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          console.error(`[gemini.ts] ✗ Failed to read/parse studentagent.json: ${errorMessage}`)
+          if (error instanceof Error && error.stack) {
+            console.error(`[gemini.ts] Stack trace: ${error.stack}`)
+          }
+        }
+      } else {
+        console.error(`[gemini.ts] ✗ studentagent.json not found in any of the checked paths:`)
+        possiblePaths.forEach(path => console.error(`[gemini.ts]   - ${path}`))
       }
     }
     
