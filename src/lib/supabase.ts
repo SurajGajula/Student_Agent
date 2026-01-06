@@ -151,7 +151,11 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
         console.log(`[supabase.ts] Config apiUrl: ${runtimeConfig.apiUrl}`)
         return runtimeConfig
       } catch (error) {
-        console.warn(`[supabase.ts] Failed to fetch from ${apiUrl}:`, error)
+        const errorDetails = error instanceof Error ? error.message : String(error)
+        console.error(`[supabase.ts] Failed to fetch from ${apiUrl}:`, errorDetails)
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.error(`[supabase.ts] Network error - check CORS, SSL, or network connectivity`)
+        }
         lastError = error as Error
         // Continue to next URL
         continue
