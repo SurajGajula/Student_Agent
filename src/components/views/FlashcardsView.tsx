@@ -294,6 +294,9 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
                   {
                     transform: [{ translateX: prevSlideAnim }],
                     position: 'absolute',
+                    ...(Platform.OS === 'web' && {
+                      zIndex: 1, // Lower z-index for sliding out card
+                    }),
                   },
                 ]}
               >
@@ -319,6 +322,9 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
                 styles.flashcard,
                 {
                   transform: [{ translateX: slideAnim }],
+                  ...(Platform.OS === 'web' && {
+                    zIndex: 2, // Higher z-index for current card
+                  }),
                 },
               ]}
             >
@@ -484,6 +490,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+    ...(Platform.OS === 'web' && {
+      position: 'relative',
+      zIndex: 1, // Lower than sidebar to stay behind it
+    }),
   },
   header: {
     flexDirection: 'row',
@@ -594,6 +604,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    ...(Platform.OS === 'web' && {
+      overflow: 'hidden', // Clip cards that go outside bounds
+    }),
   },
   progress: {
     fontSize: 16,
@@ -608,6 +621,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden', // Clip cards that go outside bounds
+    ...(Platform.OS === 'web' && {
+      overflow: 'hidden',
+    }),
   },
   flashcard: {
     width: '100%',

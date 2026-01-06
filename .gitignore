@@ -66,3 +66,5 @@ ecosystem.config.cjs
 deployment/
 *.example
 
+# Supabase
+supabase/

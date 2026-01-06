@@ -46,6 +46,7 @@
     "react-native-svg": "15.2.0",
     "react-native-web": "~0.19.10",
     "stripe": "^14.21.0",
+    "supabase": "^2.71.0",
     "zustand": "^4.4.7"
   },
   "devDependencies": {

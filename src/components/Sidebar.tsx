@@ -171,6 +171,10 @@ const styles = StyleSheet.create({
   sidebarDesktop: {
     width: 250,
     padding: 20,
+    ...(Platform.OS === 'web' && {
+      position: 'relative',
+      zIndex: 10, // Higher than flashcard container to stay in front
+    }),
   },
   sidebarMobile: {
     position: 'absolute',
