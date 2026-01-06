@@ -4,12 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CreateFolderModal from '../modals/CreateFolderModal'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
+import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, FolderIcon, DeleteIcon, FlashcardsIcon, ShuffleIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
 import { showConfirm } from '../../lib/platformHelpers'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
-function FlashcardsView() {
+interface FlashcardsViewProps {
+  onOpenLoginModal?: () => void
+}
+
+function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [currentSetId, setCurrentSetId] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
@@ -85,6 +90,10 @@ function FlashcardsView() {
   }
 
   const handleCreateFolder = () => {
+    if (!isLoggedIn) {
+      onOpenLoginModal?.()
+      return
+    }
     setIsFolderModalOpen(true)
   }
 

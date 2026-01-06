@@ -4,12 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CreateFolderModal from '../modals/CreateFolderModal'
 import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
+import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, FolderIcon, DeleteIcon, TestsIcon, EyeIcon, EyeOffIcon } from '../icons'
 import { showConfirm } from '../../lib/platformHelpers'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
-function TestsView() {
+interface TestsViewProps {
+  onOpenLoginModal?: () => void
+}
+
+function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   const [currentTestId, setCurrentTestId] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
@@ -17,6 +22,7 @@ function TestsView() {
   const [userResponses, setUserResponses] = useState<Record<string, string>>({})
   const { tests, removeTest, getTestById } = useTestsStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
+  const { isLoggedIn } = useAuthStore()
   const currentTest = currentTestId ? getTestById(currentTestId) : null
   const { setIsInDetailMode } = useDetailMode()
   
@@ -58,6 +64,10 @@ function TestsView() {
   }
 
   const handleCreateFolder = () => {
+    if (!isLoggedIn) {
+      onOpenLoginModal?.()
+      return
+    }
     setIsFolderModalOpen(true)
   }
 

@@ -234,6 +234,10 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   }
 
   const handleAddNote = () => {
+    if (!isLoggedIn) {
+      onOpenLoginModal()
+      return
+    }
     setIsNoteModalOpen(true)
   }
 
@@ -294,6 +298,10 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   }
 
   const handleCreateFolder = () => {
+    if (!isLoggedIn) {
+      onOpenLoginModal()
+      return
+    }
     setIsFolderModalOpen(true)
   }
 

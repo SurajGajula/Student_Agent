@@ -197,8 +197,8 @@ function AppContent() {
       />
       <View style={styles.mainContent}>
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
-        {currentView === 'tests' && <TestsView />}
-        {currentView === 'flashcards' && <FlashcardsView />}
+        {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
+        {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'settings' && <SettingsView />}
         <ChatBar onOpenLoginModal={openLoginModal} />
       </View>
