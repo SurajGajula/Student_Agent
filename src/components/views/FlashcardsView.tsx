@@ -25,6 +25,7 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
+  const { isLoggedIn } = useAuthStore()
   
   // Animation refs
   const flipAnim = useRef(new Animated.Value(0)).current
