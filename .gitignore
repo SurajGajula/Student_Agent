@@ -68,3 +68,5 @@ deployment/
 
 # Supabase
 supabase/
+
+dist/
