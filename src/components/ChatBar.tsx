@@ -435,6 +435,11 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           }
         }
       } else {
+        // No API call was made - message doesn't match any supported intent
+        setStatusMessage({ 
+          type: 'error', 
+          text: 'Message did not trigger any action. Try: "turn @[note] into test", "create flashcard from @[note]", or "find courses for..."' 
+        })
         setMessage('')
       }
     } catch (error) {

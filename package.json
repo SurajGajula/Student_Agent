@@ -20,7 +20,8 @@
     "prebuild:android": "expo prebuild --platform android",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-config": "~0.18.11",
@@ -59,6 +60,8 @@
     "@types/react-dom": "~18.2.25",
     "@types/react-native": "^0.72.8",
     "concurrently": "^9.2.1",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
     "tsx": "^4.7.0",
     "typescript": "~5.3.3"
   }

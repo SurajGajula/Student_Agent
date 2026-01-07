@@ -148,73 +148,119 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       }
     }
     
+    // Check for build-time config first (in dev mode, backend might not be running)
+    const fallbackUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
+    const fallbackKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
+    
+    // In dev mode, if backend isn't available, use build-time config immediately
+    const isDevMode = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' ||
+       window.location.hostname.startsWith('192.168.'))
+    
     let lastError: Error | null = null
+    let connectionRefused = false
     
     for (const apiUrl of apiUrlsToTry) {
       try {
+        // Add timeout to fetch (5 seconds)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
         
-        // Note: If you get "Mixed Content" errors, it's because HTTPS pages (Amplify) 
-        // cannot access HTTP backends. You'll need to set up HTTPS on EC2.
-        const response = await fetch(`${apiUrl}/api/config`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          // Use 'omit' to avoid sending credentials in cross-origin requests
-          credentials: 'omit',
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`)
-        }
-
-        // Check if response is actually JSON (not HTML error page)
-        const contentType = response.headers.get('content-type') || ''
-        const text = await response.text()
-        
-        // Detect HTML responses (common when hitting wrong endpoint or dev server)
-        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-          throw new Error(`Received HTML instead of JSON (likely wrong endpoint or dev server)`)
-        }
-        
-        // Try to parse as JSON
-        let config
         try {
-          config = JSON.parse(text)
-        } catch (parseError) {
-          throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
-        }
-        
-        if (!config.supabaseUrl || !config.supabasePublishableKey) {
-          throw new Error('Config missing required Supabase credentials')
-        }
+          // Note: If you get "Mixed Content" errors, it's because HTTPS pages (Amplify) 
+          // cannot access HTTP backends. You'll need to set up HTTPS on EC2.
+          const response = await fetch(`${apiUrl}/api/config`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            // Use 'omit' to avoid sending credentials in cross-origin requests
+            credentials: 'omit',
+            signal: controller.signal,
+          })
+          
+          clearTimeout(timeoutId)
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`)
+          }
 
-        // Use the apiUrl from the config response if provided, otherwise use the one we tried
-        runtimeConfig = {
-          ...config,
-          apiUrl: config.apiUrl || apiUrl
+          // Check if response is actually JSON (not HTML error page)
+          const contentType = response.headers.get('content-type') || ''
+          const text = await response.text()
+          
+          // Detect HTML responses (common when hitting wrong endpoint or dev server)
+          if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+            throw new Error(`Received HTML instead of JSON (likely wrong endpoint or dev server)`)
+          }
+          
+          // Try to parse as JSON
+          let config
+          try {
+            config = JSON.parse(text)
+          } catch (parseError) {
+            throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+          }
+          
+          if (!config.supabaseUrl || !config.supabasePublishableKey) {
+            throw new Error('Config missing required Supabase credentials')
+          }
+
+          // Use the apiUrl from the config response if provided, otherwise use the one we tried
+          runtimeConfig = {
+            ...config,
+            apiUrl: config.apiUrl || apiUrl
+          }
+          return runtimeConfig
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          throw fetchError
         }
-        return runtimeConfig
       } catch (error) {
         const errorDetails = error instanceof Error ? error.message : String(error)
-        console.error(`[supabase.ts] Failed to fetch from ${apiUrl}:`, errorDetails)
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          console.error(`[supabase.ts] Network error - check CORS, SSL, or network connectivity`)
+        
+        // Detect connection refused or network errors
+        const isConnectionError = 
+          error instanceof TypeError && 
+          (error.message.includes('fetch') || 
+           error.message.includes('Failed to fetch') ||
+           error.message.includes('ERR_CONNECTION_REFUSED') ||
+           error.message.includes('network') ||
+           error.name === 'AbortError')
+        
+        if (isConnectionError) {
+          connectionRefused = true
+          if (isDevMode) {
+            console.warn(`[supabase.ts] Backend not available at ${apiUrl} (connection refused). This is normal if the backend server isn't running.`)
+          } else {
+            console.error(`[supabase.ts] Network error connecting to ${apiUrl}:`, errorDetails)
+          }
+        } else {
+          console.error(`[supabase.ts] Failed to fetch from ${apiUrl}:`, errorDetails)
         }
+        
         lastError = error as Error
+        
+        // In dev mode, if connection is refused, try build-time config immediately
+        if (isDevMode && connectionRefused && fallbackUrl && fallbackKey) {
+          console.warn('[supabase.ts] Backend unavailable in dev mode, using build-time config')
+          runtimeConfig = {
+            supabaseUrl: fallbackUrl,
+            supabasePublishableKey: fallbackKey,
+            apiUrl: getApiBaseUrl()
+          }
+          return runtimeConfig
+        }
+        
         // Continue to next URL
         continue
       }
     }
     
     // If all URLs failed, try fallback to build-time config
-    console.error('[supabase.ts] Failed to fetch runtime config from all URLs:', lastError)
-    
-    const fallbackUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
-    const fallbackKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-    
     if (fallbackUrl && fallbackKey) {
-      console.warn('[supabase.ts] Using fallback build-time config')
+      console.warn('[supabase.ts] Failed to fetch runtime config, using fallback build-time config')
       runtimeConfig = {
         supabaseUrl: fallbackUrl,
         supabasePublishableKey: fallbackKey,
@@ -223,7 +269,12 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       return runtimeConfig
     }
     
-    throw lastError || new Error('Failed to fetch config from all available URLs')
+    // Only throw if we have no fallback config
+    const errorMessage = isDevMode && connectionRefused
+      ? 'Backend server not running. Please start the backend server on port 3001, or ensure build-time environment variables are set.'
+      : 'Failed to fetch config from all available URLs and no build-time config available'
+    
+    throw lastError || new Error(errorMessage)
   })()
 
   return configPromise
