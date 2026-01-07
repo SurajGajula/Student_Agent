@@ -7,6 +7,7 @@ import MobileMenuButton from './components/MobileMenuButton'
 import NotesView from './components/views/NotesView'
 import TestsView from './components/views/TestsView'
 import FlashcardsView from './components/views/FlashcardsView'
+import GoalsView from './components/views/GoalsView'
 import SettingsView from './components/views/SettingsView'
 import ChatBar from './components/ChatBar'
 import LoginModal from './components/modals/LoginModal'
@@ -20,6 +21,7 @@ const getViewFromUrl = (): string => {
     if (path === '/settings') return 'settings'
     if (path === '/tests') return 'tests'
     if (path === '/flashcards') return 'flashcards'
+    if (path === '/goals') return 'goals'
     if (path === '/notes' || path === '/') return 'notes'
   }
   return 'notes'
@@ -27,6 +29,7 @@ const getViewFromUrl = (): string => {
 
 function AppContent() {
   const [currentView, setCurrentView] = useState<string>(getViewFromUrl())
+  const [navCounter, setNavCounter] = useState(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -52,18 +55,22 @@ function AppContent() {
 
   // Sync auth state from actual session when tab becomes visible (web only)
   // This prevents phantom logouts by always checking the real Supabase session
+  // Runs immediately when tab becomes visible (no delays)
   useEffect(() => {
     if (Platform.OS !== 'web') return
 
-    const handleVisibilityChange = async () => {
+    const handleVisibilityChange = () => {
       if (!document.hidden) {
-        try {
-          const { initSupabase } = await import('./lib/supabase')
-          await initSupabase()
-          await useAuthStore.getState().syncFromSession()
-        } catch (err) {
-          console.error('Error syncing auth on visibility change:', err)
-        }
+        // Run immediately - no delays or timers
+        (async () => {
+          try {
+            const { initSupabase } = await import('./lib/supabase')
+            await initSupabase()
+            await useAuthStore.getState().syncFromSession()
+          } catch (err) {
+            console.error('Error syncing auth on visibility change:', err)
+          }
+        })()
       }
     }
 
@@ -151,6 +158,7 @@ function AppContent() {
 
   const handleNavigate = (view: string) => {
     setCurrentView(view)
+    setNavCounter(c => c + 1) // Increment nav counter to trigger view reset
     
     // Update URL to reflect current view (web only)
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -199,6 +207,7 @@ function AppContent() {
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
         {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
+        {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
         {currentView === 'settings' && <SettingsView />}
         <ChatBar onOpenLoginModal={openLoginModal} />
       </View>

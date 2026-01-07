@@ -39,8 +39,19 @@ function getApiBaseUrl(): string {
         window.location.hostname === 'www.studentagent.site') {
       return window.location.origin // Same domain - use relative paths
     }
-    // Development - use localhost
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Development - check if we're on a frontend dev server port
+    if (window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.startsWith('192.168.')) {
+      // Frontend dev server ports (Expo Metro, Vite, etc.)
+      const frontendDevPorts = [8081, 5173, 19006, 3000]
+      const currentPort = parseInt(window.location.port) || 80
+      
+      // If we're on a frontend dev server port, use backend API port (3001) instead
+      if (frontendDevPorts.includes(currentPort)) {
+        return `http://${window.location.hostname}:3001`
+      }
+      // Not a known frontend dev port, might be backend itself or custom setup
       return window.location.origin
     }
     // Fallback for other cases
@@ -80,11 +91,24 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
           window.location.hostname === 'www.studentagent.site') {
         apiUrlsToTry.unshift(window.location.origin) // Add to front of array (highest priority)
       }
-      // Development - use localhost origin
+      // Development - check if we're on a frontend dev server port
       else if (window.location.hostname === 'localhost' || 
                window.location.hostname === '127.0.0.1' ||
                window.location.hostname.startsWith('192.168.')) {
-        apiUrlsToTry.push(window.location.origin)
+        // Frontend dev server ports (Expo Metro, Vite, etc.)
+        const frontendDevPorts = [8081, 5173, 19006, 3000]
+        const currentPort = parseInt(window.location.port) || 80
+        
+        // If we're on a frontend dev server port, use backend API port (3001) instead
+        if (frontendDevPorts.includes(currentPort)) {
+          const backendUrl = `${window.location.protocol}//${window.location.hostname}:3001`
+          if (!apiUrlsToTry.includes(backendUrl)) {
+            apiUrlsToTry.unshift(backendUrl) // Prioritize backend API URL
+          }
+        } else {
+          // Not a known frontend dev port, might be backend itself or custom setup
+          apiUrlsToTry.push(window.location.origin)
+        }
       }
     }
     
@@ -113,13 +137,21 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
       }
     }
     
-    console.log(`[supabase.ts] Will try ${apiUrlsToTry.length} API URLs:`, apiUrlsToTry)
+    // 6. In dev mode, always ensure localhost:3001 is in the list (backend API)
+    if (typeof window !== 'undefined' && 
+        (window.location.hostname === 'localhost' || 
+         window.location.hostname === '127.0.0.1' ||
+         window.location.hostname.startsWith('192.168.'))) {
+      const backendDevUrl = `http://${window.location.hostname}:3001`
+      if (!apiUrlsToTry.includes(backendDevUrl)) {
+        apiUrlsToTry.push(backendDevUrl) // Add backend URL as fallback
+      }
+    }
     
     let lastError: Error | null = null
     
     for (const apiUrl of apiUrlsToTry) {
       try {
-        console.log(`[supabase.ts] Trying to fetch config from: ${apiUrl}/api/config`)
         
         // Note: If you get "Mixed Content" errors, it's because HTTPS pages (Amplify) 
         // cannot access HTTP backends. You'll need to set up HTTPS on EC2.
@@ -136,7 +168,22 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
           throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`)
         }
 
-        const config = await response.json()
+        // Check if response is actually JSON (not HTML error page)
+        const contentType = response.headers.get('content-type') || ''
+        const text = await response.text()
+        
+        // Detect HTML responses (common when hitting wrong endpoint or dev server)
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+          throw new Error(`Received HTML instead of JSON (likely wrong endpoint or dev server)`)
+        }
+        
+        // Try to parse as JSON
+        let config
+        try {
+          config = JSON.parse(text)
+        } catch (parseError) {
+          throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+        }
         
         if (!config.supabaseUrl || !config.supabasePublishableKey) {
           throw new Error('Config missing required Supabase credentials')
@@ -147,8 +194,6 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
           ...config,
           apiUrl: config.apiUrl || apiUrl
         }
-        console.log(`[supabase.ts] Successfully fetched config from: ${apiUrl}`)
-        console.log(`[supabase.ts] Config apiUrl: ${runtimeConfig.apiUrl}`)
         return runtimeConfig
       } catch (error) {
         const errorDetails = error instanceof Error ? error.message : String(error)
@@ -260,12 +305,8 @@ export async function initSupabase(): Promise<SupabaseClient> {
       : undefined
     
     // Check BroadcastChannel availability for cross-tab sync
-    if (typeof window !== 'undefined') {
-      if ('BroadcastChannel' in window) {
-        console.log('[supabase.ts] ✓ BroadcastChannel available for cross-tab synchronization')
-      } else {
-        console.warn('[supabase.ts] ⚠ BroadcastChannel NOT available - cross-tab sync may not work')
-      }
+    if (typeof window !== 'undefined' && !('BroadcastChannel' in window)) {
+      console.warn('[supabase.ts] ⚠ BroadcastChannel NOT available - cross-tab sync may not work')
     }
     
     supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
@@ -276,12 +317,6 @@ export async function initSupabase(): Promise<SupabaseClient> {
         detectSessionInUrl: false,
       }
     })
-  
-  if (typeof window !== 'undefined') {
-    console.log('[supabase.ts] Supabase client initialized with runtime config')
-    console.log('[supabase.ts] Supabase URL:', config.supabaseUrl.substring(0, 30) + '...')
-      console.log('[supabase.ts] Using localStorage for session persistence:', !!storage)
-  }
   
   return supabaseClient
   })()

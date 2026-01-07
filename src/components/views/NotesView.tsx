@@ -552,12 +552,12 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             { width: windowWidth } // Use actual screen width dynamically
           ]
         ]}>
-          <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
+          {/* <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
             <View style={isMobile && styles.iconWrapperMobile}>
             <FolderIcon />
             </View>
             <Text style={[styles.createFolderButtonText, isMobile && styles.buttonTextMobile]}>Create Folder</Text>
-          </Pressable>
+          </Pressable> */}
           <Pressable 
             style={[styles.uploadButton, isMobile && styles.buttonMobile]}
             onPress={handleUploadNotes}

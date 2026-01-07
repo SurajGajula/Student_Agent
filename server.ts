@@ -17,6 +17,8 @@ import chatRouter from './routes/chat.js'
 import testsRouter from './routes/tests/index.js' // Updated to use index
 import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
 import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
+import goalsRouter from './routes/goals/index.js' // Goals routes
+import coursesRouter from './routes/courses/index.js' // Courses routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
 import configRouter from './routes/config.js'
@@ -81,6 +83,8 @@ app.use('/api/folders', foldersCRUDRouter) // New folders CRUD routes
 app.use('/api', chatRouter)
 app.use('/api/tests', testsRouter) // Includes generate + CRUD
 app.use('/api/flashcards', flashcardsRouter) // Includes generate + CRUD
+app.use('/api/goals', goalsRouter) // Goals CRUD routes
+app.use('/api/courses', coursesRouter) // Course search routes
 app.use('/api', usageRouter)
 app.use('/', indexRouter)
 

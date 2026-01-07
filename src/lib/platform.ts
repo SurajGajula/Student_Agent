@@ -64,10 +64,19 @@ export const getApiBaseUrl = (): string => {
         window.location.hostname === 'www.studentagent.site') {
       return window.location.origin // Same domain - use relative paths
     }
-    // Development - use localhost
+    // Development - check if we're on a frontend dev server port
     if (window.location.hostname === 'localhost' || 
         window.location.hostname === '127.0.0.1' ||
         window.location.hostname.startsWith('192.168.')) {
+      // Frontend dev server ports (Expo Metro, Vite, etc.)
+      const frontendDevPorts = [8081, 5173, 19006, 3000]
+      const currentPort = parseInt(window.location.port) || 80
+      
+      // If we're on a frontend dev server port, use backend API port (3001) instead
+      if (frontendDevPorts.includes(currentPort)) {
+        return `http://${window.location.hostname}:3001`
+      }
+      // Not a known frontend dev port, might be backend itself or custom setup
       return window.location.origin
     }
   }

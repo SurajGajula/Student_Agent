@@ -416,12 +416,12 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
             { width: windowWidth } // Use actual screen width dynamically
           ]
         ]}>
-          <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
+          {/* <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
             <View style={isMobile && styles.iconWrapperMobile}>
             <FolderIcon />
             </View>
             <Text style={[styles.createFolderButtonText, isMobile && styles.buttonTextMobile]}>Create Folder</Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       </View>
 
@@ -569,6 +569,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     alignItems: 'center',
+    minHeight: 44, // Match NotesView button height (paddingVertical: 12 * 2 + text/icon height)
   },
   shuffleButton: {
     flexDirection: 'row',

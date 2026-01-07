@@ -8,6 +8,7 @@ import { useClassesStore } from './classesStore'
 import { useNotesStore } from './notesStore'
 import { useTestsStore } from './testsStore'
 import { useFlashcardsStore } from './flashcardsStore'
+import { useGoalsStore } from './goalsStore'
 import { useUsageStore } from './usageStore'
 
 interface AuthStore {
@@ -33,6 +34,7 @@ const syncAllStores = async () => {
       useNotesStore.getState().syncFromSupabase().catch(err => console.error('Notes sync error:', err)),
       useTestsStore.getState().syncFromSupabase().catch(err => console.error('Tests sync error:', err)),
       useFlashcardsStore.getState().syncFromSupabase().catch(err => console.error('Flashcards sync error:', err)),
+      useGoalsStore.getState().syncFromSupabase().catch(err => console.error('Goals sync error:', err)),
       useUsageStore.getState().fetchUsage().catch(err => console.error('Usage sync error:', err)),
     ])
   } catch (error) {
@@ -48,6 +50,7 @@ const clearAllStores = async () => {
     'notes-storage',
     'tests-storage',
     'flashcards-storage',
+    'goals-storage',
   ]
 
   // Clear storage (platform-aware)
@@ -89,6 +92,13 @@ const clearAllStores = async () => {
   // Reset flashcards store
   useFlashcardsStore.setState({
     flashcardSets: [],
+    isLoading: false,
+    error: null,
+  })
+
+  // Reset goals store
+  useGoalsStore.setState({
+    goals: [],
     isLoading: false,
     error: null,
   })

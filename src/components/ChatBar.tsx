@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNotesStore, type Note } from '../stores/notesStore'
 import { useTestsStore } from '../stores/testsStore'
 import { useFlashcardsStore } from '../stores/flashcardsStore'
+import { useGoalsStore } from '../stores/goalsStore'
 import { useAuthStore } from '../stores/authStore'
 import { getApiBaseUrl } from '../lib/platform'
 import { Svg, Path, Polyline, Line, Circle, Polygon } from 'react-native-svg'
@@ -28,6 +29,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   const { notes } = useNotesStore()
   const { addTest } = useTestsStore()
   const { addFlashcardSet } = useFlashcardsStore()
+  const { addGoal } = useGoalsStore()
   const { isLoggedIn } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -137,12 +139,54 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
     return patterns.some(pattern => pattern.test(lowerMessage))
   }
 
+  // Detect if message contains intent to search for courses
+  const detectCourseSearchIntent = (msg: string): { detected: boolean; school?: string; department?: string } => {
+    const lowerMessage = msg.toLowerCase()
+    
+    // Patterns for course search
+    const courseSearchPatterns = [
+      /find.*courses?/i,
+      /courses?.*for/i,
+      /recommend.*courses?/i,
+      /suggest.*courses?/i,
+      /what.*courses?/i,
+      /courses?.*that.*help/i,
+      /courses?.*will.*help/i,
+      /courses?.*to.*work/i,
+      /courses?.*for.*career/i,
+    ]
+    
+    const hasCourseIntent = courseSearchPatterns.some(pattern => pattern.test(lowerMessage))
+    
+    if (!hasCourseIntent) {
+      return { detected: false }
+    }
+
+    // Extract school (default to Stanford if not specified)
+    let school = 'Stanford'
+    const stanfordMatch = lowerMessage.match(/stanford/i)
+    if (stanfordMatch) {
+      school = 'Stanford'
+    }
+
+    // Extract department (default to CS if not specified)
+    let department = 'CS'
+    const csMatch = lowerMessage.match(/\bcs\b|c\s*s\b|computer\s*science/i)
+    if (csMatch) {
+      department = 'CS'
+    }
+
+    return { detected: true, school, department }
+  }
+
   const handleSubmit = async () => {
     if (!message.trim() || isLoading) return
 
     const isTestGeneration = detectTestIntent(message) && mentions.length > 0
     const isFlashcardGeneration = detectFlashcardIntent(message) && mentions.length > 0
-    const isAIGeneration = isTestGeneration || isFlashcardGeneration
+    const courseSearchIntent = detectCourseSearchIntent(message)
+    const isCourseSearch = courseSearchIntent.detected
+    const isAIGeneration = isTestGeneration || isFlashcardGeneration || isCourseSearch
     
     if (isAIGeneration && !isLoggedIn) {
       setStatusMessage({ type: 'error', text: 'Login to use AI tools' })
@@ -287,6 +331,91 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           } catch (error) {
             console.error('Failed to add flashcards:', error)
             setStatusMessage({ type: 'error', text: 'Failed to save flashcards. Please try again.' })
+          }
+        }
+      } else if (isCourseSearch) {
+        const { supabase } = await import('../lib/supabase')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          throw new Error('You must be logged in to use this feature')
+        }
+
+        const school = courseSearchIntent.school || 'Stanford'
+        const department = courseSearchIntent.department || 'CS'
+
+        const API_BASE_URL = getApiBaseUrl()
+        const response = await fetch(`${API_BASE_URL}/api/courses/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            query: message,
+            school,
+            department,
+            limit: 10
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication required. Please log in to use this feature.')
+          }
+          
+          if (response.status === 429) {
+            const remaining = data.remaining || 0
+            const limit = data.limit || 0
+            throw new Error(
+              `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+              `Please upgrade your plan or wait until next month.`
+            )
+          }
+          
+          throw new Error(data.message || data.error || 'Failed to search courses')
+        }
+
+        // Check if no courses were found
+        if (!data.success || !data.results || data.results.length === 0) {
+          throw new Error(data.error || `No courses found for ${school} ${department}. Make sure courses exist in the database.`)
+        }
+
+        if (data.success && data.results && data.results.length > 0) {
+          try {
+            // Generate goal name from query - use the query itself as the substantive name
+            // Clean up the query to make it a good title (remove common prefixes, capitalize)
+            let goalName = message.trim()
+            // Remove common prefixes like "find", "show me", "get me", etc.
+            goalName = goalName.replace(/^(find|show me|get me|give me|i need|i want|help me with|courses for|courses that)\s+/i, '')
+            // Capitalize first letter
+            goalName = goalName.charAt(0).toUpperCase() + goalName.slice(1)
+            // Limit length to avoid overly long titles
+            if (goalName.length > 60) {
+              goalName = goalName.substring(0, 57) + '...'
+            }
+            // Fallback to school/department if query is too short or empty
+            if (goalName.length < 5) {
+              goalName = `${school} ${department} Courses`
+            }
+            
+            await addGoal(
+              goalName,
+              message,
+              school,
+              department,
+              data.results
+            )
+            setStatusMessage({ 
+              type: 'success', 
+              text: `Goal "${goalName}" created with ${data.results.length} courses!` 
+            })
+            setMessage('')
+          } catch (error) {
+            console.error('Failed to add goal:', error)
+            setStatusMessage({ type: 'error', text: 'Failed to save goal. Please try again.' })
           }
         }
       } else {
