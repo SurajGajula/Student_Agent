@@ -365,6 +365,11 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
             </Pressable>
           </View>
         </View>
+        <CreateFolderModal
+          isOpen={isFolderModalOpen}
+          onClose={handleCloseFolderModal}
+          onSubmit={handleSubmitFolder}
+        />
       </View>
     )
   }
@@ -492,7 +497,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     ...(Platform.OS === 'web' && {
       position: 'relative',
-      zIndex: 1, // Lower than sidebar to stay behind it
+      // Don't set z-index here - let it be in normal flow so ChatBar can appear on top
     }),
   },
   header: {

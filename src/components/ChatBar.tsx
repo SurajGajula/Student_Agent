@@ -392,6 +392,9 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: '#e8e8e8',
     borderTopWidth: 1,
+    ...(Platform.OS === 'web' && {
+      zIndex: 100, // Higher z-index to ensure it appears above flashcard container
+    }),
     borderTopColor: '#d0d0d0',
     padding: 12,
     paddingBottom: 12, // Base padding, will be overridden by inline style for safe area
