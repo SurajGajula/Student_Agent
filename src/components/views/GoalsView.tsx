@@ -158,6 +158,7 @@ function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
           paddingTop: Math.max(insets.top + 8 + 8, 28),
           paddingLeft: 80,
           paddingRight: 20,
+          paddingBottom: 64, // Match height of other views that have button rows (20px marginTop + 44px button height)
           flexDirection: 'column',
           alignItems: 'flex-start',
         }
