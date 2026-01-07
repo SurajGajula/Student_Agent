@@ -41,6 +41,29 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(400).json({ error: 'Cards array is required' })
     }
 
+    // Check plan limits for free users
+    const { data: usageData } = await supabase
+      .from('user_usage')
+      .select(`
+        plan_id,
+        plans!inner(name)
+      `)
+      .eq('user_id', req.userId)
+      .single()
+
+    if (usageData && (usageData as any).plans?.name === 'free') {
+      const { count } = await supabase
+        .from('flashcards')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', req.userId)
+
+      if (count !== null && count >= 10) {
+        return res.status(403).json({
+          error: 'Free plan limit reached: You can only have 10 flashcard sets. Upgrade to add more.'
+        })
+      }
+    }
+
     const { data, error } = await supabase
       .from('flashcards')
       .insert({

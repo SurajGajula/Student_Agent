@@ -8,7 +8,7 @@ import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { parseNotesImage } from '../../lib/notesParser'
 import { BackIcon, FolderIcon, DeleteIcon, NotesIcon, UploadIcon, AddIcon } from '../icons'
-import { pickImage, showConfirm } from '../../lib/platformHelpers'
+import { pickImage } from '../../lib/platformHelpers'
 import { Svg, Circle, Path } from 'react-native-svg'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
@@ -320,13 +320,6 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const handleDeleteFolder = async (folderId: string) => {
     const folder = folders.find(f => f.id === folderId)
     if (!folder) return
-
-    const confirmed = await showConfirm(
-      'Delete Folder',
-      `Are you sure you want to delete "${folder.name}"? This action cannot be undone.`
-    )
-
-    if (!confirmed) return
 
     try {
       await removeFolder(folderId, 'note')

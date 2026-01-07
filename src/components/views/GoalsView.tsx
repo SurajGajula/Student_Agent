@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useGoalsStore, type Goal, type CourseRecommendation } from '../../stores/goalsStore'
 import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, DeleteIcon } from '../icons'
-import { showConfirm } from '../../lib/platformHelpers'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -49,13 +48,6 @@ function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
   const handleDeleteGoal = async (goalId: string) => {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
-
-    const confirmed = await showConfirm(
-      'Delete Goal',
-      `Are you sure you want to delete "${goal.name}"? This action cannot be undone.`
-    )
-
-    if (!confirmed) return
 
     try {
       await removeGoal(goalId)

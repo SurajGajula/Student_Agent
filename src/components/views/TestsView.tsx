@@ -6,7 +6,6 @@ import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, FolderIcon, DeleteIcon, TestsIcon, EyeIcon, EyeOffIcon } from '../icons'
-import { showConfirm } from '../../lib/platformHelpers'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -95,25 +94,15 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   }
 
   const handleDeleteTest = async (testId: string) => {
-    const confirmed = await showConfirm('Delete Test', 'Are you sure you want to delete this test?')
-    if (confirmed) {
-      removeTest(testId)
-      if (currentTestId === testId) {
-        setCurrentTestId(null)
-      }
+    removeTest(testId)
+    if (currentTestId === testId) {
+      setCurrentTestId(null)
     }
   }
 
   const handleDeleteFolder = async (folderId: string) => {
     const folder = folders.find(f => f.id === folderId)
     if (!folder) return
-
-    const confirmed = await showConfirm(
-      'Delete Folder',
-      `Are you sure you want to delete "${folder.name}"? This action cannot be undone.`
-    )
-
-    if (!confirmed) return
 
     try {
       await removeFolder(folderId, 'test')

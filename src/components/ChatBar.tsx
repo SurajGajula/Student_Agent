@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, TextInput, StyleSheet, Pressable, Platform, Keyboard } from 'react-native'
+import { View, Text, TextInput, StyleSheet, Pressable, Platform, Keyboard, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNotesStore, type Note } from '../stores/notesStore'
 import { useTestsStore } from '../stores/testsStore'
@@ -34,6 +34,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const insets = useSafeAreaInsets()
+  const spinAnim = useRef(new Animated.Value(0)).current
 
   // Filter notes based on autocomplete query
   const filteredNotes = notes.filter(note =>
@@ -69,6 +70,21 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
       return () => clearTimeout(timer)
     }
   }, [statusMessage])
+
+  // Animate spinner when loading
+  useEffect(() => {
+    if (isLoading) {
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ).start()
+    } else {
+      spinAnim.setValue(0)
+    }
+  }, [isLoading, spinAnim])
 
   const handleInputChange = (text: string) => {
     setMessage(text)
@@ -459,18 +475,27 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   )
 
   const SendIcon = () => (
-    <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <Line x1="22" y1="2" x2="11" y2="13" />
       <Polygon points="22 2 15 22 11 13 2 9 22 2" />
     </Svg>
   )
 
-  const Spinner = () => (
-    <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <Circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-      <Path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round" />
-    </Svg>
+  const Spinner = () => {
+    const spin = spinAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    })
+
+    return (
+      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+        <Svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+          <Path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round" />
+        </Svg>
+      </Animated.View>
     )
+  }
 
   return (
     <View style={[styles.chatbar, { paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 12) }]}>
@@ -507,7 +532,9 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
         )}
       </View>
       <Pressable style={styles.button} onPress={handleSubmit} disabled={isLoading}>
-        {isLoading ? <Spinner /> : <SendIcon />}
+        <View style={styles.iconContainer}>
+          {isLoading ? <Spinner /> : <SendIcon />}
+        </View>
       </Pressable>
     </View>
   )
@@ -625,6 +652,12 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' && {
       cursor: 'pointer',
     }),
+  },
+  iconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })
 

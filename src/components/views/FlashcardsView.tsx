@@ -6,7 +6,6 @@ import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsSt
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, FolderIcon, DeleteIcon, FlashcardsIcon, ShuffleIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
-import { showConfirm } from '../../lib/platformHelpers'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -114,13 +113,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     const folder = folders.find(f => f.id === folderId)
     if (!folder) return
 
-    const confirmed = await showConfirm(
-      'Delete Folder',
-      `Are you sure you want to delete "${folder.name}"? This action cannot be undone.`
-    )
-
-    if (!confirmed) return
-
     try {
       await removeFolder(folderId, 'flashcard')
       // If we're inside the deleted folder, navigate back
@@ -214,12 +206,9 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   }
 
   const handleDeleteSet = async (setId: string) => {
-    const confirmed = await showConfirm('Delete Flashcard Set', 'Are you sure you want to delete this flashcard set?')
-    if (confirmed) {
-      removeFlashcardSet(setId)
-      if (currentSetId === setId) {
-        setCurrentSetId(null)
-      }
+    removeFlashcardSet(setId)
+    if (currentSetId === setId) {
+      setCurrentSetId(null)
     }
   }
 
