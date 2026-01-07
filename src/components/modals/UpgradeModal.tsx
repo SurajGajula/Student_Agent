@@ -132,8 +132,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </View>
                   </View>
                   <View style={styles.benefitsList}>
-                    <Text style={styles.benefitItem}>10 notes</Text>
-                    <Text style={styles.benefitItem}>10 flashcards/tests/goals</Text>
+                    <Text style={styles.benefitItem}>10 items per category</Text>
                     <Text style={styles.benefitItem}>Limited AI usage</Text>
                   </View>
                   <Pressable 
@@ -156,8 +155,9 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </View>
                   </View>
                   <View style={styles.benefitsList}>
-                    <Text style={styles.benefitItem}>Unlimited notes</Text>
+                    <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
+                    <Text style={styles.benefitItem}>Priority support/feature requests</Text>
                   </View>
                   {isPro ? (
                     <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
@@ -229,7 +229,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                 </View>
               </View>
               <View style={styles.benefitsList}>
-                <Text style={styles.benefitItem}>10 notes</Text>
+                <Text style={styles.benefitItem}>10 items per category</Text>
                 <Text style={styles.benefitItem}>Limited AI usage</Text>
               </View>
               <Pressable 
@@ -251,11 +251,11 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <Text style={styles.planPeriod}>/month</Text>
                 </View>
               </View>
-              <View style={styles.benefitsList}>
-                <Text style={styles.benefitItem}>Unlimited notes</Text>
-                <Text style={styles.benefitItem}>Unlimited flashcards/tests/goals</Text>
-                <Text style={styles.benefitItem}>10x AI usage</Text>
-              </View>
+                  <View style={styles.benefitsList}>
+                    <Text style={styles.benefitItem}>Unlimited items per category</Text>
+                    <Text style={styles.benefitItem}>10x AI usage</Text>
+                    <Text style={styles.benefitItem}>Priority support/feature requests</Text>
+                  </View>
               {isPro ? (
                 <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
                   <Text style={styles.proPlanButtonText}>Current Plan</Text>
