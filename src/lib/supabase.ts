@@ -33,7 +33,7 @@ function getApiBaseUrl(): string {
   }
   
   // 3. In browser, use window.location.origin for same-origin setups (frontend and backend on same domain)
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.location) {
     // If we're on the same domain (production), use relative URLs
     if (window.location.hostname === 'studentagent.site' || 
         window.location.hostname === 'www.studentagent.site') {
@@ -85,7 +85,7 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     }
     
     // 2. For same-domain setups, use window.location.origin FIRST (same domain = no CORS)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.location) {
       // If on the same domain (production), use same origin
       if (window.location.hostname === 'studentagent.site' || 
           window.location.hostname === 'www.studentagent.site') {
@@ -129,16 +129,27 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     }
     
     // 5. Ensure we have at least one URL to try (fallback)
+    // On native platforms (iOS/Android), window.location doesn't exist, so we need to ensure we have a URL
     if (apiUrlsToTry.length === 0) {
       // Fallback: use the local getApiBaseUrl function
       const fallbackUrl = getApiBaseUrl()
       if (fallbackUrl && !apiUrlsToTry.includes(fallbackUrl)) {
         apiUrlsToTry.push(fallbackUrl)
       }
+      // If still empty (e.g., on native where getApiBaseUrl returns localhost), try environment variable directly
+      if (apiUrlsToTry.length === 0) {
+        const envUrl = getEnvVar('API_URL') || getEnvVar('VITE_API_URL') || getEnvVar('EXPO_PUBLIC_API_URL')
+        if (envUrl) {
+          apiUrlsToTry.push(envUrl)
+        } else {
+          // Last resort: use default localhost (for development)
+          apiUrlsToTry.push('http://localhost:3001')
+        }
+      }
     }
     
     // 6. In dev mode, always ensure localhost:3001 is in the list (backend API)
-    if (typeof window !== 'undefined' && 
+    if (typeof window !== 'undefined' && window.location && 
         (window.location.hostname === 'localhost' || 
          window.location.hostname === '127.0.0.1' ||
          window.location.hostname.startsWith('192.168.'))) {
@@ -153,7 +164,7 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
     const fallbackKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
     
     // In dev mode, if backend isn't available, use build-time config immediately
-    const isDevMode = typeof window !== 'undefined' && 
+    const isDevMode = typeof window !== 'undefined' && window.location && 
       (window.location.hostname === 'localhost' || 
        window.location.hostname === '127.0.0.1' ||
        window.location.hostname.startsWith('192.168.'))
@@ -512,7 +523,7 @@ function getLegacySupabase(): SupabaseClient {
   }
 
     // No config available - this should not happen if initSupabase() was called
-    throw new Error(
+  throw new Error(
       'Supabase client not initialized. Please ensure initSupabase() has been called and completed.'
     )
   }

@@ -9,6 +9,7 @@ import TestsView from './components/views/TestsView'
 import FlashcardsView from './components/views/FlashcardsView'
 import GoalsView from './components/views/GoalsView'
 import SettingsView from './components/views/SettingsView'
+import PrivacyPolicyView from './components/views/PrivacyPolicyView'
 import ChatBar from './components/ChatBar'
 import LoginModal from './components/modals/LoginModal'
 import UpgradeModal from './components/modals/UpgradeModal'
@@ -18,6 +19,7 @@ import { DetailModeProvider, useDetailMode } from './contexts/DetailModeContext'
 const getViewFromUrl = (): string => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const path = window.location.pathname
+    if (path === '/privacy') return 'privacy'
     if (path === '/settings') return 'settings'
     if (path === '/tests') return 'tests'
     if (path === '/flashcards') return 'flashcards'
@@ -208,8 +210,9 @@ function AppContent() {
         {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
-        {currentView === 'settings' && <SettingsView />}
-        <ChatBar onOpenLoginModal={openLoginModal} />
+        {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
+        {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
+        {currentView !== 'privacy' && <ChatBar onOpenLoginModal={openLoginModal} />}
       </View>
       <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />
       <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} />

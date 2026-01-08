@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -18,7 +18,11 @@ interface SubscriptionDetails {
   } | null
 }
 
-function SettingsView() {
+interface SettingsViewProps {
+  onNavigate?: (view: string) => void
+}
+
+function SettingsView({ onNavigate }: SettingsViewProps) {
   const { planName, tokensUsed, monthlyLimit, remaining, isLoading, error, fetchUsage } = useUsageStore()
   const { isLoggedIn } = useAuthStore()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -379,6 +383,28 @@ function SettingsView() {
                 )}
               </View>
             )}
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Legal</Text>
+              <Pressable 
+                onPress={() => {
+                  if (onNavigate) {
+                    onNavigate('privacy')
+                  } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.location.href = '/privacy'
+                  } else {
+                    // For native, open in browser
+                    Linking.openURL('https://studentagent.site/privacy').catch(err => 
+                      console.error('Failed to open privacy policy:', err)
+                    )
+                  }
+                }}
+                style={styles.linkButton}
+              >
+                <Text style={styles.linkText}>Privacy Policy</Text>
+                <Text style={styles.linkArrow}>→</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </View>
@@ -579,6 +605,26 @@ const styles = StyleSheet.create({
   noSubscriptionText: {
     fontSize: 14,
     color: '#6c757d',
+  },
+  linkButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  linkText: {
+    fontSize: 16,
+    color: '#0f0f0f',
+    fontWeight: '400',
+  },
+  linkArrow: {
+    fontSize: 18,
+    color: '#666',
   },
 })
 

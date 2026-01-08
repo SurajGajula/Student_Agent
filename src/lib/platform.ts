@@ -58,7 +58,7 @@ export const getApiBaseUrl = (): string => {
   }
   
   // In browser, use window.location.origin for same-origin setups
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.location) {
     // If on the same domain (production), use same origin
     if (window.location.hostname === 'studentagent.site' || 
         window.location.hostname === 'www.studentagent.site') {
@@ -81,7 +81,10 @@ export const getApiBaseUrl = (): string => {
     }
   }
   
-  // Fallback
-  return 'http://localhost:3001'
+  // Fallback: Use production URL for native builds, localhost for development
+  // Native builds (iOS/Android) should use production URL by default
+  // Web development can use localhost
+  const isNative = Platform.isIOS || Platform.isAndroid;
+  return isNative ? 'https://studentagent.site' : 'http://localhost:3001';
 }
 

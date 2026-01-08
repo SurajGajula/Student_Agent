@@ -23,7 +23,10 @@ process.stderr.write('[app.config.cjs] process.env keys with SUPABASE/STRIPE/EXP
 console.log('[app.config.cjs] process.env keys:', supabaseEnvVars.join(', '));
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:3001';
+// Default to production URL for mobile apps (iOS/Android builds), localhost only for development
+const isProduction = process.env.NODE_ENV === 'production' || !process.env.EXPO_PUBLIC_API_URL;
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 
+  (isProduction ? 'https://studentagent.site' : 'http://localhost:3001');
 
 // Debug logging during build (always log in app.config.cjs since it only runs at build time)
 console.error('[app.config.cjs] ===== ENVIRONMENT VARIABLES CHECK =====');
