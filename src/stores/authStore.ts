@@ -243,10 +243,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Sync state from actual session (always check the real session)
       await syncStateFromSession(set)
 
-      // If we have a session, sync all stores
+      // Check if we have a valid session
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
+        // User is logged in - sync all stores
         await syncAllStores()
+      } else {
+        // No session - clear all stores to ensure no stale data
+        // This ensures users don't see data from previous sessions
+        await clearAllStores()
       }
 
       set({ isLoading: false, error: null })
@@ -267,10 +272,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             await syncAllStores()
           }
         } else {
-          // Clear all stores on sign out event
-          if (event === 'SIGNED_OUT') {
-            await clearAllStores()
-          }
+          // Clear all stores on sign out event or when session is lost
+          await clearAllStores()
           set({
             isLoggedIn: false,
             user: null,
@@ -282,6 +285,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize auth'
       set({ isLoading: false, error: errorMessage })
+      // On error, also clear stores to be safe
+      await clearAllStores()
     }
   },
 }))

@@ -377,6 +377,9 @@ export async function initSupabase(): Promise<SupabaseClient> {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        // Ensure session persists across app restarts and page reloads
+        // This is the key setting for "remember me" functionality
+        storageKey: 'supabase.auth.token',
       }
     })
   
@@ -492,6 +495,7 @@ const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVa
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,
+          storageKey: 'supabase.auth.token',
         }
       })
       return supabaseClient
