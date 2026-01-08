@@ -50,8 +50,10 @@ const expoConfig = {
   },
 };
 
-// Only add icon if file exists (required for prebuild)
-if (fs.existsSync('./assets/icon.png')) {
+// Use Logo.png from AppStore folder as app icon
+if (fs.existsSync('./AppStore/Logo.png')) {
+  expoConfig.icon = "./AppStore/Logo.png";
+} else if (fs.existsSync('./assets/icon.png')) {
   expoConfig.icon = "./assets/icon.png";
 }
 
@@ -80,7 +82,8 @@ module.exports = {
       })
     },
     web: {
-      ...(fs.existsSync('./assets/favicon.png') && { favicon: "./assets/favicon.png" }),
+      favicon: fs.existsSync('./AppStore/Logo.png') ? "./AppStore/Logo.png" : 
+               (fs.existsSync('./assets/favicon.png') ? "./assets/favicon.png" : undefined),
       bundler: "metro",
       entryPoint: "./index.web.js",
       // Disable service worker to avoid cache errors

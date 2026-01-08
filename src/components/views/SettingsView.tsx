@@ -97,7 +97,7 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
       if (error instanceof TypeError && error.message === 'Network request failed') {
         console.warn('Network request failed - backend may not be accessible')
       } else {
-        console.error('Error fetching subscription details:', error)
+      console.error('Error fetching subscription details:', error)
       }
     } finally {
       setLoadingSubscription(false)
@@ -402,6 +402,24 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
                 style={styles.linkButton}
               >
                 <Text style={styles.linkText}>Privacy Policy</Text>
+                <Text style={styles.linkArrow}>→</Text>
+              </Pressable>
+              <Pressable 
+                onPress={() => {
+                  if (onNavigate) {
+                    onNavigate('terms')
+                  } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.location.href = '/terms'
+                  } else {
+                    // For native, open in browser
+                    Linking.openURL('https://studentagent.site/terms').catch(err => 
+                      console.error('Failed to open terms of service:', err)
+                    )
+                  }
+                }}
+                style={styles.linkButton}
+              >
+                <Text style={styles.linkText}>Terms of Service</Text>
                 <Text style={styles.linkArrow}>→</Text>
               </Pressable>
             </View>
