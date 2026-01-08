@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient, Session, AuthError } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
 import { getApiBaseUrl as getPlatformApiBaseUrl } from './platform'
 
@@ -401,6 +401,16 @@ export function getSupabase(): SupabaseClient {
 }
 
 /**
+ * Get session, ensuring Supabase is initialized first
+ * Use this instead of supabase.auth.getSession() directly to avoid race conditions
+ */
+export async function getSession(): Promise<{ data: { session: Session | null }, error: AuthError | null }> {
+  await initSupabase()
+  const client = getSupabase()
+  return await client.auth.getSession()
+}
+
+/**
  * Get a fresh session, refreshing if necessary
  * This ensures the session token is valid before making API calls
  */
@@ -470,9 +480,9 @@ function getLegacySupabase(): SupabaseClient {
   if (initPromise || configPromise) {
     // Don't create a new client - wait for initSupabase to complete
     // Use build-time config as temporary fallback only if absolutely necessary
-    const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
-    const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-    
+const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
+const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
+
     if (supabaseUrl && supabasePublishableKey && !supabaseClient) {
       console.warn('[supabase.ts] Creating temporary client with build-time config (init in progress)')
       const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined
@@ -534,13 +544,93 @@ function getLegacySupabase(): SupabaseClient {
 // Export legacy supabase as a getter for backward compatibility
 // This will use runtime config if available, otherwise fall back to build-time config
 // New code should use initSupabase() and getSupabase() instead
+// The proxy ensures Supabase is initialized before accessing auth methods
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
-    const client = getLegacySupabase()
-    const value = (client as any)[prop]
-    if (typeof value === 'function') {
-      return value.bind(client)
+    // If accessing auth, create a proxy that ensures initialization before method calls
+    if (prop === 'auth') {
+      // Return a proxy that ensures initialization before calling auth methods
+      return new Proxy({} as any, {
+        get(_authTarget, authProp) {
+          // Special handling for synchronous methods that return subscriptions
+          // These are typically called during initialization when client already exists
+          const syncMethods = ['onAuthStateChange', 'onTokenRefresh']
+          
+          // Try to get the auth object from existing client first
+          try {
+            const client = getLegacySupabase()
+            const auth = (client as any).auth
+            const methodOrValue = (auth as any)[authProp]
+            
+            // If it exists and is a function, handle it based on type
+            if (typeof methodOrValue === 'function') {
+              // For synchronous methods like onAuthStateChange, return directly (client already exists)
+              if (syncMethods.includes(authProp as string)) {
+                return methodOrValue.bind(auth)
+              }
+              
+              // For async methods like getSession, wrap to ensure initialization
+              return async function(...args: any[]) {
+                // Ensure Supabase is initialized (might already be, but ensure it's done)
+                await initSupabase()
+                const initializedClient = getSupabase()
+                const initializedAuth = (initializedClient as any).auth
+                const method = (initializedAuth as any)[authProp]
+                return method.apply(initializedAuth, args)
+              }
+            }
+            
+            // For non-function properties, return them directly
+            return methodOrValue
+          } catch {
+            // If client doesn't exist yet, handle based on method type
+            if (syncMethods.includes(authProp as string)) {
+              // For synchronous methods, client must exist (shouldn't happen in practice)
+              // Return a function that throws if client doesn't exist
+              return function(...args: any[]) {
+                try {
+                  const client = getLegacySupabase()
+                  const auth = (client as any).auth
+                  const method = (auth as any)[authProp]
+                  return method.apply(auth, args)
+                } catch {
+                  throw new Error(`Cannot call ${String(authProp)} before Supabase is initialized. Call initSupabase() first.`)
+                }
+              }
+            }
+            
+            // For async methods, create a function that initializes first
+            return async function(...args: any[]) {
+              await initSupabase()
+              const client = getSupabase()
+              const auth = (client as any).auth
+              const methodOrValue = (auth as any)[authProp]
+              
+              if (typeof methodOrValue === 'function') {
+                return methodOrValue.apply(auth, args)
+              }
+              
+              return methodOrValue
+            }
+          }
+        }
+      })
     }
-    return value
+    
+    // For non-auth properties, try to get from existing client
+    try {
+      const client = getLegacySupabase()
+      const value = (client as any)[prop]
+      if (typeof value === 'function') {
+        return value.bind(client)
+      }
+      return value
+    } catch (error) {
+      // If client doesn't exist yet, throw a helpful error
+      if (typeof prop === 'string' && prop !== 'auth') {
+        throw new Error(`Cannot access '${prop}' before Supabase is initialized. Call initSupabase() first.`)
+      }
+      throw error
+    }
   }
 })
