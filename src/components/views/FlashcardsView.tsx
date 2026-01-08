@@ -5,7 +5,7 @@ import CreateFolderModal from '../modals/CreateFolderModal'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
-import { BackIcon, FolderIcon, DeleteIcon, FlashcardsIcon, ShuffleIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
+import { BackIcon, FolderIcon, DeleteIcon, FlashcardsIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -19,7 +19,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
-  const [isShuffled, setIsShuffled] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
@@ -39,7 +38,7 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const displayedFolders = currentFolderId ? [] : folders
   
   const currentSet = currentSetId ? getFlashcardSetById(currentSetId) : null
-  const cards = currentSet ? (isShuffled ? [...currentSet.cards].sort(() => Math.random() - 0.5) : currentSet.cards) : []
+  const cards = currentSet ? currentSet.cards : []
   const currentCard = cards[currentCardIndex]
   const prevCard = prevCardIndex !== null ? cards[prevCardIndex] : null
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
@@ -69,7 +68,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     setCurrentSetId(setId)
     setCurrentCardIndex(0)
     setIsFlipped(false)
-    setIsShuffled(false)
     flipAnim.setValue(0)
   }
 
@@ -77,7 +75,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     setCurrentSetId(null)
     setCurrentCardIndex(0)
     setIsFlipped(false)
-    setIsShuffled(false)
     flipAnim.setValue(0)
   }
 
@@ -198,13 +195,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     }
   }
 
-  const handleShuffle = () => {
-    setIsShuffled(!isShuffled)
-    setCurrentCardIndex(0)
-    setIsFlipped(false)
-    flipAnim.setValue(0)
-  }
-
   const handleDeleteSet = async (setId: string) => {
     removeFlashcardSet(setId)
     if (currentSetId === setId) {
@@ -258,17 +248,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
             </Pressable>
             )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentSet.name}</Text>
-          </View>
-          <View style={styles.headerButtons}>
-            <Pressable 
-              style={[styles.shuffleButton, isShuffled && styles.shuffleButtonActive]}
-              onPress={handleShuffle}
-            >
-              <ShuffleIcon />
-              <Text style={styles.shuffleButtonText}>
-              {isShuffled ? 'Unshuffle' : 'Shuffle'}
-              </Text>
-            </Pressable>
           </View>
         </View>
         <View style={styles.studyContainer}>
@@ -559,25 +538,6 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
     minHeight: 44, // Match NotesView button height (paddingVertical: 12 * 2 + text/icon height)
-  },
-  shuffleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-    backgroundColor: 'transparent',
-  },
-  shuffleButtonActive: {
-    backgroundColor: '#e8e8e8',
-  },
-  shuffleButtonText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: '#0f0f0f',
   },
   createFolderButton: {
     flexDirection: 'row',

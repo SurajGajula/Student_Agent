@@ -70,3 +70,5 @@ deployment/
 supabase/
 
 dist/
+.cursor/
+AppStoreScreenshots/

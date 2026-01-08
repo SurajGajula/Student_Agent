@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Student Agent",
+    "slug": "student-agent",
+    "version": "1.0.0",
+    "sdkVersion": "51.0.0",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.studentagent.app"
+    },
+    "android": {
+      "package": "com.studentagent.app"
+    }
+  }
+}

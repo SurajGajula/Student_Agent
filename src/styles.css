@@ -2474,30 +2474,6 @@ body .note-editor-scroll::-webkit-scrollbar {
     gap: 12px;
 }
 
-.shuffle-button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background-color: #0f0f0f;
-    color: #f0f0f0;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 300;
-    letter-spacing: 0.01em;
-    transition: opacity 0.2s, background-color 0.2s;
-}
-
-.shuffle-button:hover {
-    opacity: 0.9;
-}
-
-.shuffle-button.active {
-    background-color: #666;
-}
-
 .flashcards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
