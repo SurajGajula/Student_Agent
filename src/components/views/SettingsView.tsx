@@ -29,6 +29,8 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   const [cancelMessage, setCancelMessage] = useState<string | null>(null)
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null)
   const [loadingSubscription, setLoadingSubscription] = useState(false)
+  const [restoringPurchases, setRestoringPurchases] = useState(false)
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
   const isMobile = windowWidth <= 768
@@ -230,6 +232,65 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
     return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')
   }
 
+  const handleRestorePurchases = async () => {
+    if (!isLoggedIn) {
+      setRestoreMessage('Please log in to restore purchases')
+      setTimeout(() => setRestoreMessage(null), 3000)
+      return
+    }
+
+    setRestoringPurchases(true)
+    setRestoreMessage(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const API_BASE_URL = getApiBaseUrl()
+      
+      // Check if API URL is localhost on native - this won't work on physical devices
+      if (Platform.OS !== 'web' && API_BASE_URL.includes('localhost')) {
+        setRestoreMessage('Cannot restore purchases: API URL is localhost. Please check your configuration.')
+        setRestoringPurchases(false)
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/stripe/sync-subscription`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || error.error || 'Failed to restore purchases')
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.hasSubscription) {
+        setRestoreMessage('Purchases restored successfully! Your subscription has been activated.')
+        // Refresh subscription details and usage
+        await fetchSubscriptionDetails()
+        await fetchUsage()
+      } else {
+        setRestoreMessage('No active subscription found. If you have a subscription, please ensure you\'re logged in with the correct account.')
+      }
+    } catch (error) {
+      console.error('Error restoring purchases:', error)
+      setRestoreMessage(error instanceof Error ? error.message : 'Failed to restore purchases. Please try again.')
+    } finally {
+      setRestoringPurchases(false)
+      // Clear message after 5 seconds
+      setTimeout(() => setRestoreMessage(null), 5000)
+    }
+  }
+
   const usagePercentage = monthlyLimit > 0 ? (tokensUsed / monthlyLimit) * 100 : 0
 
   if (!isLoggedIn) {
@@ -283,6 +344,14 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
           </View>
         )}
         
+        {restoreMessage && (
+          <View style={restoreMessage.includes('successfully') ? styles.successMessage : styles.cancelMessage}>
+            <Text style={restoreMessage.includes('successfully') ? styles.successText : styles.cancelText}>
+              {restoreMessage}
+            </Text>
+          </View>
+        )}
+        
         {isLoading ? (
           <Text style={styles.loading}>Loading usage data...</Text>
         ) : error ? (
@@ -328,61 +397,81 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
               </View>
             </View>
 
-            {planName === 'pro' && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Subscription</Text>
-                
-                {loadingSubscription ? (
-                  <Text>Loading subscription details...</Text>
-                ) : subscriptionDetails?.hasSubscription && subscriptionDetails.subscription ? (
-                  <View style={styles.subscriptionInfo}>
-                    <View style={styles.subscriptionRow}>
-                      <Text style={styles.subscriptionLabel}>Status:</Text>
-                      <View style={[
-                        styles.statusBadge,
-                        subscriptionDetails.subscription.status === 'active' 
-                          ? styles.statusActive 
-                          : styles.statusInactive
-                      ]}>
-                        <Text style={[
-                          styles.statusText,
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Subscription</Text>
+              
+              {/* Restore Purchases Button - Always visible as required by App Store */}
+              <Pressable
+                onPress={handleRestorePurchases}
+                disabled={restoringPurchases || !isLoggedIn}
+                style={({ pressed }) => [
+                  styles.restoreButton,
+                  (restoringPurchases || !isLoggedIn) && styles.restoreButtonDisabled,
+                  pressed && !restoringPurchases && isLoggedIn && styles.restoreButtonPressed
+                ]}
+              >
+                <Text style={[
+                  styles.restoreButtonText,
+                  (restoringPurchases || !isLoggedIn) && styles.restoreButtonTextDisabled
+                ]}>
+                  {restoringPurchases ? 'Restoring...' : 'Restore Purchases'}
+                </Text>
+              </Pressable>
+              
+              {planName === 'pro' && (
+                <>
+                  {loadingSubscription ? (
+                    <Text>Loading subscription details...</Text>
+                  ) : subscriptionDetails?.hasSubscription && subscriptionDetails.subscription ? (
+                    <View style={styles.subscriptionInfo}>
+                      <View style={styles.subscriptionRow}>
+                        <Text style={styles.subscriptionLabel}>Status:</Text>
+                        <View style={[
+                          styles.statusBadge,
                           subscriptionDetails.subscription.status === 'active' 
-                            ? styles.statusActiveText 
-                            : styles.statusInactiveText
+                            ? styles.statusActive 
+                            : styles.statusInactive
                         ]}>
-                        {formatSubscriptionStatus(subscriptionDetails.subscription.status)}
+                          <Text style={[
+                            styles.statusText,
+                            subscriptionDetails.subscription.status === 'active' 
+                              ? styles.statusActiveText 
+                              : styles.statusInactiveText
+                          ]}>
+                          {formatSubscriptionStatus(subscriptionDetails.subscription.status)}
+                          </Text>
+                        </View>
+                        {subscriptionDetails.subscription.cancelAtPeriodEnd && (
+                          <View style={styles.cancelingBadge}>
+                            <Text style={styles.cancelingText}>Canceling at period end</Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      <View style={styles.subscriptionRow}>
+                        <Text style={styles.subscriptionLabel}>Current Period:</Text>
+                        <Text style={styles.subscriptionValue}>
+                          {formatDate(subscriptionDetails.subscription.currentPeriodStart)} - {formatDate(subscriptionDetails.subscription.currentPeriodEnd)}
                         </Text>
                       </View>
+                      
                       {subscriptionDetails.subscription.cancelAtPeriodEnd && (
-                        <View style={styles.cancelingBadge}>
-                          <Text style={styles.cancelingText}>Canceling at period end</Text>
+                        <View style={styles.cancelNotice}>
+                          <Text style={styles.cancelNoticeText}>
+                          Your subscription will end on {formatDate(subscriptionDetails.subscription.currentPeriodEnd)}. 
+                          You'll retain Pro access until then.
+                          </Text>
                         </View>
                       )}
                     </View>
-                    
-                    <View style={styles.subscriptionRow}>
-                      <Text style={styles.subscriptionLabel}>Current Period:</Text>
-                      <Text style={styles.subscriptionValue}>
-                        {formatDate(subscriptionDetails.subscription.currentPeriodStart)} - {formatDate(subscriptionDetails.subscription.currentPeriodEnd)}
-                      </Text>
+                  ) : (
+                    <View style={styles.noSubscription}>
+                      <Text style={styles.noSubscriptionText}>No active subscription found.</Text>
                     </View>
-                    
-                    {subscriptionDetails.subscription.cancelAtPeriodEnd && (
-                      <View style={styles.cancelNotice}>
-                        <Text style={styles.cancelNoticeText}>
-                        Your subscription will end on {formatDate(subscriptionDetails.subscription.currentPeriodEnd)}. 
-                        You'll retain Pro access until then.
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.noSubscription}>
-                    <Text style={styles.noSubscriptionText}>No active subscription found.</Text>
-                  </View>
-                )}
-              </View>
-            )}
+                  )}
+                </>
+              )}
+            </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Legal</Text>
@@ -643,6 +732,32 @@ const styles = StyleSheet.create({
   linkArrow: {
     fontSize: 18,
     color: '#666',
+  },
+  restoreButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    minHeight: 44, // Minimum touch target for iOS
+  },
+  restoreButtonPressed: {
+    backgroundColor: '#333',
+    opacity: 0.9,
+  },
+  restoreButtonDisabled: {
+    backgroundColor: '#999',
+    opacity: 0.6,
+  },
+  restoreButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '400',
+  },
+  restoreButtonTextDisabled: {
+    color: '#cccccc',
   },
 })
 
