@@ -129,93 +129,110 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
     }
   }
 
-  // Detect if message contains intent to create a test
-  const detectTestIntent = (msg: string): boolean => {
-    const lowerMessage = msg.toLowerCase()
-    const patterns = [
-      /turn.*into.*test/i,
-      /turn.*note.*into.*test/i,
-      /create.*test.*from/i,
-      /generate.*test/i,
-      /make.*test/i,
-      /convert.*to.*test/i,
-    ]
-    return patterns.some(pattern => pattern.test(lowerMessage))
-  }
-
-  // Detect if message contains intent to create flashcards
-  const detectFlashcardIntent = (msg: string): boolean => {
-    const lowerMessage = msg.toLowerCase()
-    const patterns = [
-      /turn.*into.*flashcard/i,
-      /create.*flashcard/i,
-      /generate.*flashcard/i,
-      /make.*flashcard/i,
-    ]
-    return patterns.some(pattern => pattern.test(lowerMessage))
-  }
-
-  // Detect if message contains intent to search for courses
-  const detectCourseSearchIntent = (msg: string): { detected: boolean; school?: string; department?: string } => {
-    const lowerMessage = msg.toLowerCase()
+  // Route intent using Gemini AI
+  const routeIntent = async (msg: string, mentionsList: Mention[]): Promise<{ intent: 'test' | 'flashcard' | 'course_search' | 'none'; school?: string; department?: string }> => {
+    const { supabase } = await import('../lib/supabase')
+    const { data: { session } } = await supabase.auth.getSession()
     
-    // Patterns for course search
-    const courseSearchPatterns = [
-      /find.*courses?/i,
-      /courses?.*for/i,
-      /recommend.*courses?/i,
-      /suggest.*courses?/i,
-      /what.*courses?/i,
-      /courses?.*that.*help/i,
-      /courses?.*will.*help/i,
-      /courses?.*to.*work/i,
-      /courses?.*for.*career/i,
-    ]
-    
-    const hasCourseIntent = courseSearchPatterns.some(pattern => pattern.test(lowerMessage))
-    
-    if (!hasCourseIntent) {
-      return { detected: false }
+    if (!session) {
+      throw new Error('You must be logged in to use this feature')
     }
 
-    // Extract school (default to Stanford if not specified)
-    let school = 'Stanford'
-    const stanfordMatch = lowerMessage.match(/stanford/i)
-    if (stanfordMatch) {
-      school = 'Stanford'
+    const API_BASE_URL = getApiBaseUrl()
+    const response = await fetch(`${API_BASE_URL}/api/route`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        message: msg,
+        mentions: mentionsList
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Authentication required. Please log in to use this feature.')
+      }
+      
+      if (response.status === 429) {
+        const remaining = data.remaining || 0
+        const limit = data.limit || 0
+        throw new Error(
+          `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+          `Please upgrade your plan or wait until next month.`
+        )
+      }
+      
+      throw new Error(data.message || data.error || 'Failed to route intent')
     }
 
-    // Extract department (default to CS if not specified)
-    let department = 'CS'
-    const csMatch = lowerMessage.match(/\bcs\b|c\s*s\b|computer\s*science/i)
-    if (csMatch) {
-      department = 'CS'
+    if (data.success) {
+      return {
+        intent: data.intent || 'none',
+        school: data.school,
+        department: data.department
+      }
     }
 
-    return { detected: true, school, department }
+    return { intent: 'none' }
   }
 
   const handleSubmit = async () => {
     if (!message.trim() || isLoading) return
-
-    const isTestGeneration = detectTestIntent(message) && mentions.length > 0
-    const isFlashcardGeneration = detectFlashcardIntent(message) && mentions.length > 0
-    const courseSearchIntent = detectCourseSearchIntent(message)
-    const isCourseSearch = courseSearchIntent.detected
-    const isAIGeneration = isTestGeneration || isFlashcardGeneration || isCourseSearch
-    
-    if (isAIGeneration && !isLoggedIn) {
-      setStatusMessage({ type: 'error', text: 'Login to use AI tools' })
-      onOpenLoginModal()
-      return
-    }
 
     setIsLoading(true)
     setStatusMessage(null)
     Keyboard.dismiss()
 
     try {
-      if (isTestGeneration) {
+      // Route intent using Gemini AI
+      let intentResult: { intent: 'test' | 'flashcard' | 'course_search' | 'none'; school?: string; department?: string }
+      
+      if (isLoggedIn) {
+        try {
+          intentResult = await routeIntent(message, mentions)
+        } catch (error) {
+          console.error('Error routing intent:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Failed to route intent'
+          setStatusMessage({ type: 'error', text: errorMessage })
+          setIsLoading(false)
+          return
+        }
+      } else {
+        // If not logged in, skip intent routing and show login prompt
+        setStatusMessage({ type: 'error', text: 'Login to use AI tools' })
+        onOpenLoginModal()
+        setIsLoading(false)
+        return
+      }
+
+      // If intent is 'none', don't do anything
+      if (intentResult.intent === 'none') {
+        setStatusMessage({ 
+          type: 'error', 
+          text: 'Message did not match any available capabilities. Try: "turn @[note] into test", "create flashcard from @[note]", or "find courses for..."' 
+        })
+        setMessage('')
+        setIsLoading(false)
+        return
+      }
+
+      // Handle test generation
+      if (intentResult.intent === 'test') {
+        if (!mentions || mentions.length === 0) {
+          setStatusMessage({ 
+            type: 'error', 
+            text: 'Test generation requires a note mention. Use @ to mention a note first.' 
+          })
+          setMessage('')
+          setIsLoading(false)
+          return
+        }
+
         const mentionedNote = notes.find(n => n.id === mentions[0].noteId)
         if (!mentionedNote) {
           throw new Error('Note not found')
@@ -282,7 +299,19 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
             setStatusMessage({ type: 'error', text: 'Failed to save test. Please try again.' })
           }
         }
-      } else if (isFlashcardGeneration) {
+      } 
+      // Handle flashcard generation
+      else if (intentResult.intent === 'flashcard') {
+        if (!mentions || mentions.length === 0) {
+          setStatusMessage({ 
+            type: 'error', 
+            text: 'Flashcard generation requires a note mention. Use @ to mention a note first.' 
+          })
+          setMessage('')
+          setIsLoading(false)
+          return
+        }
+
         const mentionedNote = notes.find(n => n.id === mentions[0].noteId)
         if (!mentionedNote) {
           throw new Error('Note not found')
@@ -349,7 +378,9 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
             setStatusMessage({ type: 'error', text: 'Failed to save flashcards. Please try again.' })
           }
         }
-      } else if (isCourseSearch) {
+      } 
+      // Handle course search
+      else if (intentResult.intent === 'course_search') {
         const { supabase } = await import('../lib/supabase')
         const { data: { session } } = await supabase.auth.getSession()
         
@@ -357,8 +388,8 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           throw new Error('You must be logged in to use this feature')
         }
 
-        const school = courseSearchIntent.school || 'Stanford'
-        const department = courseSearchIntent.department || 'CS'
+        const school = intentResult.school || 'Stanford'
+        const department = intentResult.department || 'CS'
 
         const API_BASE_URL = getApiBaseUrl()
         const response = await fetch(`${API_BASE_URL}/api/courses/search`, {
@@ -434,13 +465,6 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
             setStatusMessage({ type: 'error', text: 'Failed to save goal. Please try again.' })
           }
         }
-      } else {
-        // No API call was made - message doesn't match any supported intent
-        setStatusMessage({ 
-          type: 'error', 
-          text: 'Message did not trigger any action. Try: "turn @[note] into test", "create flashcard from @[note]", or "find courses for..."' 
-        })
-        setMessage('')
       }
     } catch (error) {
       console.error('Error processing request:', error)

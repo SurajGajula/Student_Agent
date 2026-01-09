@@ -13,7 +13,7 @@ import scheduleRouter from './routes/schedule.js'
 import notesParseRouter from './routes/notes.js' // Keep parse-notes route
 import notesCRUDRouter from './routes/notes/index.js' // New CRUD routes
 import classesCRUDRouter from './routes/classes/index.js' // New classes CRUD routes
-import chatRouter from './routes/chat.js'
+import chatRouter from './routes/chat/index.js'
 import testsRouter from './routes/tests/index.js' // Updated to use index
 import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
 import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
