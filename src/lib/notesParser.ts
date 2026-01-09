@@ -1,7 +1,7 @@
 import { getApiBaseUrl } from './platform'
 
 /**
- * Platform-aware image handling
+ * Platform-aware file handling (supports images and PDFs)
  */
 const createFormData = async (imageSource: File | Blob | string): Promise<FormData> => {
   const formData = new FormData()
@@ -9,13 +9,14 @@ const createFormData = async (imageSource: File | Blob | string): Promise<FormDa
   // React Native - imageSource is a string URI
   if (typeof imageSource === 'string') {
     // @ts-ignore - React Native FormData accepts different types
+    // Note: For PDFs on React Native, would need document picker instead
     formData.append('image', {
       uri: imageSource,
       type: 'image/jpeg',
       name: 'photo.jpg',
     } as any)
   } 
-  // Web - imageSource is File or Blob
+  // Web - imageSource is File or Blob (can be image or PDF)
   else {
     formData.append('image', imageSource)
   }
@@ -24,8 +25,8 @@ const createFormData = async (imageSource: File | Blob | string): Promise<FormDa
 }
 
 /**
- * Calls the backend API to parse notes image using service account credentials
- * @param imageSource - The image file (web) or URI (native) containing the notes
+ * Calls the backend API to parse notes file (image or PDF) using service account credentials
+ * @param imageSource - The image file or PDF (web) or URI (native) containing the notes
  * @returns Promise resolving to extracted text
  */
 async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Promise<string> {
@@ -100,7 +101,7 @@ async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Pr
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(
         `Request timed out after 3 minutes. ` +
-        `The image processing is taking longer than expected. ` +
+        `The file processing is taking longer than expected. ` +
         `Please try again or check if the server is running at ${API_BASE_URL}`
       )
     }
@@ -127,8 +128,8 @@ async function checkBackendHealth(): Promise<boolean> {
 }
 
 /**
- * Parse notes image and extract text
- * @param imageSource - The image file (web) or URI (native) containing handwritten notes
+ * Parse notes file (image or PDF) and extract text
+ * @param imageSource - The image file or PDF (web) or URI (native) containing notes
  * @returns Promise resolving to extracted text
  */
 export async function parseNotesImage(imageSource: File | Blob | string): Promise<string> {
@@ -146,7 +147,7 @@ export async function parseNotesImage(imageSource: File | Blob | string): Promis
     const text = await extractNotesWithBackendAPI(imageSource)
     
     if (text.length === 0) {
-      console.warn('No text found in notes image')
+      console.warn('No text found in notes file')
     }
     
     return text

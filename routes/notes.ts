@@ -53,18 +53,37 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
     }
 
     if (!req.file) {
-      console.error('No image file provided')
-      return res.status(400).json({ error: 'No image file provided' })
+      console.error('No file provided')
+      return res.status(400).json({ error: 'No file provided' })
     }
 
-    console.log(`Processing image: ${req.file.originalname}, size: ${req.file.size} bytes, type: ${req.file.mimetype}`)
+    console.log(`Processing file: ${req.file.originalname}, size: ${req.file.size} bytes, type: ${req.file.mimetype}`)
 
-    const imageBuffer = req.file.buffer
-    const base64Image = imageBuffer.toString('base64')
+    const fileBuffer = req.file.buffer
+    const base64File = fileBuffer.toString('base64')
     const mimeType = req.file.mimetype || 'image/png'
 
-    // Prompt optimized for extracting text from handwritten lecture notes
-    const prompt = `Extract all text from this image of handwritten lecture notes. 
+    // Validate mime type and set appropriate prompt
+    const isPdf = mimeType === 'application/pdf'
+    const isImage = mimeType.startsWith('image/')
+    
+    if (!isImage && !isPdf) {
+      return res.status(400).json({ error: 'Invalid file type. Please upload an image or PDF file.' })
+    }
+
+    // Adjust prompt based on file type
+    const prompt = isPdf 
+      ? `Extract all text from this PDF document. 
+Preserve the structure, formatting, and organization of the content including:
+- Headers and section titles
+- Bullet points and lists
+- Paragraphs and line breaks
+- Any mathematical formulas or equations (preserve as written)
+- Course codes, dates, and page numbers
+
+Return the extracted text exactly as it appears, maintaining the original formatting and structure.
+Do not add any commentary or explanations, just return the raw extracted text.`
+      : `Extract all text from this image of handwritten lecture notes. 
 Preserve the structure, formatting, and organization of the notes including:
 - Headers and section titles
 - Bullet points and lists
@@ -76,8 +95,8 @@ Return the extracted text exactly as it appears, maintaining the original format
 Do not add any commentary or explanations, just return the raw extracted text.`
 
     // Check token limit before making API call
-    // Estimate tokens needed (rough estimate: ~1000 tokens for prompt + image)
-    const estimatedTokens = 2000
+    // Estimate tokens needed - PDFs can be larger so increase estimate
+    const estimatedTokens = isPdf ? 5000 : 2000
     const limitCheck = await checkTokenLimit(req.userId, estimatedTokens)
     if (!limitCheck.allowed) {
       return res.status(429).json({
@@ -123,7 +142,7 @@ Do not add any commentary or explanations, just return the raw extracted text.`
             {
               inlineData: {
                 mimeType: mimeType,
-                data: base64Image,
+                data: base64File,
               },
             },
           ],

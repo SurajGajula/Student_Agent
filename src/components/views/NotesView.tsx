@@ -68,7 +68,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     if (Platform.OS === 'web') {
       const input = document.createElement('input')
       input.type = 'file'
-      input.accept = 'image/*'
+      input.accept = 'image/*,application/pdf'
       input.style.display = 'none'
       input.onchange = async (e: Event) => {
         const target = e.target as HTMLInputElement
@@ -361,8 +361,8 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
           await handleFileChange(file as File)
         }
       } catch (error) {
-        console.error('Failed to pick image:', error)
-        setErrorMessage('Image picker not available on this platform')
+        console.error('Failed to pick file:', error)
+        setErrorMessage('File picker not available on this platform')
         setTimeout(() => setErrorMessage(null), 3000)
       }
     }
@@ -371,11 +371,15 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const handleFileChange = async (file: File | Blob) => {
     if (!file) return
 
-    // Validate file type
-    if (file instanceof File && !file.type.startsWith('image/')) {
-      setErrorMessage('Please upload an image file')
+    // Validate file type - allow both images and PDFs
+    if (file instanceof File) {
+      const isValidImage = file.type.startsWith('image/')
+      const isValidPdf = file.type === 'application/pdf'
+      if (!isValidImage && !isValidPdf) {
+        setErrorMessage('Please upload an image file or PDF')
       setTimeout(() => setErrorMessage(null), 3000)
       return
+      }
     }
 
     setIsProcessing(true)
@@ -386,7 +390,8 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
       const extractedText = await parseNotesImage(file)
       
       if (!extractedText || extractedText.trim().length === 0) {
-        setErrorMessage('No text found in the notes image. Please ensure the image is clear and contains readable notes.')
+        const fileType = file instanceof File && file.type === 'application/pdf' ? 'PDF' : 'image'
+        setErrorMessage(`No text found in the ${fileType}. Please ensure the ${fileType} is clear and contains readable text.`)
         setTimeout(() => setErrorMessage(null), 5000)
       } else {
         let noteTitle = 'Untitled Note'
@@ -404,26 +409,26 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
 
         try {
           await addNote(noteTitle, currentFolderId || undefined)
-          
-          const currentState = useNotesStore.getState()
-          const allNotes = currentState.notes
-          
-          const newNote = allNotes
-            .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
+        
+        const currentState = useNotesStore.getState()
+        const allNotes = currentState.notes
+        
+        const newNote = allNotes
+          .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
             .sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
               return dateB - dateA
             })[0]
-          
-          if (newNote) {
+        
+        if (newNote) {
             await updateNoteContent(newNote.id, extractedText)
-            setCurrentNoteId(newNote.id)
-            setSuccessMessage('Notes uploaded successfully')
-            setTimeout(() => setSuccessMessage(null), 3000)
-          } else {
-            setErrorMessage('Failed to create note. Please try again.')
-            setTimeout(() => setErrorMessage(null), 3000)
+          setCurrentNoteId(newNote.id)
+          setSuccessMessage('Notes uploaded successfully')
+          setTimeout(() => setSuccessMessage(null), 3000)
+        } else {
+          setErrorMessage('Failed to create note. Please try again.')
+          setTimeout(() => setErrorMessage(null), 3000)
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to create note'
@@ -435,7 +440,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
       console.error('Error processing notes:', error)
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to process notes image. Please try again with a clearer image.'
+        : 'Failed to process notes file. Please try again with a clearer image or PDF.'
       setErrorMessage(errorMessage)
       setTimeout(() => setErrorMessage(null), 8000)
     } finally {

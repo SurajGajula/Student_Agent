@@ -62,7 +62,7 @@ export async function openURL(url: string): Promise<void> {
 }
 
 /**
- * Platform-aware image picker
+ * Platform-aware image picker (also supports PDFs on web)
  * Returns a promise that resolves to a file/blob (web) or image URI (native)
  */
 export async function pickImage(): Promise<File | string | null> {
@@ -70,7 +70,7 @@ export async function pickImage(): Promise<File | string | null> {
     return new Promise((resolve) => {
       const input = document.createElement('input')
       input.type = 'file'
-      input.accept = 'image/*'
+      input.accept = 'image/*,application/pdf'
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0] || null
         resolve(file)
@@ -81,9 +81,10 @@ export async function pickImage(): Promise<File | string | null> {
       input.click()
     })
   } else {
-    // Native implementation - will need react-native-image-picker
+    // Native implementation - will need react-native-image-picker for images
+    // For PDFs on native, would need react-native-document-picker
     // For now, return null and let the component handle it
-    // TODO: Implement with react-native-image-picker
+    // TODO: Implement with react-native-image-picker and react-native-document-picker
     throw new Error('Image picker not yet implemented for native. Please install react-native-image-picker.')
   }
 }
