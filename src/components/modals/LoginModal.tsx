@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TextInput, StyleSheet, Modal, Pressable, Platform, KeyboardAvoidingView, ScrollView, Keyboard } from 'react-native'
+import { View, Text, TextInput, StyleSheet, Modal, Pressable, Platform, ScrollView } from 'react-native'
 import { createPortal } from 'react-dom'
 import { Svg, Line } from 'react-native-svg'
 import { useAuthStore } from '../../stores/authStore'
@@ -37,19 +37,9 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   }, [isOpen])
 
-  // Handle keyboard on web (mobile browsers)
+  // Handle body scroll lock on web (mobile browsers) - without keyboard scrolling
   useEffect(() => {
     if (Platform.OS !== 'web' || !isOpen) return
-
-    const handleResize = () => {
-      // Scroll the active input into view when keyboard appears
-      const activeElement = document.activeElement as HTMLElement
-      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-        setTimeout(() => {
-          activeElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-        }, 100)
-      }
-    }
 
     // Prevent body scroll when modal is open on mobile
     if (window.innerWidth <= 768) {
@@ -58,12 +48,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
       document.body.style.width = '100%'
     }
 
-    window.addEventListener('resize', handleResize)
-    window.visualViewport?.addEventListener('resize', handleResize)
-
     return () => {
-      window.removeEventListener('resize', handleResize)
-      window.visualViewport?.removeEventListener('resize', handleResize)
       if (window.innerWidth <= 768) {
         document.body.style.overflow = ''
         document.body.style.position = ''
@@ -227,13 +212,8 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <Pressable style={styles.overlayNative} onPress={handleClose}>
-          <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
+      <Pressable style={styles.overlayNative} onPress={handleClose}>
+        <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
             <View style={styles.header}>
               <View style={styles.tabs}>
                 <Pressable
@@ -288,6 +268,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   autoCapitalize="none"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
               <View style={styles.formGroup}>
@@ -323,7 +304,6 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </View>
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -371,11 +351,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   bodyScroll: {
     flexGrow: 0,

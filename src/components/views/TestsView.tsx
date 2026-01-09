@@ -135,8 +135,9 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
           }
         ]}>
           <View style={[styles.headerTitle, isMobile && {
-            flex: 0,
+            flex: 1,
             maxWidth: '100%',
+            minWidth: 0, // Allow shrinking for truncation
           }]}>
             {!isMobile && (
             <Pressable style={styles.backButton} onPress={handleBackClick}>
@@ -371,8 +372,8 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                   <View style={styles.testCardIcon}>
                     <TestsIcon />
                   </View>
-                  <Text style={styles.testCardTitle}>{test.name}</Text>
-                  <Text style={styles.testCardMeta}>
+                  <Text style={styles.testCardTitle} numberOfLines={2} ellipsizeMode="tail">{test.name}</Text>
+                  <Text style={styles.testCardMeta} numberOfLines={1} ellipsizeMode="tail">
                     {test.questions.length} questions • From: {test.noteName}
                   </Text>
                 </Pressable>
@@ -411,6 +412,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0, // Allow text truncation
   },
   titleMobile: {
     fontSize: 24,
@@ -459,6 +461,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     letterSpacing: -0.5,
     color: '#0f0f0f',
+    flexShrink: 1, // Allow title to shrink when needed
   },
   headerButtons: {
     flexDirection: 'row',

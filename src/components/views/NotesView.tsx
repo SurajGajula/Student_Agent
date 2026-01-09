@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, Keyboard } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AddNoteModal from '../modals/AddNoteModal'
 import CreateFolderModal from '../modals/CreateFolderModal'
@@ -38,6 +38,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const scrollViewRef = useRef<any>(null)
+  const editorInputRef = useRef<TextInput>(null)
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
@@ -297,6 +298,15 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     }
   }
 
+  const handleDonePress = () => {
+    if (editorInputRef.current) {
+      editorInputRef.current.blur()
+    }
+    if (Platform.OS !== 'web') {
+      Keyboard.dismiss()
+    }
+  }
+
   const handleCreateFolder = () => {
     if (!isLoggedIn) {
       onOpenLoginModal()
@@ -453,8 +463,9 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
           }
         ]}>
           <View style={[styles.headerTitle, isMobile && {
-            flex: 0,
+            flex: 1,
             maxWidth: '100%',
+            minWidth: 0, // Allow shrinking for truncation
           }]}>
             {!isMobile && (
             <Pressable style={styles.backButton} onPress={handleBackClick}>
@@ -463,6 +474,9 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentNote.name}</Text>
           </View>
+          <Pressable style={styles.doneButton} onPress={handleDonePress}>
+            <Text style={styles.doneButtonText}>Done</Text>
+          </Pressable>
         </View>
         <ScrollView 
           ref={scrollViewRef}
@@ -475,6 +489,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
           })}
         >
           <TextInput
+            ref={editorInputRef}
             style={styles.editor}
             value={currentNote.content || ''}
             onChangeText={handleNoteContentChange}
@@ -679,7 +694,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
                     <View style={styles.noteCardIcon}>
                       <NotesIcon />
                     </View>
-                    <Text style={styles.noteCardTitle}>{note.name}</Text>
+                    <Text style={styles.noteCardTitle} numberOfLines={2} ellipsizeMode="tail">{note.name}</Text>
                   </Pressable>
                 )
               }
@@ -722,6 +737,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0, // Allow text truncation
   },
   titleMobile: {
     fontSize: 24,
@@ -770,6 +786,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     letterSpacing: -0.5,
     color: '#0f0f0f',
+    flexShrink: 1, // Allow title to shrink when needed for truncation
   },
   headerButtons: {
     flexDirection: 'row',
@@ -974,6 +991,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '300',
     color: '#0f0f0f',
+  },
+  doneButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#0f0f0f',
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#f0f0f0',
   },
 })
 
