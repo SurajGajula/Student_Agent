@@ -441,8 +441,17 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           throw new Error('You must be logged in to use this feature')
         }
 
-        const school = intentResult.school || 'Stanford'
-        const department = intentResult.department || 'CS'
+        // Check if school and department were extracted from the message
+        if (!intentResult.school || !intentResult.department) {
+          setStatusMessage({ 
+            type: 'error', 
+            text: 'Please specify a school and department. For example: "find CS courses for MIT" or "Stanford CS courses for AI"' 
+          })
+          return
+        }
+
+        const school = intentResult.school
+        const department = intentResult.department
 
         const API_BASE_URL = getApiBaseUrl()
         const response = await fetch(`${API_BASE_URL}/api/courses/search`, {
@@ -512,7 +521,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
               type: 'success', 
               text: `Goal "${goalName}" created with ${data.results.length} courses!` 
             })
-            setMessage('')
+        setMessage('')
           } catch (error) {
             console.error('Failed to add goal:', error)
             setStatusMessage({ type: 'error', text: 'Failed to save goal. Please try again.' })

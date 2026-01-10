@@ -95,29 +95,33 @@ Instructions:
 - If the user wants to create a test/quiz from notes AND mentions are present, respond with intent: "test"
 - If the user wants to create flashcards from notes AND mentions are present, respond with intent: "flashcard"
 - If the user is asking about courses, course recommendations, career-related courses, or course search, respond with intent: "course_search" and extract:
-  * school: The university name (default to "Stanford" if not specified)
-  * department: The department/major (default to "CS" if not specified)
+  * school: The university name (ONLY if mentioned in the message, leave undefined if not specified)
+  * department: The department/major (ONLY if mentioned in the message, leave undefined if not specified)
 - If the message doesn't clearly match any capability, respond with intent: "none"
 
-For course_search intent, extract the school and department from the message if mentioned. Common variations:
-- Stanford, Stanford University, Stanford CS → school: "Stanford", department: "CS"
-- Computer Science, CS, C.S. → department: "CS"
-- If not specified, use defaults: school: "Stanford", department: "CS"
+For course_search intent, extract the school and department from the message ONLY if explicitly mentioned. Common variations:
+- "Stanford CS courses", "MIT CS", "Berkeley Computer Science" → extract school and department
+- "CS courses", "Computer Science courses" → extract only department, leave school undefined
+- "courses for AI career" → leave both undefined (no school/department mentioned)
+- DO NOT default to any values if school or department are not mentioned
 
 IMPORTANT: Be flexible with phrasing. Users can express the same intent in many ways:
 - "turn @[note] into a test" = test
 - "make a quiz from @[note]" = test
 - "create flashcards from @[note]" = flashcard
 - "I want flashcards for @[note]" = flashcard
-- "find courses for AI career" = course_search
-- "what classes should I take to work at OpenAI" = course_search
+- "find courses for AI career" = course_search (no school/department - leave undefined)
+- "what classes should I take to work at OpenAI" = course_search (no school/department - leave undefined)
 - "recommend stanford CS courses" = course_search (school: "Stanford", department: "CS")
+- "MIT CS courses for machine learning" = course_search (school: "MIT", department: "CS")
+- "Berkeley Computer Science courses" = course_search (school: "Berkeley", department: "CS")
+- "find CS courses at MIT" = course_search (school: "MIT", department: "CS")
 
 Respond with ONLY a valid JSON object in this exact format:
 {
   "intent": "test" | "flashcard" | "course_search" | "none",
-  "school": "Stanford" (only for course_search),
-  "department": "CS" (only for course_search),
+  "school": "University Name" (only for course_search if mentioned, omit if not specified),
+  "department": "Department" (only for course_search if mentioned, omit if not specified),
   "confidence": 0.0-1.0,
   "reasoning": "brief explanation"
 }
@@ -208,11 +212,8 @@ Return ONLY the JSON object, no other text or markdown formatting.`
         intentResult.intent = 'none'
       }
 
-      // Validate course_search has required fields
-      if (intentResult.intent === 'course_search') {
-        intentResult.school = intentResult.school || 'Stanford'
-        intentResult.department = intentResult.department || 'CS'
-      }
+      // Validate course_search - do not set defaults, only use what was extracted
+      // School and department are optional and should only be included if extracted from the message
 
       // Ensure test/flashcard intents require mentions
       if ((intentResult.intent === 'test' || intentResult.intent === 'flashcard') && !hasMentions) {
