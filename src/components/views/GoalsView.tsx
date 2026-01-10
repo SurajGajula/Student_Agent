@@ -3,24 +3,32 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, Fl
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useGoalsStore, type Goal, type CourseRecommendation } from '../../stores/goalsStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useUsageStore } from '../../stores/usageStore'
 import { BackIcon, DeleteIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
+import BetaModal from '../modals/BetaModal'
+import { getStorage } from '../../lib/storage'
 
 interface GoalsViewProps {
   onOpenLoginModal?: () => void
+  onOpenUpgradeModal?: () => void
 }
 
-function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
+function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}) {
   const [currentGoalId, setCurrentGoalId] = useState<string | null>(null)
   const { goals, removeGoal, getGoalById, syncFromSupabase } = useGoalsStore()
   const { isLoggedIn } = useAuthStore()
+  const { planName } = useUsageStore()
   const currentGoal = currentGoalId ? getGoalById(currentGoalId) : null
   const { setIsInDetailMode } = useDetailMode()
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const insets = useSafeAreaInsets()
   const isMobile = windowWidth <= 768
+  const [showBetaModal, setShowBetaModal] = useState(false)
+
+  const isPro = planName === 'pro'
 
   // Update window width on resize
   useEffect(() => {
@@ -30,12 +38,57 @@ function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
     return () => subscription?.remove()
   }, [])
 
-  // Sync goals on mount
+  // Sync goals on mount (only if pro user)
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && isPro) {
       syncFromSupabase()
     }
-  }, [isLoggedIn, syncFromSupabase])
+  }, [isLoggedIn, isPro, syncFromSupabase])
+
+  // Fetch usage to check plan status on mount
+  useEffect(() => {
+    if (isLoggedIn) {
+      const { fetchUsage } = useUsageStore.getState()
+      fetchUsage()
+    }
+  }, [isLoggedIn])
+
+  // Check if beta modal should be shown on mount (only for pro users)
+  useEffect(() => {
+    if (!isPro) return
+
+    const checkBetaModal = async () => {
+      const storage = getStorage()
+      if (!storage) {
+        // If no storage available, show modal by default
+        setShowBetaModal(true)
+        return
+      }
+
+      try {
+        let dismissed = false
+        if (Platform.OS === 'web') {
+          // Web: localStorage is synchronous
+          const result = storage.getItem('goals-beta-modal-dismissed')
+          dismissed = result === 'true'
+        } else {
+          // Native: AsyncStorage is asynchronous
+          const result = await storage.getItem('goals-beta-modal-dismissed')
+          dismissed = result === 'true'
+        }
+
+        if (!dismissed) {
+          setShowBetaModal(true)
+        }
+      } catch (error) {
+        console.error('Failed to check beta modal dismissal status:', error)
+        // Show modal if we can't check (better to show than not show)
+        setShowBetaModal(true)
+      }
+    }
+
+    checkBetaModal()
+  }, [isPro])
 
   const handleGoalClick = (goalId: string) => {
     setCurrentGoalId(goalId)
@@ -61,9 +114,67 @@ function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
 
   // Update detail mode when entering/exiting goal detail
   useEffect(() => {
-    setIsInDetailMode(!!(currentGoalId && currentGoal))
+    setIsInDetailMode(!!(currentGoalId && currentGoal && isPro))
     return () => setIsInDetailMode(false)
-  }, [currentGoalId, currentGoal, setIsInDetailMode])
+  }, [currentGoalId, currentGoal, isPro, setIsInDetailMode])
+
+  // Show upgrade prompt if not pro user
+  if (!isPro) {
+    return (
+      <View style={styles.container}>
+        <View style={[
+          styles.header,
+          isMobile && {
+            paddingTop: Math.max(insets.top + 8 + 8, 28),
+            paddingLeft: 80,
+            paddingRight: 20,
+            paddingBottom: 64,
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+          }
+        ]}>
+          <View style={[styles.headerTitle, isMobile && { 
+            flex: 0,
+            maxWidth: '100%',
+          }]}>
+            <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Goals</Text>
+          </View>
+        </View>
+        <View style={styles.lockedContainer}>
+          <Text style={styles.lockedTitle}>Goals is a Pro Feature</Text>
+          <Text style={styles.lockedMessage}>
+            Upgrade to Pro to access AI-powered course recommendations based on your career goals.
+          </Text>
+          <Text style={styles.lockedSubmessage}>
+            Pro members get access to beta features including Goals, unlimited items, and 10x AI usage.
+          </Text>
+          {isLoggedIn ? (
+            <Pressable 
+              style={styles.upgradeButton}
+              onPress={() => {
+                if (onOpenUpgradeModal) {
+                  onOpenUpgradeModal()
+                }
+              }}
+            >
+              <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+            </Pressable>
+          ) : (
+            <Pressable 
+              style={styles.upgradeButton}
+              onPress={() => {
+                if (onOpenLoginModal) {
+                  onOpenLoginModal()
+                }
+              }}
+            >
+              <Text style={styles.upgradeButtonText}>Login to Upgrade</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    )
+  }
 
   // Render goal detail view with courses
   if (currentGoalId && currentGoal) {
@@ -144,6 +255,7 @@ function GoalsView({ onOpenLoginModal }: GoalsViewProps = {}) {
   // Render goals grid
   return (
     <View style={styles.container}>
+      <BetaModal isOpen={showBetaModal} onClose={() => setShowBetaModal(false)} />
       <View style={[
         styles.header,
         isMobile && {
@@ -407,6 +519,49 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: '#f0f0f0',
     borderRadius: 4,
+  },
+  lockedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    gap: 20,
+  },
+  lockedTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0f0f0f',
+    textAlign: 'center',
+  },
+  lockedMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 500,
+  },
+  lockedSubmessage: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 500,
+    marginTop: 8,
+  },
+  upgradeButton: {
+    backgroundColor: '#0f0f0f',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    marginTop: 12,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  upgradeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 })
 

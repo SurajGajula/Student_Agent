@@ -158,6 +158,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
+                    <Text style={styles.benefitItem}>Access to beta features</Text>
                   </View>
                   {isPro ? (
                     <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
@@ -255,6 +256,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
+                    <Text style={styles.benefitItem}>Access to beta features</Text>
                   </View>
               {isPro ? (
                 <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>

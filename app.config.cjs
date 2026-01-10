@@ -50,8 +50,10 @@ const expoConfig = {
   },
 };
 
-// Use Logo.png from AppStore folder as app icon
-if (fs.existsSync('./AppStore/Logo.png')) {
+// Use Logo.png from assets folder as app icon
+if (fs.existsSync('./assets/Logo.png')) {
+  expoConfig.icon = "./assets/Logo.png";
+} else if (fs.existsSync('./AppStore/Logo.png')) {
   expoConfig.icon = "./AppStore/Logo.png";
 } else if (fs.existsSync('./assets/icon.png')) {
   expoConfig.icon = "./assets/icon.png";
@@ -82,8 +84,9 @@ module.exports = {
       })
     },
     web: {
-      favicon: fs.existsSync('./AppStore/Logo.png') ? "./AppStore/Logo.png" : 
-               (fs.existsSync('./assets/favicon.png') ? "./assets/favicon.png" : undefined),
+      favicon: fs.existsSync('./assets/Logo.png') ? "./assets/Logo.png" : 
+               (fs.existsSync('./AppStore/Logo.png') ? "./AppStore/Logo.png" : 
+               (fs.existsSync('./assets/favicon.png') ? "./assets/favicon.png" : undefined)),
       bundler: "metro",
       entryPoint: "./index.web.js",
       // Disable service worker to avoid cache errors

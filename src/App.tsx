@@ -211,7 +211,7 @@ function AppContent() {
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
         {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
-        {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
+        {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
         {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
         {currentView === 'terms' && <TermsOfServiceView onNavigate={handleNavigate} />}

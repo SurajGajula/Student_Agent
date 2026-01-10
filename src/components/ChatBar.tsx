@@ -6,6 +6,7 @@ import { useTestsStore } from '../stores/testsStore'
 import { useFlashcardsStore } from '../stores/flashcardsStore'
 import { useGoalsStore } from '../stores/goalsStore'
 import { useAuthStore } from '../stores/authStore'
+import { useUsageStore } from '../stores/usageStore'
 import { getApiBaseUrl } from '../lib/platform'
 import { Svg, Path, Polyline, Line, Circle, Polygon } from 'react-native-svg'
 
@@ -31,7 +32,10 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   const { addFlashcardSet } = useFlashcardsStore()
   const { addGoal } = useGoalsStore()
   const { isLoggedIn } = useAuthStore()
+  const { planName } = useUsageStore()
   const [isLoading, setIsLoading] = useState(false)
+  
+  const isPro = planName === 'pro'
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const insets = useSafeAreaInsets()
   const spinAnim = useRef(new Animated.Value(0)).current
@@ -60,6 +64,14 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   }
 
   const mentions = parseMentions(message)
+
+  // Fetch usage to check plan status on mount
+  useEffect(() => {
+    if (isLoggedIn) {
+      const { fetchUsage } = useUsageStore.getState()
+      fetchUsage()
+    }
+  }, [isLoggedIn])
 
   // Clear status message after 5 seconds when it's set
   useEffect(() => {
@@ -379,8 +391,18 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           }
         }
       } 
-      // Handle course search
+      // Handle course search (Pro only)
       else if (intentResult.intent === 'course_search') {
+        if (!isPro) {
+          setStatusMessage({ 
+            type: 'error', 
+            text: 'Goals is a Pro feature. Upgrade to Pro to access AI-powered course recommendations.' 
+          })
+          setMessage('')
+          setIsLoading(false)
+          return
+        }
+
         const { supabase } = await import('../lib/supabase')
         const { data: { session } } = await supabase.auth.getSession()
         
