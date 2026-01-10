@@ -62,7 +62,7 @@ function BetaModal({ isOpen, onClose }: BetaModalProps) {
               
               <View style={styles.body}>
                 <Text style={styles.message}>
-                  The Goals feature is currently in beta and is limited to Stanford CS courses.
+                  The Goals feature is currently in beta and supports CS courses from UC Berkeley, UC Santa Cruz, and Stanford.
                 </Text>
                 <Text style={styles.submessage}>
                   We're working on expanding support to more schools and departments. Stay tuned for updates!
@@ -110,7 +110,7 @@ function BetaModal({ isOpen, onClose }: BetaModalProps) {
             
             <View style={styles.body}>
               <Text style={styles.message}>
-                The Goals feature is currently in beta and is limited to Stanford CS courses.
+                The Goals feature is currently in beta and supports CS courses from UC Berkeley, UC Santa Cruz, and Stanford.
               </Text>
               <Text style={styles.submessage}>
                 We're working on expanding support to more schools and departments. Stay tuned for updates!
