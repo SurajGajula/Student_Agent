@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, StyleSheet, Pressable, Dimensions, Platform } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useAuthStore } from './stores/authStore'
 import Sidebar from './components/Sidebar'
 import MobileMenuButton from './components/MobileMenuButton'
@@ -185,6 +186,7 @@ function AppContent() {
   }, [])
 
   return (
+    <KeyboardProvider>
     <SafeAreaProvider>
     <View style={styles.app}>
       {windowWidth <= 768 && !isInDetailMode && (
@@ -221,6 +223,7 @@ function AppContent() {
       <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} />
     </View>
     </SafeAreaProvider>
+    </KeyboardProvider>
   )
 }
 

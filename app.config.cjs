@@ -72,10 +72,12 @@ module.exports = {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.studentagent.app"
+      bundleIdentifier: "com.studentagent.app",
+      orientation: "portrait"
     },
     android: {
       package: "com.studentagent.app",
+      orientation: "portrait",
       ...(fs.existsSync('./assets/adaptive-icon.png') && {
         adaptiveIcon: {
           foregroundImage: "./assets/adaptive-icon.png",

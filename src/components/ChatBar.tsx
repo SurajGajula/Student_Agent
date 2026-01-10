@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { View, Text, TextInput, StyleSheet, Pressable, Platform, Keyboard, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useKeyboardHandler } from 'react-native-keyboard-controller'
+import ReanimatedAnimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated'
 import { useNotesStore, type Note } from '../stores/notesStore'
 import { useTestsStore } from '../stores/testsStore'
 import { useFlashcardsStore } from '../stores/flashcardsStore'
@@ -39,6 +41,34 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const insets = useSafeAreaInsets()
   const spinAnim = useRef(new Animated.Value(0)).current
+  
+  // Use keyboard controller for smooth animations on mobile
+  const keyboardHeight = useSharedValue(0)
+  
+  // Listen to keyboard events and follow keyboard in real-time (only on mobile)
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        'worklet'
+        if (Platform.OS !== 'web') {
+          // Update directly without animation to match native keyboard speed
+          keyboardHeight.value = e.height
+        }
+      },
+    },
+    []
+  )
+  
+  // Animated style for smooth keyboard movement
+  const animatedStyle = useAnimatedStyle(() => {
+    if (Platform.OS === 'web') {
+      return {}
+    }
+    // Move chatbar up by keyboard height when keyboard is visible
+    return {
+      bottom: keyboardHeight.value,
+    }
+  }, [])
 
   // Filter notes based on autocomplete query
   const filteredNotes = notes.filter(note =>
@@ -97,6 +127,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
       spinAnim.setValue(0)
     }
   }, [isLoading, spinAnim])
+
 
   const handleInputChange = (text: string) => {
     setMessage(text)
@@ -548,8 +579,16 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
     )
   }
 
+  const ChatBarWrapper = Platform.OS === 'web' ? View : ReanimatedAnimated.View
+
   return (
-    <View style={[styles.chatbar, { paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 12) }]}>
+    <ChatBarWrapper style={[
+      styles.chatbar, 
+      { 
+        paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 12),
+      },
+      Platform.OS !== 'web' && animatedStyle
+    ]}>
       {statusMessage && (
         <View style={[styles.status, statusMessage.type === 'error' ? styles.statusError : styles.statusSuccess]}>
           <Text style={styles.statusText}>{statusMessage.text}</Text>
@@ -587,7 +626,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           {isLoading ? <Spinner /> : <SendIcon />}
         </View>
       </Pressable>
-    </View>
+    </ChatBarWrapper>
   )
 }
 
