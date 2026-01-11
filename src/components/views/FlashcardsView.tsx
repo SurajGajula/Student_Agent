@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, Animated, Platform } from 'react-native'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, Animated, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CreateFolderModal from '../modals/CreateFolderModal'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
@@ -202,6 +202,59 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     }
   }
 
+  // Refs to store latest values for PanResponder (to avoid stale closures)
+  const currentCardIndexRef = useRef(currentCardIndex)
+  const isTransitioningRef = useRef(isTransitioning)
+  const cardsLengthRef = useRef(cards.length)
+  
+  // Update refs when values change
+  useEffect(() => {
+    currentCardIndexRef.current = currentCardIndex
+  }, [currentCardIndex])
+  
+  useEffect(() => {
+    isTransitioningRef.current = isTransitioning
+  }, [isTransitioning])
+  
+  useEffect(() => {
+    cardsLengthRef.current = cards.length
+  }, [cards.length])
+
+  // PanResponder for swipe gestures (mobile only)
+  const panResponder = useMemo(
+    () => {
+      if (Platform.OS === 'web') return null
+      
+      return PanResponder.create({
+        onMoveShouldSetPanResponder: (evt, gestureState) => {
+          // Only respond to horizontal swipes (more horizontal than vertical)
+          return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10
+        },
+        onPanResponderRelease: (evt, gestureState) => {
+          // Only trigger if not transitioning and swipe is significant
+          if (isTransitioningRef.current) return
+          
+          const swipeThreshold = 50
+          const swipeVelocity = 0.5
+          
+          // Swipe left (next card)
+          if (gestureState.dx < -swipeThreshold || gestureState.vx < -swipeVelocity) {
+            if (currentCardIndexRef.current < cardsLengthRef.current - 1) {
+              handleNextCard()
+            }
+          }
+          // Swipe right (previous card)
+          else if (gestureState.dx > swipeThreshold || gestureState.vx > swipeVelocity) {
+            if (currentCardIndexRef.current > 0) {
+              handlePrevCard()
+            }
+          }
+        },
+      })
+    },
+    [handleNextCard, handlePrevCard] // Only recreate if handlers change (they don't, so this is stable)
+  )
+
   // Card flip animation interpolations
   const frontInterpolate = flipAnim.interpolate({
     inputRange: [0, 1],
@@ -254,7 +307,10 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
           <Text style={styles.progress}>
             Card {currentCardIndex + 1} of {cards.length}
           </Text>
-          <View style={styles.cardSlideContainer}>
+          <View 
+            style={styles.cardSlideContainer}
+            {...(panResponder?.panHandlers || {})}
+          >
             {/* Previous card sliding out */}
             {prevCard && prevCardIndex !== null && (
               <Animated.View

@@ -848,7 +848,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
                 }
               },
               onBlur: (e: any) => {
-                handleNoteBlur()
+                handleNoteBlur(e)
                 if (e.target && (e.target as any).__selectionCleanup) {
                   ;(e.target as any).__selectionCleanup()
                 }
