@@ -1372,6 +1372,62 @@ body .note-editor-scroll::-webkit-scrollbar {
     height: 0 !important;
 }
 
+/* Symbol Toolbar Styles */
+.symbol-toolbar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #d0d0d0;
+    padding: 8px 0;
+    max-height: 120px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.symbol-toolbar-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.symbol-toolbar-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.symbol-toolbar-scroll::-webkit-scrollbar-track {
+    background: #f0f0f0;
+}
+
+.symbol-toolbar-scroll::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 3px;
+}
+
+.symbol-toolbar-scroll::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.symbol-button {
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 6px;
+    border: 1px solid #d0d0d0;
+    background-color: #f8f8f8;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.symbol-button:hover {
+    background-color: #e8e8e8;
+    border-color: #0f0f0f;
+    transform: translateY(-1px);
+}
+
+.symbol-button:active {
+    transform: translateY(0);
+    background-color: #d0d0d0;
+}
+
 .classes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));

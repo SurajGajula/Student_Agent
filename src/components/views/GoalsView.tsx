@@ -202,9 +202,9 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
               <Text style={[styles.headerTitleText, isMobile && styles.headerTitleTextMobile]}>
                 {currentGoal.name}
               </Text>
-              <Text style={styles.headerSubtitle}>
+            <Text style={styles.headerSubtitle}>
                 {currentGoal.school} {currentGoal.department} • {currentGoal.courses.length} courses
-              </Text>
+            </Text>
             </View>
           </View>
         </View>
@@ -295,23 +295,23 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
             >
               <Pressable
                 style={styles.cardDeleteButton}
-                onPress={(e) => {
-                  e.stopPropagation()
+                    onPress={(e) => {
+                      e.stopPropagation()
                   handleDeleteGoal(goal.id)
-                }}
-              >
-                <DeleteIcon />
-              </Pressable>
+                    }}
+                  >
+                    <DeleteIcon />
+                  </Pressable>
               <Text style={styles.goalCardTitle} numberOfLines={2}>
                 {goal.name}
               </Text>
               <Text style={styles.goalCardMeta}>
                 {goal.school} {goal.department}
-              </Text>
+                </Text>
               <Text style={styles.goalCardMeta}>
                 {goal.courses.length} {goal.courses.length === 1 ? 'course' : 'courses'}
-              </Text>
-            </Pressable>
+                </Text>
+              </Pressable>
           )}
         />
       )}
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   title: {
-    fontSize: 32,
+      fontSize: 32,
     fontWeight: '300',
     letterSpacing: -0.5,
     color: '#0f0f0f',

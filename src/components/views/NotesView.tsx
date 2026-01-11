@@ -39,8 +39,11 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const scrollViewRef = useRef<any>(null)
   const editorInputRef = useRef<TextInput>(null)
+  const isInsertingSymbolRef = useRef(false)
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [isEditorFocused, setIsEditorFocused] = useState(false)
+  const [selection, setSelection] = useState({ start: 0, end: 0 })
   const insets = useSafeAreaInsets()
   const { setIsInDetailMode } = useDetailMode()
 
@@ -291,11 +294,134 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     }, 1000)
   }
 
-  const handleNoteBlur = () => {
+  const handleNoteBlur = (e: any) => {
+    // Don't blur if we're in the middle of inserting a symbol
+    if (isInsertingSymbolRef.current) {
+      return
+    }
+    
+    // Don't blur if clicking on the symbol toolbar
+    if (Platform.OS === 'web' && e?.relatedTarget) {
+      const relatedTarget = e.relatedTarget as HTMLElement
+      if (relatedTarget.closest && relatedTarget.closest('[data-symbol-toolbar]')) {
+        // Click was on the toolbar, don't blur
+        return
+      }
+    }
+    
+    setIsEditorFocused(false)
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
       saveTimeoutRef.current = null
     }
+  }
+
+  const handleNoteFocus = () => {
+    setIsEditorFocused(true)
+  }
+
+  const handleSelectionChange = (event: any) => {
+    setSelection({
+      start: event.nativeEvent.selection.start,
+      end: event.nativeEvent.selection.end,
+    })
+  }
+
+  const insertSymbol = (symbol: string, event?: any) => {
+    // Prevent the input from losing focus when clicking the symbol button
+    if (event) {
+      event.preventDefault?.()
+      event.stopPropagation?.()
+    }
+    
+    if (!currentNoteId || !currentNote) return
+    
+    // Set flag to prevent blur during symbol insertion
+    isInsertingSymbolRef.current = true
+    
+    let insertStart = selection.start
+    let insertEnd = selection.end
+    
+    // On web, try to get current selection from the DOM element
+    if (Platform.OS === 'web' && editorInputRef.current) {
+      try {
+        const input = editorInputRef.current as any
+        if (input._internalFiberInstanceHandleDEV) {
+          // React Native Web - find the actual input element
+          const node = input._internalFiberInstanceHandleDEV.stateNode
+          if (node && node.input) {
+            const domInput = node.input as HTMLInputElement | HTMLTextAreaElement
+            insertStart = domInput.selectionStart || selection.start
+            insertEnd = domInput.selectionEnd || selection.end
+          }
+        } else if (input.selectionStart !== undefined) {
+          // Direct DOM access
+          insertStart = input.selectionStart || selection.start
+          insertEnd = input.selectionEnd || selection.end
+        }
+      } catch (e) {
+        // Fallback to state
+        console.warn('Could not get selection from DOM, using state')
+      }
+    }
+    
+    const currentContent = currentNote.content || ''
+    const before = currentContent.substring(0, insertStart)
+    const after = currentContent.substring(insertEnd)
+    const newContent = before + symbol + after
+    const newCursorPos = insertStart + symbol.length
+    
+    handleNoteContentChange(newContent)
+    
+    // Update cursor position and refocus to keep keyboard open
+    setTimeout(() => {
+      if (editorInputRef.current) {
+        if (Platform.OS === 'web') {
+          try {
+            const input = editorInputRef.current as any
+            if (input._internalFiberInstanceHandleDEV) {
+              const node = input._internalFiberInstanceHandleDEV.stateNode
+              if (node && node.input) {
+                const domInput = node.input as HTMLInputElement | HTMLTextAreaElement
+                // Only update selection, don't call focus() to avoid scrolling
+                domInput.setSelectionRange(newCursorPos, newCursorPos)
+                setSelection({ start: newCursorPos, end: newCursorPos })
+                setIsEditorFocused(true)
+                isInsertingSymbolRef.current = false
+                return
+              }
+            } else if (input.setSelectionRange) {
+              // Only update selection, don't call focus() to avoid scrolling
+              input.setSelectionRange(newCursorPos, newCursorPos)
+              setSelection({ start: newCursorPos, end: newCursorPos })
+              setIsEditorFocused(true)
+              isInsertingSymbolRef.current = false
+              return
+            }
+          } catch (e) {
+            console.warn('Could not set selection on DOM element')
+          }
+        }
+        
+        // Native: update selection and refocus to keep keyboard open
+        editorInputRef.current.setNativeProps({
+          selection: { start: newCursorPos, end: newCursorPos },
+        })
+        setSelection({ start: newCursorPos, end: newCursorPos })
+        // Refocus on mobile to keep keyboard open after inserting symbol
+        if (Platform.OS !== 'web') {
+          // Use requestAnimationFrame for smoother refocus on mobile
+          requestAnimationFrame(() => {
+            editorInputRef.current?.focus()
+            isInsertingSymbolRef.current = false
+          })
+        } else {
+          isInsertingSymbolRef.current = false
+        }
+      } else {
+        isInsertingSymbolRef.current = false
+      }
+    }, 10)
   }
 
   const handleDonePress = () => {
@@ -483,6 +609,142 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             <Text style={styles.doneButtonText}>Done</Text>
           </Pressable>
         </View>
+        {isEditorFocused && (
+          <View style={styles.symbolToolbar} {...(Platform.OS === 'web' && { 'data-symbol-toolbar': true })}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.symbolToolbarScroll}
+              contentContainerStyle={styles.symbolToolbarContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Special Characters */}
+              <View style={styles.symbolGroup}>
+                <Text style={styles.symbolGroupLabel}>Special</Text>
+                <View style={styles.symbolRow}>
+                  {['⓸', '©', '®', '™', '°', '•', '→', '←', '↑', '↓', '✓', '✗', '★', '☆'].map((sym) => (
+                    <Pressable 
+                      key={sym} 
+                      style={styles.symbolButton} 
+                      onPress={(e) => insertSymbol(sym, e)}
+                      {...(Platform.OS === 'web' && {
+                        onMouseDown: (e: any) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        },
+                      })}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Text style={styles.symbolText}>{sym}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Greek Letters */}
+              <View style={styles.symbolGroup}>
+                <Text style={styles.symbolGroupLabel}>Greek</Text>
+                <View style={styles.symbolRow}>
+                  {['α', 'β', 'γ', 'δ', 'ε', 'θ', 'λ', 'μ', 'π', 'σ', 'φ', 'ω', 'Δ', 'Ω', '∑', '∫'].map((sym) => (
+                    <Pressable 
+                      key={sym} 
+                      style={styles.symbolButton} 
+                      onPress={(e) => insertSymbol(sym, e)}
+                      {...(Platform.OS === 'web' && {
+                        onMouseDown: (e: any) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        },
+                      })}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Text style={styles.symbolText}>{sym}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Math Symbols */}
+              <View style={styles.symbolGroup}>
+                <Text style={styles.symbolGroupLabel}>Math</Text>
+                <View style={styles.symbolRow}>
+                  {['±', '×', '÷', '≤', '≥', '≠', '≈', '∞', '√', '²', '³', '½', '¼', '¾', '∂', '∇'].map((sym) => (
+                    <Pressable 
+                      key={sym} 
+                      style={styles.symbolButton} 
+                      onPress={(e) => insertSymbol(sym, e)}
+                      {...(Platform.OS === 'web' && {
+                        onMouseDown: (e: any) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        },
+                      })}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Text style={styles.symbolText}>{sym}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Subscript */}
+              <View style={styles.symbolGroup}>
+                <Text style={styles.symbolGroupLabel}>Subscript</Text>
+                <View style={styles.symbolRow}>
+                  {['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉', '₊', '₋', '₌', '₍', '₎'].map((sym) => (
+                    <Pressable 
+                      key={sym} 
+                      style={styles.symbolButton} 
+                      onPress={(e) => insertSymbol(sym, e)}
+                      {...(Platform.OS === 'web' && {
+                        onMouseDown: (e: any) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        },
+                      })}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Text style={styles.symbolText}>{sym}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Superscript */}
+              <View style={styles.symbolGroup}>
+                <Text style={styles.symbolGroupLabel}>Superscript</Text>
+                <View style={styles.symbolRow}>
+                  {['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '⁺', '⁻', '⁼', '⁽', '⁾'].map((sym) => (
+                    <Pressable 
+                      key={sym} 
+                      style={styles.symbolButton} 
+                      onPress={(e) => insertSymbol(sym, e)}
+                      {...(Platform.OS === 'web' && {
+                        onMouseDown: (e: any) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        },
+                      })}
+                      onTouchStart={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Text style={styles.symbolText}>{sym}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        )}
         <ScrollView 
           ref={scrollViewRef}
           style={styles.editorContainer}
@@ -493,32 +755,107 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             className: 'note-editor-scroll',
           })}
         >
-          <TextInput
-            ref={editorInputRef}
-            style={styles.editor}
-            value={currentNote.content || ''}
-            onChangeText={handleNoteContentChange}
-            onBlur={handleNoteBlur}
-            placeholder="Start typing..."
-            multiline
-            textAlignVertical="top"
-            autoFocus={Platform.OS === 'web'}
-            placeholderTextColor="#999"
-            underlineColorAndroid="transparent"
-            selectionColor={Platform.OS === 'web' ? '#0f0f0f' : undefined}
-            scrollEnabled={false}
+          <Pressable
+            style={styles.editorWrapper}
+            {...(Platform.OS !== 'web' && !isEditorFocused && {
+              // On mobile when not focused, make wrapper tappable to focus input
+              onPress: () => {
+                editorInputRef.current?.focus()
+              },
+              // Delay press to allow scroll gestures to pass through
+              delayPressIn: 0,
+              // Allow scroll gestures to cancel the press
+              android_ripple: null,
+            })}
+          >
+            <TextInput
+              ref={editorInputRef}
+              style={styles.editor}
+              value={currentNote.content || ''}
+              onChangeText={handleNoteContentChange}
+              onBlur={handleNoteBlur}
+              onFocus={handleNoteFocus}
+              onSelectionChange={handleSelectionChange}
+              placeholder="Start typing..."
+              multiline
+              textAlignVertical="top"
+              autoFocus={Platform.OS === 'web'}
+              placeholderTextColor="#999"
+              underlineColorAndroid="transparent"
+              selectionColor={Platform.OS === 'web' ? '#0f0f0f' : undefined}
+              scrollEnabled={false}
+              {...(Platform.OS !== 'web' && !isEditorFocused && {
+                // On mobile when not focused, prevent TextInput from intercepting scroll gestures
+                pointerEvents: 'none',
+              })}
             {...(Platform.OS === 'web' && {
               // Remove focus outline on web
               className: 'note-editor-rn',
               onFocus: (e: any) => {
+                handleNoteFocus()
                 if (e.target && e.target.style) {
                   e.target.style.setProperty('outline', 'none', 'important')
                   e.target.style.setProperty('border', 'none', 'important')
                   e.target.style.setProperty('box-shadow', 'none', 'important')
                 }
+                // Track selection on web
+                const updateWebSelection = () => {
+                  if (editorInputRef.current) {
+                    try {
+                      const input = editorInputRef.current as any
+                      if (input._internalFiberInstanceHandleDEV) {
+                        const node = input._internalFiberInstanceHandleDEV.stateNode
+                        if (node && node.input) {
+                          const domInput = node.input as HTMLInputElement | HTMLTextAreaElement
+                          setSelection({
+                            start: domInput.selectionStart || 0,
+                            end: domInput.selectionEnd || 0,
+                          })
+                        }
+                      } else if (input.selectionStart !== undefined) {
+                        setSelection({
+                          start: input.selectionStart || 0,
+                          end: input.selectionEnd || 0,
+                        })
+                      }
+                    } catch (err) {
+                      // Ignore errors
+                    }
+                  }
+                }
+                
+                // Initial selection
+                setTimeout(updateWebSelection, 0)
+                
+                // Listen for selection changes on web
+                const handleWebSelectionChange = () => {
+                  updateWebSelection()
+                }
+                
+                document.addEventListener('selectionchange', handleWebSelectionChange)
+                if (e.target) {
+                  e.target.addEventListener('click', handleWebSelectionChange)
+                  e.target.addEventListener('keyup', handleWebSelectionChange)
+                  e.target.addEventListener('mouseup', handleWebSelectionChange)
+                  
+                  // Store cleanup function
+                  ;(e.target as any).__selectionCleanup = () => {
+                    document.removeEventListener('selectionchange', handleWebSelectionChange)
+                    e.target.removeEventListener('click', handleWebSelectionChange)
+                    e.target.removeEventListener('keyup', handleWebSelectionChange)
+                    e.target.removeEventListener('mouseup', handleWebSelectionChange)
+                  }
+                }
+              },
+              onBlur: (e: any) => {
+                handleNoteBlur()
+                if (e.target && (e.target as any).__selectionCleanup) {
+                  ;(e.target as any).__selectionCleanup()
+                }
               },
             })}
-          />
+            />
+          </Pressable>
         </ScrollView>
       </View>
     )
@@ -887,6 +1224,10 @@ const styles = StyleSheet.create({
     }),
     width: '100%',
   },
+  editorWrapper: {
+    width: '100%',
+    minHeight: '100%',
+  },
   editor: {
     minHeight: '100%',
     width: '100%',
@@ -1010,6 +1351,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '400',
     color: '#f0f0f0',
+  },
+  symbolToolbar: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#d0d0d0',
+    paddingVertical: 8,
+    maxHeight: 120,
+    ...(Platform.OS === 'web' && {
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    }),
+  },
+  symbolToolbarScroll: {
+    flexGrow: 0,
+  },
+  symbolToolbarContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    gap: 16,
+  },
+  symbolGroup: {
+    gap: 6,
+    marginRight: 16,
+  },
+  symbolGroupLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  symbolRow: {
+    flexDirection: 'row',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  symbolButton: {
+    minWidth: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    backgroundColor: '#f8f8f8',
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      ':hover': {
+        backgroundColor: '#e8e8e8',
+        borderColor: '#0f0f0f',
+      },
+    }),
+  },
+  symbolText: {
+    fontSize: 18,
+    color: '#0f0f0f',
+    lineHeight: 20,
   },
 })
 

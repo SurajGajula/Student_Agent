@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, StyleSheet, Modal, Pressable, Platform, ScrollView } from 'react-native'
 import { createPortal } from 'react-dom'
 import { Svg, Line } from 'react-native-svg'
@@ -26,6 +26,17 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const emailInputRef = useRef<TextInput>(null)
   const passwordInputRef = useRef<TextInput>(null)
   const nameInputRef = useRef<TextInput>(null)
+  
+  // Stable onChange handlers to prevent re-renders and keyboard flicker
+  const handleEmailChange = useCallback((text: string) => {
+    setEmail(text)
+  }, [])
+  const handlePasswordChange = useCallback((text: string) => {
+    setPassword(text)
+  }, [])
+  const handleNameChange = useCallback((text: string) => {
+    setName(text)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -138,7 +149,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       style={styles.input}
                       placeholder="Enter your name"
                       value={name}
-                      onChangeText={setName}
+                      onChangeText={handleNameChange}
                       autoComplete="off"
                       returnKeyType="next"
                       onSubmitEditing={() => emailInputRef.current?.focus()}
@@ -152,7 +163,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     style={styles.input}
                     placeholder="Enter your email"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={handleEmailChange}
                     autoComplete="email"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -167,7 +178,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     style={styles.input}
                     placeholder="Enter your password"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={handlePasswordChange}
                     secureTextEntry
                     autoComplete="password"
                     returnKeyType="done"
@@ -211,9 +222,11 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
       transparent
       animationType="fade"
       onRequestClose={handleClose}
+      presentationStyle="overFullScreen"
     >
       <Pressable style={styles.overlayNative} onPress={handleClose}>
-        <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
+        <View style={styles.contentWrapperNative}>
+          <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
             <View style={styles.header}>
               <View style={styles.tabs}>
                 <Pressable
@@ -239,6 +252,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
               contentContainerStyle={styles.body}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              bounces={false}
             >
               {!isLogin && (
                 <View style={styles.formGroup}>
@@ -248,10 +262,11 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     style={styles.input}
                     placeholder="Enter your name"
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={handleNameChange}
                     autoComplete="off"
                     returnKeyType="next"
                     onSubmitEditing={() => emailInputRef.current?.focus()}
+                    editable={!isLoading}
                   />
                 </View>
               )}
@@ -262,13 +277,15 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   style={styles.input}
                   placeholder="Enter your email"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={handleEmailChange}
                   autoComplete="email"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   returnKeyType="next"
                   onSubmitEditing={() => passwordInputRef.current?.focus()}
                   blurOnSubmit={false}
+                  textContentType="emailAddress"
+                  importantForAutofill="no"
                 />
               </View>
               <View style={styles.formGroup}>
@@ -278,11 +295,12 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   style={styles.input}
                   placeholder="Enter your password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={handlePasswordChange}
                   secureTextEntry
                   autoComplete="password"
                   returnKeyType="done"
                   onSubmitEditing={handleSubmit}
+                  editable={!isLoading}
                 />
               </View>
               {error && (
@@ -303,7 +321,8 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </View>
+      </Pressable>
     </Modal>
   )
 }
@@ -350,7 +369,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  contentWrapperNative: {
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%',
     padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bodyScroll: {
     flexGrow: 0,
@@ -386,6 +412,10 @@ const styles = StyleSheet.create({
       zIndex: 2147483647,
       pointerEvents: 'auto',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    }),
+    ...(Platform.OS !== 'web' && {
+      // Prevent layout shifts on native
+      overflow: 'hidden',
     }),
   },
   header: {
