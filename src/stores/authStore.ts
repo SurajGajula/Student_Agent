@@ -2,20 +2,15 @@ import { create } from 'zustand'
 import { Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
-import type { User } from '@supabase/supabase-js'
-import { useFolderStore } from './folderStore'
-import { useClassesStore } from './classesStore'
-import { useNotesStore } from './notesStore'
-import { useTestsStore } from './testsStore'
-import { useFlashcardsStore } from './flashcardsStore'
-import { useGoalsStore } from './goalsStore'
-import { useUsageStore } from './usageStore'
+import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthStore {
   isLoggedIn: boolean
   user: User | null
   username: string
   email: string | null
+  session: Session | null // Store session for synchronous access
+  authReady: boolean // Signal that auth state is ready
   isLoading: boolean
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
@@ -23,14 +18,51 @@ interface AuthStore {
   signOut: () => Promise<void>
   initializeAuth: () => Promise<void>
   syncFromSession: () => Promise<void> // Always syncs Zustand state with actual Supabase session
+  setSession: (session: Session | null) => void // Set session and mark auth as ready
+  _authStateChangeSubscription: { unsubscribe: () => void } | null // Track subscription for cleanup
 }
 
+// Track if stores are currently syncing to prevent duplicate calls
+let isSyncingStores = false
+
 // Helper function to sync all stores from Supabase
-const syncAllStores = async () => {
+// Uses dynamic imports to avoid require cycles
+export const syncAllStores = async () => {
+  // Prevent duplicate syncs
+  if (isSyncingStores) {
+    console.log('[authStore] Stores already syncing, skipping duplicate call')
+    return
+  }
+  
+  // Check auth readiness before syncing
+  const { authReady, session } = useAuthStore.getState()
+  if (!authReady || !session) {
+    console.log('[authStore] Auth not ready or no session, skipping store sync')
+    return
+  }
+  
+  isSyncingStores = true
   try {
+    // Use dynamic imports to avoid require cycles
+    const [
+      { useFolderStore },
+      { useNotesStore },
+      { useTestsStore },
+      { useFlashcardsStore },
+      { useGoalsStore },
+      { useUsageStore },
+    ] = await Promise.all([
+      import('./folderStore'),
+      import('./notesStore'),
+      import('./testsStore'),
+      import('./flashcardsStore'),
+      import('./goalsStore'),
+      import('./usageStore'),
+    ])
+    
     await Promise.all([
       useFolderStore.getState().syncFromSupabase().catch(err => console.error('Folder sync error:', err)),
-      useClassesStore.getState().syncFromSupabase().catch(err => console.error('Classes sync error:', err)),
+      // Classes store removed - page is commented out
       useNotesStore.getState().syncFromSupabase().catch(err => console.error('Notes sync error:', err)),
       useTestsStore.getState().syncFromSupabase().catch(err => console.error('Tests sync error:', err)),
       useFlashcardsStore.getState().syncFromSupabase().catch(err => console.error('Flashcards sync error:', err)),
@@ -39,10 +71,13 @@ const syncAllStores = async () => {
     ])
   } catch (error) {
     console.error('Error syncing stores:', error)
+  } finally {
+    isSyncingStores = false
   }
 }
 
 // Helper function to clear all stores on logout
+// Uses dynamic imports to avoid require cycles
 const clearAllStores = async () => {
   const storageKeys = [
     'folders-storage',
@@ -60,6 +95,23 @@ const clearAllStores = async () => {
     // Native: use AsyncStorage
     await Promise.all(storageKeys.map(key => AsyncStorage.removeItem(key)))
   }
+
+  // Use dynamic imports to avoid require cycles
+  const [
+    { useFolderStore },
+    { useClassesStore },
+    { useNotesStore },
+    { useTestsStore },
+    { useFlashcardsStore },
+    { useGoalsStore },
+  ] = await Promise.all([
+    import('./folderStore'),
+    import('./classesStore'),
+    import('./notesStore'),
+    import('./testsStore'),
+    import('./flashcardsStore'),
+    import('./goalsStore'),
+  ])
 
   // Reset folder store
   useFolderStore.setState({
@@ -107,12 +159,13 @@ const clearAllStores = async () => {
 // Helper function to sync Zustand state with actual Supabase session
 const syncStateFromSession = async (set: any) => {
   try {
-    // Ensure Supabase is initialized
-    const { initSupabase } = await import('../lib/supabase')
+    // Ensure Supabase is initialized and get a valid session
+    const { initSupabase, getSupabase } = await import('../lib/supabase')
     await initSupabase()
+    const client = getSupabase()
     
-    const { data: { session }, error } = await supabase.auth.getSession()
-    
+    const { data: { session }, error } = await client.auth.getSession()
+
     if (error) {
       console.warn('[authStore] Error getting session:', error)
       set({
@@ -120,6 +173,8 @@ const syncStateFromSession = async (set: any) => {
         user: null,
         username: 'User',
         email: null,
+        session: null,
+        authReady: true, // Still mark as ready even if no session
       })
       return
     }
@@ -131,6 +186,8 @@ const syncStateFromSession = async (set: any) => {
         user: session.user,
         username: name,
         email: session.user.email || null,
+        session: session,
+        authReady: true,
       })
     } else {
       set({
@@ -138,6 +195,8 @@ const syncStateFromSession = async (set: any) => {
         user: null,
         username: 'User',
         email: null,
+        session: null,
+        authReady: true, // Mark as ready even if no session
       })
     }
   } catch (error) {
@@ -147,6 +206,8 @@ const syncStateFromSession = async (set: any) => {
       user: null,
       username: 'User',
       email: null,
+      session: null,
+      authReady: true, // Mark as ready even on error
     })
   }
 }
@@ -156,8 +217,34 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   username: 'User',
   email: null,
+  session: null,
+  authReady: false,
   isLoading: false,
   error: null,
+  _authStateChangeSubscription: null,
+
+  setSession: (session: Session | null) => {
+    if (session?.user) {
+      const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
+      set({
+        session,
+        isLoggedIn: true,
+        user: session.user,
+        username: name,
+        email: session.user.email || null,
+        authReady: true,
+      })
+    } else {
+      set({
+        session: null,
+        isLoggedIn: false,
+        user: null,
+        username: 'User',
+        email: null,
+        authReady: true,
+      })
+    }
+  },
 
   syncFromSession: async () => {
     await syncStateFromSession(set)
@@ -243,9 +330,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Sync state from actual session (always check the real session)
       await syncStateFromSession(set)
 
-      // Check if we have a valid session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
+      // After syncing state, check if we have a session and sync stores
+      const currentState = get()
+      if (currentState.session?.user) {
         // User is logged in - sync all stores
         await syncAllStores()
       } else {
@@ -256,32 +343,33 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       set({ isLoading: false, error: null })
 
+      // Unsubscribe from any existing auth state change listener to prevent multiple subscriptions
+      const existingSubscription = get()._authStateChangeSubscription
+      if (existingSubscription) {
+        try {
+          existingSubscription.unsubscribe()
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+      }
+
       // Listen for auth state changes - this handles cross-tab synchronization
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        // Always sync from the actual session passed to the listener
-        if (session?.user) {
-          const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User'
-          set({
-            isLoggedIn: true,
-            user: session.user,
-            username: name,
-            email: session.user.email || null,
-          })
-          // Sync all stores when user logs in
-          if (event === 'SIGNED_IN') {
-            await syncAllStores()
-          }
-        } else {
+      const subscription = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Update session and mark auth as ready
+        get().setSession(session)
+        
+        // Only sync stores on SIGNED_IN event, not on TOKEN_REFRESHED or other events
+        // This prevents duplicate syncs on page refresh
+        if (event === 'SIGNED_IN' && session?.user) {
+          await syncAllStores()
+        } else if (!session) {
           // Clear all stores on sign out event or when session is lost
           await clearAllStores()
-          set({
-            isLoggedIn: false,
-            user: null,
-            username: 'User',
-            email: null,
-          })
         }
       })
+      
+      // Store the subscription so we can unsubscribe later
+      set({ _authStateChangeSubscription: subscription })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize auth'
       set({ isLoading: false, error: errorMessage })

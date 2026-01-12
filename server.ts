@@ -62,7 +62,12 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  // Cache preflight responses for 24 hours to reduce OPTIONS requests
+  maxAge: 86400, // 24 hours in seconds
+  // Handle preflight requests immediately
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }))
 
 // Stripe webhook must be before JSON parser (it uses raw body)

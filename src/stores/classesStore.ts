@@ -32,8 +32,9 @@ export const useClassesStore = create<ClassesStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -64,8 +65,9 @@ export const useClassesStore = create<ClassesStore>()(
       },
 
       addClass: async (name: string, folderId?: string, time?: { days: string[], timeRange: string }) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -98,8 +100,9 @@ export const useClassesStore = create<ClassesStore>()(
       },
 
       removeClass: async (id: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -128,8 +131,9 @@ export const useClassesStore = create<ClassesStore>()(
       },
 
       moveClassToFolder: async (id: string, folderId: string | null) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {

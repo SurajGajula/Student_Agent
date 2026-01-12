@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, StyleSheet, Pressable, Dimensions, Platform } from 'react-native'
+import { View, StyleSheet, Pressable, Dimensions, Platform, AppState, AppStateStatus } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useAuthStore } from './stores/authStore'
@@ -58,29 +58,194 @@ function AppContent() {
     init()
   }, [])
 
-  // Sync auth state from actual session when tab becomes visible (web only)
-  // This prevents phantom logouts by always checking the real Supabase session
-  // Runs immediately when tab becomes visible (no delays)
+  // Refresh session when app becomes active and sync all stores
   useEffect(() => {
-    if (Platform.OS !== 'web') return
+    let lastRefreshTime = 0
+    const REFRESH_COOLDOWN = 2000 // 2 second cooldown
+    let isHandlingTabReturn = false // Guard to prevent concurrent execution
 
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Run immediately - no delays or timers
-        (async () => {
-          try {
-            const { initSupabase } = await import('./lib/supabase')
-            await initSupabase()
-            await useAuthStore.getState().syncFromSession()
-          } catch (err) {
-            console.error('Error syncing auth on visibility change:', err)
+    const refreshSessionOnTabReturn = async (): Promise<boolean> => {
+      const now = Date.now()
+      // Skip if we just refreshed recently
+      if (now - lastRefreshTime < REFRESH_COOLDOWN) {
+        console.log('[App] Skipping refresh due to cooldown')
+        return false
+      }
+      lastRefreshTime = now
+
+      console.log('[App] App became active - refreshing session...')
+      try {
+        const { getSupabase } = await import('./lib/supabase')
+        const client = getSupabase()
+        
+        // Check if we have a session
+        const { data: { session } } = await client.auth.getSession()
+        if (session) {
+          console.log('[App] Found session, calling refreshSession...')
+          
+          // Force a refresh by directly calling the Supabase auth API
+          const supabaseModule = await import('./lib/supabase')
+          await supabaseModule.initSupabase() // Ensure initialized
+          
+          // Get config from runtime config cache
+          const config = supabaseModule.getRuntimeConfig()
+          
+          if (!config || !config.supabaseUrl || !config.supabasePublishableKey) {
+            console.warn('[App] Could not get Supabase config, falling back to refreshSession')
+            const { data, error } = await client.auth.refreshSession(session)
+            if (error) {
+              console.warn('[App] refreshSession failed:', error.message)
+              return false
+            } else if (data?.session) {
+              console.log('[App] ✓ refreshSession succeeded')
+              // Update auth store with new session
+              const { useAuthStore } = await import('./stores/authStore')
+              useAuthStore.getState().setSession(data.session)
+              return true
+            }
+            return false
           }
-        })()
+          
+          const refreshToken = session.refresh_token
+          
+          if (!refreshToken) {
+            console.warn('[App] No refresh token found, cannot force refresh')
+            return false
+          }
+          
+          console.log('[App] Making direct refresh token request to force network call...')
+          
+          try {
+            // Directly call the Supabase token refresh endpoint
+            const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': config.supabasePublishableKey,
+              },
+              body: JSON.stringify({
+                refresh_token: refreshToken
+              })
+            })
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              console.warn('[App] Direct refresh request failed:', response.status, errorData)
+              // Fall back to Supabase's refreshSession
+              const { data, error } = await client.auth.refreshSession(session)
+              if (error) {
+                console.warn('[App] Fallback refreshSession also failed:', error.message)
+                return false
+              } else if (data?.session) {
+                console.log('[App] ✓ Fallback refreshSession succeeded')
+                const { useAuthStore } = await import('./stores/authStore')
+                useAuthStore.getState().setSession(data.session)
+                return true
+              }
+              return false
+            } else {
+              const refreshData = await response.json()
+              console.log('[App] ✓ Direct refresh request succeeded')
+              
+              // Update the session with the new tokens
+              const { data: { session: updatedSession }, error: updateError } = await client.auth.setSession({
+                access_token: refreshData.access_token,
+                refresh_token: refreshData.refresh_token || refreshToken,
+              })
+              
+              if (updateError) {
+                console.warn('[App] Failed to update session after refresh:', updateError.message)
+                return false
+              } else if (updatedSession) {
+                console.log('[App] ✓ Session updated with new tokens')
+                // Update auth store with new session
+                const { useAuthStore } = await import('./stores/authStore')
+                useAuthStore.getState().setSession(updatedSession)
+                return true
+              }
+              return false
+            }
+          } catch (fetchError) {
+            console.error('[App] Error making direct refresh request:', fetchError)
+            // Fall back to Supabase's refreshSession
+            const { data, error } = await client.auth.refreshSession(session)
+            if (error) {
+              console.warn('[App] Fallback refreshSession failed:', error.message)
+              return false
+            } else if (data?.session) {
+              console.log('[App] ✓ Fallback refreshSession succeeded')
+              const { useAuthStore } = await import('./stores/authStore')
+              useAuthStore.getState().setSession(data.session)
+              return true
+            }
+            return false
+          }
+        } else {
+          console.log('[App] No session found, skipping refresh')
+          return false
+        }
+      } catch (err) {
+        console.error('[App] Error refreshing session on tab return:', err)
+        return false
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    const onTabReturn = async () => {
+      // Prevent concurrent execution
+      if (isHandlingTabReturn) {
+        console.log('[App] Tab return already being handled, skipping duplicate call')
+        return
+      }
+      
+      isHandlingTabReturn = true
+      try {
+        const refreshed = await refreshSessionOnTabReturn()
+        if (refreshed) {
+          console.log('[App] Session refreshed, syncing all stores...')
+          // Reset store guards to allow re-fetch
+          const { useUsageStore } = await import('./stores/usageStore')
+          const { useNotesStore } = await import('./stores/notesStore')
+          const { useFolderStore } = await import('./stores/folderStore')
+          const { useFlashcardsStore } = await import('./stores/flashcardsStore')
+          const { useTestsStore } = await import('./stores/testsStore')
+          const { useGoalsStore } = await import('./stores/goalsStore')
+          
+          // Reset stores to clear guards
+          useUsageStore.getState().reset?.()
+          // Note: Other stores don't have reset methods yet, but guards will be cleared by sync
+          
+          // Sync all stores after refresh
+          const { syncAllStores } = await import('./stores/authStore')
+          await syncAllStores()
+        }
+      } finally {
+        isHandlingTabReturn = false
+      }
+    }
+
+    // Use AppState for React Native compatibility (works on web too)
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        onTabReturn()
+      }
+    })
+
+    // Also handle web-specific events as fallback
+    // Note: On web, AppState also fires, so we'll get both events
+    // The guard in onTabReturn prevents duplicate execution
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const handleFocus = () => onTabReturn()
+      window.addEventListener('focus', handleFocus)
+      
+      return () => {
+        subscription.remove()
+        window.removeEventListener('focus', handleFocus)
+      }
+    }
+
+    return () => {
+      subscription.remove()
+    }
   }, [])
 
   // Handle window resize for responsive behavior

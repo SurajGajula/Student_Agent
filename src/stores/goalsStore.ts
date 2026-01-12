@@ -50,8 +50,9 @@ export const useGoalsStore = create<GoalsStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -82,9 +83,10 @@ export const useGoalsStore = create<GoalsStore>()(
         set({ error: null })
         try {
           const API_BASE_URL = getApiBaseUrl()
-          const { data: { session } } = await supabase.auth.getSession()
+          const { useAuthStore } = await import('./authStore')
+          const { authReady, session } = useAuthStore.getState()
           
-          if (!session) {
+          if (!authReady || !session) {
             throw new Error('You must be logged in to create a goal')
           }
 
@@ -128,9 +130,10 @@ export const useGoalsStore = create<GoalsStore>()(
         set({ error: null })
         try {
           const API_BASE_URL = getApiBaseUrl()
-          const { data: { session } } = await supabase.auth.getSession()
+          const { useAuthStore } = await import('./authStore')
+          const { authReady, session } = useAuthStore.getState()
           
-          if (!session) {
+          if (!authReady || !session) {
             throw new Error('You must be logged in to delete a goal')
           }
 

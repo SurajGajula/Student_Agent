@@ -23,6 +23,7 @@ interface NotesStore {
   updateNoteContentLocal: (id: string, content: string) => void
   updateNoteContent: (id: string, content: string) => Promise<void>
   moveNoteToFolder: (id: string, folderId: string | null) => Promise<void>
+  reset: () => void
 }
 
 export const useNotesStore = create<NotesStore>()(
@@ -33,8 +34,10 @@ export const useNotesStore = create<NotesStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        // Check auth readiness synchronously (dynamic import to avoid require cycle)
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -65,8 +68,10 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       addNote: async (name: string, folderId?: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        // Dynamic import to avoid require cycle
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -109,9 +114,14 @@ export const useNotesStore = create<NotesStore>()(
     }))
   },
 
+      reset: () => {
+        set({ isLoading: false, error: null })
+      },
+
       updateNoteContent: async (id: string, content: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -147,8 +157,9 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       removeNote: async (id: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -177,8 +188,9 @@ export const useNotesStore = create<NotesStore>()(
       },
 
       moveNoteToFolder: async (id: string, folderId: string | null) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {

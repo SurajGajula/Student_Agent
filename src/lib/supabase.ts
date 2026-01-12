@@ -15,6 +15,15 @@ let runtimeConfig: AppConfig | null = null
 let supabaseClient: SupabaseClient | null = null
 let configPromise: Promise<AppConfig> | null = null
 let initPromise: Promise<SupabaseClient> | null = null // Prevent multiple simultaneous initializations
+let authStateChangeSubscription: { unsubscribe: () => void } | null = null // Track auth state change subscription
+
+/**
+ * Get the current runtime config (if available)
+ * This is useful for accessing Supabase URL and keys
+ */
+export function getRuntimeConfig(): AppConfig | null {
+  return runtimeConfig
+}
 
 /**
  * Get API base URL - works in both browser and Node.js
@@ -63,15 +72,33 @@ function getApiBaseUrl(): string {
 }
 
 /**
+ * Reset the cached runtime config and Supabase client to force a fresh fetch
+ * Useful when returning from a different window/tab
+ */
+export function resetRuntimeConfig(): void {
+  runtimeConfig = null
+  configPromise = null
+  supabaseClient = null
+  initPromise = null
+}
+
+/**
  * Fetch configuration from backend API at runtime
  * This avoids build-time environment variable issues
+ * @param force - If true, force a fresh fetch even if config is cached
  */
-async function fetchRuntimeConfig(): Promise<AppConfig> {
-  if (runtimeConfig) {
+async function fetchRuntimeConfig(force: boolean = false): Promise<AppConfig> {
+  // If forcing, clear cached config and promise to ensure fresh fetch
+  if (force) {
+    runtimeConfig = null
+    configPromise = null
+  }
+  
+  if (runtimeConfig && !force) {
     return runtimeConfig
   }
 
-  if (configPromise) {
+  if (configPromise && !force) {
     return configPromise
   }
 
@@ -179,6 +206,11 @@ async function fetchRuntimeConfig(): Promise<AppConfig> {
         const timeoutId = setTimeout(() => controller.abort(), 5000)
         
         try {
+          // Log when we're making the API call (especially useful when force=true)
+          if (force) {
+            console.log(`[supabase.ts] Force fetching config from: ${apiUrl}/api/config`)
+          }
+          
           // Note: If you get "Mixed Content" errors, it's because HTTPS pages (Amplify) 
           // cannot access HTTP backends. You'll need to set up HTTPS on EC2.
           const response = await fetch(`${apiUrl}/api/config`, {
@@ -344,21 +376,66 @@ function getEnvVar(key: string): string | undefined {
 /**
  * Initialize Supabase client with runtime configuration
  * This should be called before using the supabase client
+ * @param force - If true, force re-initialization even if client already exists
+ * @param refreshConfig - If true, refresh the config but reuse existing client if config hasn't changed
  */
-export async function initSupabase(): Promise<SupabaseClient> {
-  // Return existing client if already initialized
-  if (supabaseClient) {
+export async function initSupabase(force: boolean = false, refreshConfig: boolean = false): Promise<SupabaseClient> {
+  // If we have an existing client and we're just refreshing config (not forcing full re-init)
+  if (supabaseClient && !force && refreshConfig) {
+    // Fetch fresh config to check if it changed
+    const oldConfig = runtimeConfig
+    const newConfig = await fetchRuntimeConfig(true) // Force fetch
+    
+    // Only create new client if config actually changed
+    if (oldConfig && (
+      oldConfig.supabaseUrl !== newConfig.supabaseUrl ||
+      oldConfig.supabasePublishableKey !== newConfig.supabasePublishableKey
+    )) {
+      console.log('[supabase.ts] Config changed, will create new client')
+      // Config changed, need to force re-initialization
+      force = true
+    } else {
+      // Config unchanged, just return existing client
+      return supabaseClient
+    }
+  }
+  
+  // Return existing client if already initialized (unless forcing)
+  if (supabaseClient && !force) {
     return supabaseClient
   }
 
-  // If initialization is in progress, wait for it
-  if (initPromise) {
+  // If initialization is in progress and not forcing, wait for it
+  if (initPromise && !force) {
     return initPromise
+  }
+  
+  // If forcing, clear the old client and promise before creating a new one
+  if (force) {
+    // Clear the old client reference to prevent multiple instances
+    const oldClient = supabaseClient
+    supabaseClient = null
+    initPromise = null
+    
+    // Clean up any existing auth state change subscriptions
+    if (authStateChangeSubscription) {
+      try {
+        authStateChangeSubscription.unsubscribe()
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+      authStateChangeSubscription = null
+    }
+    
+    // If there's an old client, log that we're cleaning it up
+    if (oldClient && typeof window !== 'undefined') {
+      console.log('[supabase.ts] Clearing old Supabase client before re-initialization to prevent multiple instances')
+    }
   }
 
   // Start initialization
   initPromise = (async () => {
-  const config = await fetchRuntimeConfig()
+  const config = await fetchRuntimeConfig(force || refreshConfig)
   
     // For web, explicitly use localStorage for cross-tab synchronization
     // For mobile/native, use default storage (AsyncStorage)
@@ -371,7 +448,9 @@ export async function initSupabase(): Promise<SupabaseClient> {
       console.warn('[supabase.ts] ⚠ BroadcastChannel NOT available - cross-tab sync may not work')
     }
     
-    supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
+    // Only create a new client if we don't already have one (unless forcing)
+    if (!supabaseClient || force) {
+      supabaseClient = createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: {
         storage: storage,
         persistSession: true,
@@ -382,6 +461,7 @@ export async function initSupabase(): Promise<SupabaseClient> {
         storageKey: 'supabase.auth.token',
       }
     })
+    }
   
   return supabaseClient
   })()
@@ -411,6 +491,38 @@ export async function getSession(): Promise<{ data: { session: Session | null },
   await initSupabase()
   const client = getSupabase()
   return await client.auth.getSession()
+}
+
+/**
+ * Get a valid session, refreshing if needed
+ * This ensures the session token is valid before making API calls
+ * Use this in stores before making API requests
+ */
+export async function getValidSession(): Promise<Session | null> {
+  await initSupabase()
+  const client = getSupabase()
+  
+  // Get current session
+  const { data: { session }, error } = await client.auth.getSession()
+  
+  if (error || !session) {
+    return null
+  }
+  
+  // Force refresh by passing the current session
+  // This ensures a network request is made even if Supabase thinks the token is still valid
+  // This is important after switching tabs/windows when the token might be stale
+  try {
+    const { data: { session: refreshedSession }, error: refreshError } = await client.auth.refreshSession(session)
+    if (refreshError) {
+      // If refresh fails, return the existing session (it might still be valid)
+      return session
+    }
+    return refreshedSession || session
+  } catch (refreshError) {
+    // If refresh fails, return the existing session (it might still be valid)
+    return session
+  }
 }
 
 /**
@@ -479,70 +591,22 @@ function getLegacySupabase(): SupabaseClient {
     return supabaseClient
   }
 
-  // If initialization is in progress, wait for it (synchronously we can't await, so use build-time config)
+  // IMPORTANT: Don't create fallback clients here - this causes multiple instances
+  // Instead, throw an error and let the caller handle initialization properly
+  // The proxy will handle initialization before calling methods
+  
+  // If initialization is in progress, we should wait for it
+  // But since this is synchronous, we can't await - so we throw an error
   if (initPromise || configPromise) {
-    // Don't create a new client - wait for initSupabase to complete
-    // Use build-time config as temporary fallback only if absolutely necessary
-const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
-const supabasePublishableKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-
-    if (supabaseUrl && supabasePublishableKey && !supabaseClient) {
-      console.warn('[supabase.ts] Creating temporary client with build-time config (init in progress)')
-      const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined
-      supabaseClient = createClient(supabaseUrl, supabasePublishableKey, {
-        auth: {
-          storage: storage,
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: false,
-          storageKey: 'supabase.auth.token',
-        }
-      })
-      return supabaseClient
-    }
-  }
-
-  // If runtime config is available, use it
-  if (runtimeConfig && !supabaseClient) {
-    console.warn('[supabase.ts] Creating client from runtime config (init not called yet)')
-    const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined
-    supabaseClient = createClient(runtimeConfig.supabaseUrl, runtimeConfig.supabasePublishableKey, {
-      auth: {
-        storage: storage,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-      }
-    })
-    return supabaseClient
-  }
-
-  // If we still don't have a client, try build-time config one more time
-  if (!supabaseClient) {
-    const buildTimeUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL')
-    const buildTimeKey = getEnvVar('SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY')
-
-    if (buildTimeUrl && buildTimeKey) {
-      console.warn('[supabase.ts] Creating client from build-time config (fallback)')
-      const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined
-      supabaseClient = createClient(buildTimeUrl, buildTimeKey, {
-        auth: {
-          storage: storage,
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: false,
-        }
-      })
-    return supabaseClient
-  }
-
-    // No config available - this should not happen if initSupabase() was called
-  throw new Error(
-      'Supabase client not initialized. Please ensure initSupabase() has been called and completed.'
+    throw new Error(
+      'Supabase client initialization in progress. Please wait for initSupabase() to complete, or use the async supabase proxy methods.'
     )
   }
-  
-  return supabaseClient
+
+  // No client available and no initialization in progress
+  throw new Error(
+    'Supabase client not initialized. Please ensure initSupabase() has been called and completed.'
+  )
 }
 
 // Export legacy supabase as a getter for backward compatibility

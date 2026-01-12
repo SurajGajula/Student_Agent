@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
@@ -34,6 +34,11 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
   const isMobile = windowWidth <= 768
+  
+  // Track if subscription details are being fetched to prevent duplicate calls
+  const [isFetchingSubscription, setIsFetchingSubscription] = useState(false)
+  // Track if we've already fetched on this mount to prevent duplicate calls
+  const hasFetchedOnMountRef = useRef(false)
   // Button center calculation: button is at top (insets.top + 8 on iOS, 50 on web), height is 40px (8px padding + 24px icon + 8px padding)
   // Button center = (insets.top + 8) + 20 = insets.top + 28 on iOS, or 50 + 20 = 70 on web
   // Title is 32px tall, so half-height is 16px
@@ -45,7 +50,14 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
 
   const fetchSubscriptionDetails = async () => {
     if (!isLoggedIn) return
-
+    
+    // Prevent duplicate calls
+    if (isFetchingSubscription) {
+      console.log('[SettingsView] Subscription details already being fetched, skipping duplicate call')
+      return
+    }
+    
+    setIsFetchingSubscription(true)
     setLoadingSubscription(true)
     try {
       let session, error
@@ -103,6 +115,7 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
       }
     } finally {
       setLoadingSubscription(false)
+      setIsFetchingSubscription(false)
     }
   }
 
@@ -116,10 +129,13 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
     }
     
     // Sync auth state from actual session when component mounts (in case it's out of sync)
+    // Note: Don't call fetchSubscriptionDetails here - let the isLoggedIn useEffect handle it
+    // to avoid duplicate calls
     const syncAuth = async () => {
       try {
         const { useAuthStore } = await import('../../stores/authStore')
         await useAuthStore.getState().syncFromSession()
+        // The isLoggedIn useEffect will handle fetching subscription details
       } catch (err) {
         console.error('[SettingsView] Error syncing auth state:', err)
       }
@@ -128,24 +144,26 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   }, [])
 
   useEffect(() => {
-    console.log('[SettingsView] useEffect for fetchUsage triggered', {
+    console.log('[SettingsView] useEffect triggered', {
       isLoggedIn,
       isLoading,
       fetchUsageExists: !!fetchUsage,
+      hasFetchedOnMount: hasFetchedOnMountRef.current,
       timestamp: new Date().toISOString()
     })
     
-    if (isLoggedIn) {
-      console.log('[SettingsView] isLoggedIn is true, calling fetchUsage and fetchSubscriptionDetails')
-      // Use the current fetchUsage directly (Zustand functions are stable)
-      fetchUsage().then(() => {
-        console.log('[SettingsView] fetchUsage completed successfully')
-      }).catch(err => {
-        console.error('[SettingsView] fetchUsage failed:', err)
-      })
+    if (isLoggedIn && !hasFetchedOnMountRef.current) {
+      console.log('[SettingsView] isLoggedIn is true, calling fetchSubscriptionDetails')
+      hasFetchedOnMountRef.current = true
+      // Note: fetchUsage is already called by syncAllStores in initializeAuth,
+      // so we only need to fetch subscription details here
       fetchSubscriptionDetails()
-    } else {
+    } else if (!isLoggedIn) {
+      // Reset the ref when logged out so it can fetch again when logging back in
+      hasFetchedOnMountRef.current = false
       console.log('[SettingsView] isLoggedIn is false, skipping API calls')
+    } else {
+      console.log('[SettingsView] Already fetched on mount, skipping duplicate call')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]) // Only depend on isLoggedIn - fetchUsage is stable from Zustand

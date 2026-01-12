@@ -34,8 +34,9 @@ export const useFolderStore = create<FolderStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -70,8 +71,9 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       addFolder: async (name: string, type: FolderType, parentFolderId?: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -104,8 +106,9 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       removeFolder: async (id: string, type: FolderType) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -134,8 +137,9 @@ export const useFolderStore = create<FolderStore>()(
       },
 
       updateFolder: async (id: string, name: string, type: FolderType, parentFolderId?: string | null) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {

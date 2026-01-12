@@ -45,13 +45,9 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
     }
   }, [isLoggedIn, isPro, syncFromSupabase])
 
-  // Fetch usage to check plan status on mount
-  useEffect(() => {
-    if (isLoggedIn) {
-      const { fetchUsage } = useUsageStore.getState()
-      fetchUsage()
-    }
-  }, [isLoggedIn])
+  // Note: fetchUsage is already called by syncAllStores in initializeAuth,
+  // so we don't need to call it here to avoid duplicates
+  // The usage store will be populated when the app initializes
 
   // Check if beta modal should be shown on mount (only for pro users)
   useEffect(() => {

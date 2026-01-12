@@ -42,8 +42,9 @@ export const useTestsStore = create<TestsStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -74,8 +75,9 @@ export const useTestsStore = create<TestsStore>()(
       },
 
       addTest: async (testData) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -114,8 +116,9 @@ export const useTestsStore = create<TestsStore>()(
       },
 
       removeTest: async (id: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -148,8 +151,9 @@ export const useTestsStore = create<TestsStore>()(
       },
 
       moveTestToFolder: async (id: string, folderId: string | null) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {

@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dim
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AddNoteModal from '../modals/AddNoteModal'
 import CreateFolderModal from '../modals/CreateFolderModal'
+import UploadNotesModal from '../modals/UploadNotesModal'
 import { useNotesStore, type Note } from '../../stores/notesStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
-import { parseNotesImage } from '../../lib/notesParser'
+import { parseNotesImage, parseNotesFromYouTube } from '../../lib/notesParser'
 import { BackIcon, FolderIcon, DeleteIcon, NotesIcon, UploadIcon, AddIcon } from '../icons'
 import { pickImage } from '../../lib/platformHelpers'
 import { Svg, Circle, Path } from 'react-native-svg'
@@ -27,6 +28,7 @@ const SpinnerIcon = () => (
 function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -470,27 +472,76 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
     }
   }
 
-  const handleUploadNotes = async () => {
+  const handleUploadNotes = () => {
     if (!isLoggedIn) {
       setErrorMessage('Login to use AI tools')
       setTimeout(() => setErrorMessage(null), 3000)
       onOpenLoginModal()
       return
     }
+    setIsUploadModalOpen(true)
+  }
 
-    if (Platform.OS === 'web' && fileInputRef.current) {
-      fileInputRef.current.click()
-    } else {
-      try {
-        const file = await pickImage()
-        if (file) {
-          await handleFileChange(file as File)
+  const handleFileSelect = async (file: File | Blob) => {
+    await handleFileChange(file)
+  }
+
+  const handleYouTubeUrlSubmit = async (youtubeUrl: string) => {
+    setIsProcessing(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      const result = await parseNotesFromYouTube(youtubeUrl)
+      const extractedText = result.text
+      const videoTitle = result.videoTitle
+      
+      if (!extractedText || extractedText.trim().length === 0) {
+        setErrorMessage('No content found in the YouTube video. Please ensure the video has captions or spoken content.')
+        setTimeout(() => setErrorMessage(null), 5000)
+      } else {
+        // Use video title if available, otherwise fallback to default
+        let noteTitle = videoTitle || 'YouTube Video Notes'
+        
+        // Limit title length
+        if (noteTitle.length > 100) {
+          noteTitle = noteTitle.substring(0, 97) + '...'
         }
-      } catch (error) {
-        console.error('Failed to pick file:', error)
-        setErrorMessage('File picker not available on this platform')
-        setTimeout(() => setErrorMessage(null), 3000)
+
+        try {
+          await addNote(noteTitle, currentFolderId || undefined)
+        
+          const currentState = useNotesStore.getState()
+          const allNotes = currentState.notes
+          
+          const newNote = allNotes
+            .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
+            .sort((a, b) => {
+              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+              return dateB - dateA
+            })[0]
+
+          if (newNote) {
+            await updateNoteContent(newNote.id, extractedText)
+            setCurrentNoteId(newNote.id)
+            setSuccessMessage('Notes generated successfully!')
+            setTimeout(() => setSuccessMessage(null), 3000)
+          }
+        } catch (error) {
+          console.error('Error saving note:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Failed to save note'
+          setErrorMessage(errorMessage)
+          setTimeout(() => setErrorMessage(null), 5000)
+        }
       }
+    } catch (error) {
+      console.error('Error parsing YouTube video:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to parse YouTube video'
+      setErrorMessage(errorMessage)
+      setTimeout(() => setErrorMessage(null), 5000)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -771,12 +822,12 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
             <TextInput
               ref={editorInputRef}
               style={styles.editor}
-              value={currentNote.content || ''}
+            value={currentNote.content || ''}
               onChangeText={handleNoteContentChange}
-              onBlur={handleNoteBlur}
+            onBlur={handleNoteBlur}
               onFocus={handleNoteFocus}
               onSelectionChange={handleSelectionChange}
-              placeholder="Start typing..."
+            placeholder="Start typing..."
               multiline
               textAlignVertical="top"
               autoFocus={Platform.OS === 'web'}
@@ -983,7 +1034,7 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
                     {...(Platform.OS === 'web' && {
                       onDragOver: (e: any) => {
                         e.preventDefault()
-                        e.stopPropagation()
+                    e.stopPropagation()
                         handleDragOver(folder.id)
                       },
                       onDragLeave: handleDragLeave,
@@ -1054,6 +1105,12 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
         isOpen={isFolderModalOpen}
         onClose={handleCloseFolderModal}
         onSubmit={handleSubmitFolder}
+      />
+      <UploadNotesModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onFileSelect={handleFileSelect}
+        onYouTubeUrlSubmit={handleYouTubeUrlSubmit}
       />
     </View>
   )

@@ -40,8 +40,9 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       error: null,
 
       syncFromSupabase: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) return
 
         set({ isLoading: true, error: null })
         try {
@@ -72,8 +73,9 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       addFlashcardSet: async (setData) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -112,8 +114,9 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       removeFlashcardSet: async (id: string) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
@@ -146,8 +149,9 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
       },
 
       moveFlashcardSetToFolder: async (id: string, folderId: string | null) => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Not authenticated')
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
 
         set({ error: null })
         try {
