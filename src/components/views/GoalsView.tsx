@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, Fl
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useGoalsStore, type Goal, type CourseRecommendation } from '../../stores/goalsStore'
 import { useAuthStore } from '../../stores/authStore'
-import { useUsageStore } from '../../stores/usageStore'
 import { BackIcon, DeleteIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
@@ -19,7 +18,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
   const [currentGoalId, setCurrentGoalId] = useState<string | null>(null)
   const { goals, removeGoal, getGoalById, syncFromSupabase } = useGoalsStore()
   const { isLoggedIn } = useAuthStore()
-  const { planName } = useUsageStore()
   const currentGoal = currentGoalId ? getGoalById(currentGoalId) : null
   const { setIsInDetailMode } = useDetailMode()
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
@@ -27,8 +25,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
   const insets = useSafeAreaInsets()
   const isMobile = windowWidth <= 768
   const [showBetaModal, setShowBetaModal] = useState(false)
-
-  const isPro = planName === 'pro'
 
   // Update window width on resize
   useEffect(() => {
@@ -38,21 +34,19 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
     return () => subscription?.remove()
   }, [])
 
-  // Sync goals on mount (only if pro user)
+  // Sync goals on mount
   useEffect(() => {
-    if (isLoggedIn && isPro) {
+    if (isLoggedIn) {
       syncFromSupabase()
     }
-  }, [isLoggedIn, isPro, syncFromSupabase])
+  }, [isLoggedIn, syncFromSupabase])
 
   // Note: fetchUsage is already called by syncAllStores in initializeAuth,
   // so we don't need to call it here to avoid duplicates
   // The usage store will be populated when the app initializes
 
-  // Check if beta modal should be shown on mount (only for pro users)
+  // Check if beta modal should be shown on mount
   useEffect(() => {
-    if (!isPro) return
-
     const checkBetaModal = async () => {
       const storage = getStorage()
       if (!storage) {
@@ -84,7 +78,7 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
     }
 
     checkBetaModal()
-  }, [isPro])
+  }, [])
 
   const handleGoalClick = (goalId: string) => {
     setCurrentGoalId(goalId)
@@ -110,67 +104,9 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
 
   // Update detail mode when entering/exiting goal detail
   useEffect(() => {
-    setIsInDetailMode(!!(currentGoalId && currentGoal && isPro))
+    setIsInDetailMode(!!(currentGoalId && currentGoal))
     return () => setIsInDetailMode(false)
-  }, [currentGoalId, currentGoal, isPro, setIsInDetailMode])
-
-  // Show upgrade prompt if not pro user
-  if (!isPro) {
-    return (
-      <View style={styles.container}>
-        <View style={[
-          styles.header,
-          isMobile && {
-            paddingTop: Math.max(insets.top + 8 + 8, 28),
-            paddingLeft: 80,
-            paddingRight: 20,
-            paddingBottom: 64,
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-          }
-        ]}>
-          <View style={[styles.headerTitle, isMobile && { 
-            flex: 0,
-            maxWidth: '100%',
-          }]}>
-            <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Goals</Text>
-          </View>
-        </View>
-        <View style={styles.lockedContainer}>
-          <Text style={styles.lockedTitle}>Goals is a Pro Feature</Text>
-          <Text style={styles.lockedMessage}>
-            Upgrade to Pro to access AI-powered course recommendations based on your career goals.
-          </Text>
-          <Text style={styles.lockedSubmessage}>
-            Pro members get access to beta features including Goals, unlimited items, and 10x AI usage.
-          </Text>
-          {isLoggedIn ? (
-            <Pressable 
-              style={styles.upgradeButton}
-              onPress={() => {
-                if (onOpenUpgradeModal) {
-                  onOpenUpgradeModal()
-                }
-              }}
-            >
-              <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
-            </Pressable>
-          ) : (
-            <Pressable 
-              style={styles.upgradeButton}
-              onPress={() => {
-                if (onOpenLoginModal) {
-                  onOpenLoginModal()
-                }
-              }}
-            >
-              <Text style={styles.upgradeButtonText}>Login to Upgrade</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-    )
-  }
+  }, [currentGoalId, currentGoal, setIsInDetailMode])
 
   // Render goal detail view with courses
   if (currentGoalId && currentGoal) {

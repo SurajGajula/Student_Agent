@@ -422,18 +422,8 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           }
         }
       } 
-      // Handle course search (Pro only)
+      // Handle course search
       else if (intentResult.intent === 'course_search') {
-        if (!isPro) {
-          setStatusMessage({ 
-            type: 'error', 
-            text: 'Goals is a Pro feature. Upgrade to Pro to access AI-powered course recommendations.' 
-          })
-          setMessage('')
-          setIsLoading(false)
-          return
-        }
-
         const { supabase } = await import('../lib/supabase')
         const { data: { session } } = await supabase.auth.getSession()
         
