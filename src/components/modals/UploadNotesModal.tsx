@@ -9,6 +9,9 @@ interface UploadNotesModalProps {
   onClose: () => void
   onFileSelect: (file: File | Blob) => void
   onYouTubeUrlSubmit: (url: string) => void
+  isPro: boolean
+  onOpenUpgradeModal?: () => void
+  onOpenLoginModal?: () => void
 }
 
 const CloseIcon = () => (
@@ -18,7 +21,7 @@ const CloseIcon = () => (
   </Svg>
 )
 
-function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }: UploadNotesModalProps) {
+function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit, isPro, onOpenUpgradeModal, onOpenLoginModal }: UploadNotesModalProps) {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [activeTab, setActiveTab] = useState<'file' | 'youtube'>('file')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -50,6 +53,13 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
     }
   }, [isOpen, onFileSelect, onClose])
 
+  // Reset to file tab if user is not Pro and tries to access YouTube tab
+  useEffect(() => {
+    if (activeTab === 'youtube' && !isPro) {
+      setActiveTab('file')
+    }
+  }, [isPro, activeTab])
+
   const handleFileUpload = () => {
     if (Platform.OS === 'web' && fileInputRef.current) {
       fileInputRef.current.click()
@@ -67,6 +77,15 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
   }
 
   const handleYouTubeSubmit = () => {
+    if (!isPro) {
+      if (onOpenUpgradeModal) {
+        onOpenUpgradeModal()
+      } else if (onOpenLoginModal) {
+        onOpenLoginModal()
+      }
+      return
+    }
+    
     const trimmedUrl = youtubeUrl.trim()
     if (trimmedUrl) {
       // Validate YouTube URL format
@@ -119,10 +138,20 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
                   <Text style={[styles.tabText, activeTab === 'file' && styles.tabTextActive]}>File</Text>
                 </Pressable>
                 <Pressable 
-                  style={[styles.tab, activeTab === 'youtube' && styles.tabActive]}
-                  onPress={() => setActiveTab('youtube')}
+                  style={[styles.tab, activeTab === 'youtube' && styles.tabActive, !isPro && styles.tabDisabled]}
+                  onPress={() => {
+                    if (isPro) {
+                      setActiveTab('youtube')
+                    } else {
+                      if (onOpenUpgradeModal) {
+                        onOpenUpgradeModal()
+                      } else if (onOpenLoginModal) {
+                        onOpenLoginModal()
+                      }
+                    }
+                  }}
                 >
-                  <Text style={[styles.tabText, activeTab === 'youtube' && styles.tabTextActive]}>YouTube</Text>
+                  <Text style={[styles.tabText, activeTab === 'youtube' && styles.tabTextActive, !isPro && styles.tabTextDisabled]}>YouTube</Text>
                 </Pressable>
               </View>
               
@@ -136,6 +165,26 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
                       <Text style={styles.uploadButtonText}>Choose File</Text>
                     </Pressable>
                     <Text style={styles.fileHint}>Supports: Images (JPG, PNG) and PDF files</Text>
+                  </View>
+                ) : !isPro ? (
+                  <View style={styles.lockedSection}>
+                    <Text style={styles.lockedTitle}>YouTube Notes is a Pro Feature</Text>
+                    <Text style={styles.lockedMessage}>
+                      Upgrade to Pro to generate notes from YouTube videos.
+                    </Text>
+                    <Pressable 
+                      style={styles.upgradeButton}
+                      onPress={() => {
+                        handleClose()
+                        if (onOpenUpgradeModal) {
+                          onOpenUpgradeModal()
+                        } else if (onOpenLoginModal) {
+                          onOpenLoginModal()
+                        }
+                      }}
+                    >
+                      <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+                    </Pressable>
                   </View>
                 ) : (
                   <View style={styles.youtubeSection}>
@@ -164,7 +213,7 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
                 <Pressable style={styles.buttonSecondary} onPress={handleClose}>
                   <Text style={styles.buttonSecondaryText}>Cancel</Text>
                 </Pressable>
-                {activeTab === 'youtube' && (
+                {activeTab === 'youtube' && isPro && (
                   <Pressable style={styles.buttonPrimary} onPress={handleYouTubeSubmit}>
                     <Text style={styles.buttonPrimaryText}>Generate Notes</Text>
                   </Pressable>
@@ -208,10 +257,20 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
               <Text style={[styles.tabText, activeTab === 'file' && styles.tabTextActive]}>File</Text>
             </Pressable>
             <Pressable 
-              style={[styles.tab, activeTab === 'youtube' && styles.tabActive]}
-              onPress={() => setActiveTab('youtube')}
+              style={[styles.tab, activeTab === 'youtube' && styles.tabActive, !isPro && styles.tabDisabled]}
+              onPress={() => {
+                if (isPro) {
+                  setActiveTab('youtube')
+                } else {
+                  if (onOpenUpgradeModal) {
+                    onOpenUpgradeModal()
+                  } else if (onOpenLoginModal) {
+                    onOpenLoginModal()
+                  }
+                }
+              }}
             >
-              <Text style={[styles.tabText, activeTab === 'youtube' && styles.tabTextActive]}>YouTube</Text>
+              <Text style={[styles.tabText, activeTab === 'youtube' && styles.tabTextActive, !isPro && styles.tabTextDisabled]}>YouTube</Text>
             </Pressable>
           </View>
           
@@ -225,6 +284,26 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
                   <Text style={styles.uploadButtonText}>Choose File</Text>
                 </Pressable>
                 <Text style={styles.fileHint}>Supports: Images (JPG, PNG) and PDF files</Text>
+              </View>
+            ) : !isPro ? (
+              <View style={styles.lockedSection}>
+                <Text style={styles.lockedTitle}>YouTube Notes is a Pro Feature</Text>
+                <Text style={styles.lockedMessage}>
+                  Upgrade to Pro to generate notes from YouTube videos.
+                </Text>
+                <Pressable 
+                  style={styles.upgradeButton}
+                  onPress={() => {
+                    handleClose()
+                    if (onOpenUpgradeModal) {
+                      onOpenUpgradeModal()
+                    } else if (onOpenLoginModal) {
+                      onOpenLoginModal()
+                    }
+                  }}
+                >
+                  <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+                </Pressable>
               </View>
             ) : (
               <View style={styles.youtubeSection}>
@@ -253,7 +332,7 @@ function UploadNotesModal({ isOpen, onClose, onFileSelect, onYouTubeUrlSubmit }:
             <Pressable style={styles.buttonSecondary} onPress={handleClose}>
               <Text style={styles.buttonSecondaryText}>Cancel</Text>
             </Pressable>
-            {activeTab === 'youtube' && (
+            {activeTab === 'youtube' && isPro && (
               <Pressable style={styles.buttonPrimary} onPress={handleYouTubeSubmit}>
                 <Text style={styles.buttonPrimaryText}>Generate Notes</Text>
               </Pressable>
@@ -372,6 +451,12 @@ const styles = StyleSheet.create({
     color: '#0f0f0f',
     fontWeight: '400',
   },
+  tabDisabled: {
+    opacity: 0.5,
+  },
+  tabTextDisabled: {
+    opacity: 0.5,
+  },
   body: {
     padding: 20,
   },
@@ -380,6 +465,34 @@ const styles = StyleSheet.create({
   },
   youtubeSection: {
     width: '100%',
+  },
+  lockedSection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  lockedTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#0f0f0f',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  lockedMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  upgradeButton: {
+    backgroundColor: '#0f0f0f',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  upgradeButtonText: {
+    color: '#f0f0f0',
+    fontSize: 16,
+    fontWeight: '300',
   },
   sectionDescription: {
     fontSize: 14,

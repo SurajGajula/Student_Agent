@@ -375,7 +375,7 @@ function AppContent() {
         onOpenLoginModal={openLoginModal}
       />
       <View style={styles.mainContent}>
-        {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} />}
+        {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}

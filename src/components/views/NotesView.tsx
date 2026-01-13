@@ -7,6 +7,7 @@ import UploadNotesModal from '../modals/UploadNotesModal'
 import { useNotesStore, type Note } from '../../stores/notesStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useUsageStore } from '../../stores/usageStore'
 import { parseNotesImage, parseNotesFromYouTube } from '../../lib/notesParser'
 import { BackIcon, FolderIcon, DeleteIcon, NotesIcon, UploadIcon, AddIcon } from '../icons'
 import { pickImage } from '../../lib/platformHelpers'
@@ -16,6 +17,7 @@ import { useDetailMode } from '../../contexts/DetailModeContext'
 
 interface NotesViewProps {
   onOpenLoginModal: () => void
+  onOpenUpgradeModal?: () => void
 }
 
 const SpinnerIcon = () => (
@@ -25,7 +27,7 @@ const SpinnerIcon = () => (
   </Svg>
 )
 
-function NotesView({ onOpenLoginModal }: NotesViewProps) {
+function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
@@ -37,6 +39,8 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
   const { notes, addNote, updateNoteContentLocal, updateNoteContent, removeNote, moveNoteToFolder } = useNotesStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
+  const { planName } = useUsageStore()
+  const isPro = planName === 'pro'
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const scrollViewRef = useRef<any>(null)
@@ -1111,6 +1115,9 @@ function NotesView({ onOpenLoginModal }: NotesViewProps) {
         onClose={() => setIsUploadModalOpen(false)}
         onFileSelect={handleFileSelect}
         onYouTubeUrlSubmit={handleYouTubeUrlSubmit}
+        isPro={isPro}
+        onOpenUpgradeModal={onOpenUpgradeModal}
+        onOpenLoginModal={onOpenLoginModal}
       />
     </View>
   )
