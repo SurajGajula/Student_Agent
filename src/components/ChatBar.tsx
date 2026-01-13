@@ -431,17 +431,9 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           throw new Error('You must be logged in to use this feature')
         }
 
-        // Check if school and department were extracted from the message
-        if (!intentResult.school || !intentResult.department) {
-          setStatusMessage({ 
-            type: 'error', 
-            text: 'Please specify a school and department. For example: "find CS courses for MIT" or "Stanford CS courses for AI"' 
-          })
-          return
-        }
-
-        const school = intentResult.school
-        const department = intentResult.department
+        // School and department are optional - if not provided, search all courses
+        const school = intentResult.school || undefined
+        const department = intentResult.department || undefined
 
         const API_BASE_URL = getApiBaseUrl()
         const response = await fetch(`${API_BASE_URL}/api/courses/search`, {
@@ -452,8 +444,8 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           },
           body: JSON.stringify({
             query: message,
-            school,
-            department,
+            ...(school && { school }),
+            ...(department && { department }),
             limit: 10
           }),
         })
@@ -479,7 +471,14 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
 
         // Check if no courses were found
         if (!data.success || !data.results || data.results.length === 0) {
-          throw new Error(data.error || `No courses found for ${school} ${department}. Make sure courses exist in the database.`)
+          const filterDesc = school && department 
+            ? `${school} ${department}`
+            : school
+            ? school
+            : department
+            ? department
+            : 'all courses'
+          throw new Error(data.error || `No courses found for ${filterDesc}. Make sure courses exist in the database.`)
         }
 
         if (data.success && data.results && data.results.length > 0) {
@@ -497,7 +496,15 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
             }
             // Fallback to school/department if query is too short or empty
             if (goalName.length < 5) {
-              goalName = `${school} ${department} Courses`
+              if (school && department) {
+                goalName = `${school} ${department} Courses`
+              } else if (school) {
+                goalName = `${school} Courses`
+              } else if (department) {
+                goalName = `${department} Courses`
+              } else {
+                goalName = 'Course Recommendations'
+              }
             }
             
             await addGoal(

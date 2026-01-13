@@ -38,42 +38,50 @@ interface CourseRecommendation {
 }
 
 // Fetch all courses from Supabase
-async function getAllCourses(school: string, department: string): Promise<Course[]> {
-  // Normalize department to uppercase for matching (e.g., "cs" -> "CS", "CSE" -> "CSE")
-  const deptUpper = department.toUpperCase().trim()
-  // Normalize school name - trim and try exact match first, then case-insensitive
-  const schoolNormalized = school.trim()
-  
-  // Filter by school and where course_code starts with the department abbreviation
-  // Try exact match first, then case-insensitive if needed
-  // This handles cases like "CS 101", "CSE 101", etc.
+async function getAllCourses(school?: string, department?: string): Promise<Course[]> {
   let query = supabase
     .from('course_directory')
     .select('*')
-    .eq('school', schoolNormalized) // Try exact match first
-    .ilike('course_code', `${deptUpper}%`) // Case-insensitive match for course codes starting with department
-    .order('course_code')
-
-  const { data, error } = await query
+  
+  // If school is provided, filter by school
+  if (school && school.trim()) {
+    const schoolNormalized = school.trim()
+    query = query.eq('school', schoolNormalized) // Try exact match first
+  }
+  
+  // If department is provided, filter by department prefix
+  if (department && department.trim()) {
+    const deptUpper = department.toUpperCase().trim()
+    query = query.ilike('course_code', `${deptUpper}%`) // Case-insensitive match for course codes starting with department
+  }
+  
+  const { data, error } = await query.order('course_code')
 
   if (error) {
     console.error('Supabase query error:', error)
     throw new Error(`Failed to fetch courses: ${error.message}`)
   }
 
-  // If no results, try case-insensitive school matching as fallback
-  if (!data || data.length === 0) {
-    console.log(`No courses found with exact school match. Trying case-insensitive match for school="${schoolNormalized}", department="${deptUpper}"`)
-    // Try case-insensitive school matching with wildcards
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('course_directory')
-      .select('*')
-      .ilike('school', `%${schoolNormalized}%`) // Case-insensitive partial match
-      .ilike('course_code', `${deptUpper}%`)
-      .order('course_code')
+  // If school/department were provided but no results, try case-insensitive matching as fallback
+  if ((school || department) && (!data || data.length === 0)) {
+    const schoolNormalized = school?.trim() || ''
+    const deptUpper = department?.toUpperCase().trim() || ''
+    console.log(`No courses found with exact match. Trying case-insensitive match for school="${schoolNormalized}", department="${deptUpper}"`)
+    
+    let fallbackQuery = supabase.from('course_directory').select('*')
+    
+    if (schoolNormalized) {
+      fallbackQuery = fallbackQuery.ilike('school', `%${schoolNormalized}%`) // Case-insensitive partial match
+    }
+    
+    if (deptUpper) {
+      fallbackQuery = fallbackQuery.ilike('course_code', `${deptUpper}%`)
+    }
+    
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery.order('course_code')
     
     if (!fallbackError && fallbackData && fallbackData.length > 0) {
-      console.log(`Found ${fallbackData.length} courses with case-insensitive school match`)
+      console.log(`Found ${fallbackData.length} courses with case-insensitive match`)
       return fallbackData.map(course => ({
         id: course.id,
         course_number: course.course_code || course.course_number,
@@ -81,20 +89,13 @@ async function getAllCourses(school: string, department: string): Promise<Course
         description: course.description,
         prerequisites: course.prerequisites,
         credits: course.credits,
-        department: course.department || deptUpper,
+        department: course.department || (deptUpper || null),
         semesters: course.semesters || null,
       }))
     }
-    
-    // Debug: Check what schools actually exist
-    const { data: sampleSchools } = await supabase
-      .from('course_directory')
-      .select('school')
-      .limit(20)
-    const uniqueSchools = [...new Set(sampleSchools?.map(s => s.school) || [])]
-    console.log('Sample schools in database:', uniqueSchools)
   }
 
+  // Map results to Course format
   return (data || []).map(course => ({
     id: course.id,
     course_number: course.course_code || course.course_number, // Handle both column names
@@ -102,7 +103,7 @@ async function getAllCourses(school: string, department: string): Promise<Course
     description: course.description,
     prerequisites: course.prerequisites,
     credits: course.credits,
-    department: course.department || deptUpper, // Use department from query if not in table
+    department: course.department || (department?.toUpperCase().trim() || null),
     semesters: course.semesters || null, // May not exist in course_directory
   }))
 }
@@ -314,25 +315,28 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
       return res.status(400).json({ error: 'Query is required' })
     }
 
-    if (!school || !school.trim()) {
-      return res.status(400).json({ error: 'School is required' })
-    }
+    // School and department are now optional - if not provided, search all courses
+    const schoolTrimmed = school?.trim() || undefined
+    const departmentTrimmed = department?.trim() || undefined
 
-    if (!department || !department.trim()) {
-      return res.status(400).json({ error: 'Department is required' })
-    }
-
-    // Fetch all courses for the school and department
-    const allCourses = await getAllCourses(school.trim(), department.trim())
+    // Fetch courses (filtered by school/department if provided, otherwise all courses)
+    const allCourses = await getAllCourses(schoolTrimmed, departmentTrimmed)
 
     if (allCourses.length === 0) {
       // Return 200 with empty results instead of 404, so the frontend can handle it gracefully
+      const filterDesc = schoolTrimmed && departmentTrimmed 
+        ? `${schoolTrimmed} ${departmentTrimmed}`
+        : schoolTrimmed 
+        ? schoolTrimmed
+        : departmentTrimmed
+        ? departmentTrimmed
+        : 'all courses'
       return res.status(200).json({ 
         success: false,
-        error: `No courses found for ${school} ${department}. Please check that courses exist in the course_directory table with matching school and course_code prefix.`,
+        error: `No courses found for ${filterDesc}. Please check that courses exist in the course_directory table.`,
         query,
-        school: school.trim(),
-        department: department.trim(),
+        school: schoolTrimmed || null,
+        department: departmentTrimmed || null,
         results: [],
         totalCourses: 0
       })
@@ -344,8 +348,8 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
     res.json({
       success: true,
       query,
-      school,
-      department,
+      school: schoolTrimmed || null,
+      department: departmentTrimmed || null,
       results: recommendations,
       totalCourses: allCourses.length
     })

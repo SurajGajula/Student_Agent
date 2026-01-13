@@ -37,13 +37,9 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(400).json({ error: 'Query is required' })
     }
 
-    if (!school || typeof school !== 'string' || !school.trim()) {
-      return res.status(400).json({ error: 'School is required' })
-    }
-
-    if (!department || typeof department !== 'string' || !department.trim()) {
-      return res.status(400).json({ error: 'Department is required' })
-    }
+    // School and department are now optional
+    const schoolTrimmed = school && typeof school === 'string' ? school.trim() : null
+    const departmentTrimmed = department && typeof department === 'string' ? department.trim() : null
 
     if (!courses || !Array.isArray(courses)) {
       return res.status(400).json({ error: 'Courses array is required' })
@@ -78,8 +74,8 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
         user_id: req.userId,
         name: name.trim(),
         query: query.trim(),
-        school: school.trim(),
-        department: department.trim(),
+        school: schoolTrimmed,
+        department: departmentTrimmed,
         courses: courses, // JSONB handled automatically by Supabase
       })
       .select()
