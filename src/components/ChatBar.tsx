@@ -431,8 +431,16 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           throw new Error('You must be logged in to use this feature')
         }
 
-        // School and department are optional - if not provided, search all courses
-        const school = intentResult.school || undefined
+        // School is required, department is optional
+        if (!intentResult.school) {
+          setStatusMessage({ 
+            type: 'error', 
+            text: 'Please specify a school. For example: "find CS courses for MIT" or "Stanford courses for AI"' 
+          })
+          return
+        }
+
+        const school = intentResult.school
         const department = intentResult.department || undefined
 
         const API_BASE_URL = getApiBaseUrl()
@@ -444,7 +452,7 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
           },
           body: JSON.stringify({
             query: message,
-            ...(school && { school }),
+            school,
             ...(department && { department }),
             limit: 10
           }),
@@ -471,13 +479,9 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
 
         // Check if no courses were found
         if (!data.success || !data.results || data.results.length === 0) {
-          const filterDesc = school && department 
+          const filterDesc = department 
             ? `${school} ${department}`
             : school
-            ? school
-            : department
-            ? department
-            : 'all courses'
           throw new Error(data.error || `No courses found for ${filterDesc}. Make sure courses exist in the database.`)
         }
 
@@ -496,14 +500,10 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
             }
             // Fallback to school/department if query is too short or empty
             if (goalName.length < 5) {
-              if (school && department) {
+              if (department) {
                 goalName = `${school} ${department} Courses`
-              } else if (school) {
-                goalName = `${school} Courses`
-              } else if (department) {
-                goalName = `${department} Courses`
               } else {
-                goalName = 'Course Recommendations'
+                goalName = `${school} Courses`
               }
             }
             

@@ -315,27 +315,27 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
       return res.status(400).json({ error: 'Query is required' })
     }
 
-    // School and department are now optional - if not provided, search all courses
-    const schoolTrimmed = school?.trim() || undefined
+    // School is required, department is optional
+    if (!school || !school.trim()) {
+      return res.status(400).json({ error: 'School is required' })
+    }
+
+    const schoolTrimmed = school.trim()
     const departmentTrimmed = department?.trim() || undefined
 
-    // Fetch courses (filtered by school/department if provided, otherwise all courses)
+    // Fetch courses (filtered by school, and optionally by department)
     const allCourses = await getAllCourses(schoolTrimmed, departmentTrimmed)
 
     if (allCourses.length === 0) {
       // Return 200 with empty results instead of 404, so the frontend can handle it gracefully
-      const filterDesc = schoolTrimmed && departmentTrimmed 
+      const filterDesc = departmentTrimmed 
         ? `${schoolTrimmed} ${departmentTrimmed}`
-        : schoolTrimmed 
-        ? schoolTrimmed
-        : departmentTrimmed
-        ? departmentTrimmed
-        : 'all courses'
+        : schoolTrimmed
       return res.status(200).json({ 
         success: false,
         error: `No courses found for ${filterDesc}. Please check that courses exist in the course_directory table.`,
         query,
-        school: schoolTrimmed || null,
+        school: schoolTrimmed,
         department: departmentTrimmed || null,
         results: [],
         totalCourses: 0
@@ -348,7 +348,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
     res.json({
       success: true,
       query,
-      school: schoolTrimmed || null,
+      school: schoolTrimmed,
       department: departmentTrimmed || null,
       results: recommendations,
       totalCourses: allCourses.length

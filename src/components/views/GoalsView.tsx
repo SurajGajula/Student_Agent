@@ -135,13 +135,9 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
                 {currentGoal.name}
               </Text>
             <Text style={styles.headerSubtitle}>
-                {currentGoal.school && currentGoal.department 
+                {currentGoal.department 
                   ? `${currentGoal.school} ${currentGoal.department} • ${currentGoal.courses.length} courses`
-                  : currentGoal.school
-                  ? `${currentGoal.school} • ${currentGoal.courses.length} courses`
-                  : currentGoal.department
-                  ? `${currentGoal.department} • ${currentGoal.courses.length} courses`
-                  : `${currentGoal.courses.length} courses`}
+                  : `${currentGoal.school} • ${currentGoal.courses.length} courses`}
             </Text>
             </View>
           </View>
@@ -244,9 +240,9 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
                 {goal.name}
               </Text>
               <Text style={styles.goalCardMeta}>
-                {goal.school && goal.department 
+                {goal.department 
                   ? `${goal.school} ${goal.department}`
-                  : goal.school || goal.department || 'All courses'}
+                  : goal.school}
                 </Text>
               <Text style={styles.goalCardMeta}>
                 {goal.courses.length} {goal.courses.length === 1 ? 'course' : 'courses'}

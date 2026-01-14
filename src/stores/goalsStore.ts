@@ -25,7 +25,7 @@ export interface Goal {
   id: string
   name: string
   query: string
-  school: string | null
+  school: string
   department: string | null
   courses: CourseRecommendation[]
   createdAt?: string
@@ -37,7 +37,7 @@ interface GoalsStore {
   isLoading: boolean
   error: string | null
   syncFromSupabase: () => Promise<void>
-  addGoal: (name: string, query: string, school: string | null, department: string | null, courses: CourseRecommendation[]) => Promise<void>
+  addGoal: (name: string, query: string, school: string, department: string | null, courses: CourseRecommendation[]) => Promise<void>
   removeGoal: (id: string) => Promise<void>
   getGoalById: (id: string) => Goal | undefined
 }
@@ -76,7 +76,7 @@ export const useGoalsStore = create<GoalsStore>()(
         }
       },
 
-      addGoal: async (name: string, query: string, school: string | null, department: string | null, courses: CourseRecommendation[]) => {
+      addGoal: async (name: string, query: string, school: string, department: string | null, courses: CourseRecommendation[]) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
 

@@ -37,8 +37,12 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(400).json({ error: 'Query is required' })
     }
 
-    // School and department are now optional
-    const schoolTrimmed = school && typeof school === 'string' ? school.trim() : null
+    // School is required, department is optional
+    if (!school || typeof school !== 'string' || !school.trim()) {
+      return res.status(400).json({ error: 'School is required' })
+    }
+
+    const schoolTrimmed = school.trim()
     const departmentTrimmed = department && typeof department === 'string' ? department.trim() : null
 
     if (!courses || !Array.isArray(courses)) {
