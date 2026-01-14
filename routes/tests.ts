@@ -73,11 +73,12 @@ ${noteContent}
 
 Requirements:
 1. Generate exactly 10 questions
-2. Use a mix of question types: some multiple-choice (with 4 options each) and some short-answer questions
+2. ALL questions must be multiple-choice with exactly 4 options each
 3. Questions should test understanding of key concepts, facts, and relationships from the notes
-4. For multiple-choice questions, include 4 options labeled A, B, C, D
+4. For each multiple-choice question, include 4 options labeled A, B, C, D
 5. Make questions progressively more challenging
 6. Ensure questions cover different topics/sections from the notes
+7. Only one option should be correct for each question
 
 Return your response as a JSON object with this exact structure:
 {
@@ -87,14 +88,11 @@ Return your response as a JSON object with this exact structure:
       "type": "multiple-choice",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctAnswer": "Option A"
-    },
-    {
-      "question": "Question text here?",
-      "type": "short-answer",
-      "correctAnswer": "Brief answer"
     }
   ]
 }
+
+IMPORTANT: All questions must be multiple-choice. Do not include any short-answer questions.
 
 Return ONLY the JSON object, no additional text or markdown formatting.`
 
@@ -128,7 +126,7 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
       }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192, // Increased to handle longer responses with 10 questions
         responseMimeType: 'application/json',
       },
     }),
@@ -146,6 +144,12 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
   // Extract token usage
   const tokenUsage = data.usageMetadata?.totalTokenCount || 0
   
+  // Check if response was truncated
+  const finishReason = data.candidates?.[0]?.finishReason
+  if (finishReason === 'MAX_TOKENS') {
+    console.warn('Response was truncated due to token limit. Consider increasing maxOutputTokens.')
+  }
+  
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
     const content = data.candidates[0].content
     if (content.parts && content.parts[0]) {
@@ -158,18 +162,83 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
   }
 
   console.log('Received response from Gemini API')
-  console.log('Gemini response preview:', textResponse.substring(0, 200))
+  console.log('Response length:', textResponse.length)
+  console.log('Finish reason:', finishReason)
+  console.log('Gemini response preview (first 500 chars):', textResponse.substring(0, 500))
+  if (textResponse.length > 500) {
+    console.log('Gemini response preview (last 500 chars):', textResponse.substring(Math.max(0, textResponse.length - 500)))
+  }
 
   // Parse JSON response
   try {
     // Clean the response - remove markdown code blocks if present
     let cleanedResponse = textResponse.trim()
     if (cleanedResponse.startsWith('```json')) {
-      cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+      cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/\s*```$/g, '').trim()
     } else if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '')
+      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/g, '').trim()
     }
 
+    // Check if response looks truncated (doesn't end with ] or })
+    if (!cleanedResponse.endsWith(']') && !cleanedResponse.endsWith('}')) {
+      console.warn('Response may be truncated - attempting to fix incomplete JSON')
+      
+      // Try to find the last complete question object
+      const questionsArrayMatch = cleanedResponse.match(/"questions"\s*:\s*\[/);
+      if (questionsArrayMatch && questionsArrayMatch.index !== undefined) {
+        const questionsStart = questionsArrayMatch.index + questionsArrayMatch[0].length;
+        const questionsContent = cleanedResponse.substring(questionsStart);
+        
+        // Find the last complete question object (ends with })
+        let lastCompleteIndex = -1;
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        
+        for (let i = 0; i < questionsContent.length; i++) {
+          const char = questionsContent[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"' && !escapeNext) {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') {
+              braceCount++;
+            } else if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                lastCompleteIndex = i;
+              }
+            }
+          }
+        }
+        
+        if (lastCompleteIndex > 0) {
+          // Extract valid JSON up to the last complete question
+          const validQuestions = questionsContent.substring(0, lastCompleteIndex + 1);
+          const beforeQuestions = cleanedResponse.substring(0, questionsStart);
+          cleanedResponse = beforeQuestions + validQuestions + ']}';
+          console.log('Fixed truncated JSON by extracting complete questions');
+        }
+      }
+    }
+
+    // Try to fix common JSON issues
+    // Remove trailing commas before closing brackets/braces
+    cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1')
+    
     const parsed = JSON.parse(cleanedResponse) as GeneratedTestResponse
 
     if (!parsed.questions || !Array.isArray(parsed.questions)) {
@@ -182,6 +251,20 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
       console.warn(`Only received ${questions.length} questions, expected 10`)
     }
 
+    // Validate and clean each question
+    questions = questions.filter(q => {
+      if (!q.question || !q.type) {
+        console.warn('Skipping invalid question:', q)
+        return false
+      }
+      return true
+    }).map(q => ({
+      question: String(q.question || '').trim(),
+      type: (q.type === 'multiple-choice' || q.type === 'short-answer') ? q.type : 'short-answer' as const,
+      options: q.type === 'multiple-choice' && Array.isArray(q.options) ? q.options.map(opt => String(opt).trim()) : undefined,
+      correctAnswer: q.correctAnswer ? String(q.correctAnswer).trim() : undefined,
+    }))
+
     // Add IDs to questions
     return {
       questions: questions.map((q, index) => ({
@@ -192,6 +275,11 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
     }
   } catch (error) {
     console.error('Error parsing Gemini response:', error)
+    console.error('Raw response length:', textResponse.length)
+    console.error('Raw response (first 2000 chars):', textResponse.substring(0, 2000))
+    if (textResponse.length > 2000) {
+      console.error('Raw response (last 1000 chars):', textResponse.substring(Math.max(0, textResponse.length - 1000)))
+    }
     throw new Error(`Failed to parse test questions: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

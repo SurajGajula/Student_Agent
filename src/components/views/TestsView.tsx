@@ -5,7 +5,7 @@ import CreateFolderModal from '../modals/CreateFolderModal'
 import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
-import { BackIcon, FolderIcon, DeleteIcon, TestsIcon, EyeIcon, EyeOffIcon } from '../icons'
+import { BackIcon, FolderIcon, DeleteIcon, TestsIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -17,8 +17,9 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   const [currentTestId, setCurrentTestId] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
-  const [showAnswers, setShowAnswers] = useState(false)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userResponses, setUserResponses] = useState<Record<string, string>>({})
+  const [gradedQuestions, setGradedQuestions] = useState<Record<string, boolean>>({})
   const { tests, removeTest, getTestById } = useTestsStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
@@ -46,13 +47,17 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
 
   const handleTestClick = (testId: string) => {
     setCurrentTestId(testId)
+    setCurrentQuestionIndex(0)
+    setUserResponses({})
+    setGradedQuestions({})
   }
 
   const handleBackClick = () => {
     if (currentTestId) {
       setCurrentTestId(null)
-      setShowAnswers(false)
+      setCurrentQuestionIndex(0)
       setUserResponses({})
+      setGradedQuestions({})
     } else {
       setCurrentFolderId(null)
     }
@@ -82,15 +87,42 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     }
   }
 
-  const handleResponseChange = (questionId: string, response: string) => {
+  const handleResponseChange = (questionId: string, response: string, questionType?: 'multiple-choice' | 'short-answer') => {
     setUserResponses(prev => ({
       ...prev,
       [questionId]: response
     }))
+    
+    // Auto-grade only for multiple-choice questions when an option is selected
+    // Short-answer questions require explicit submission
+    if (questionType === 'multiple-choice' && response && response.trim()) {
+      setGradedQuestions(prev => ({
+        ...prev,
+        [questionId]: true
+      }))
+    }
   }
 
-  const toggleAnswers = () => {
-    setShowAnswers(prev => !prev)
+  const handleSubmitAnswer = (questionId: string) => {
+    const response = userResponses[questionId] || ''
+    if (response && response.trim()) {
+      setGradedQuestions(prev => ({
+        ...prev,
+        [questionId]: true
+      }))
+    }
+  }
+
+  const handleNextQuestion = () => {
+    if (currentTest && currentQuestionIndex < currentTest.questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1)
+    }
+  }
+
+  const handlePrevQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1)
+    }
   }
 
   const handleDeleteTest = async (testId: string) => {
@@ -146,129 +178,136 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
             )}
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentTest.name}</Text>
           </View>
-          <View style={styles.headerButtons}>
-            <Pressable 
-              style={[styles.toggleButton, showAnswers && styles.toggleButtonActive]}
-              onPress={toggleAnswers}
-            >
-              {showAnswers ? (
-                <>
-                  <EyeIcon />
-                  <Text style={styles.toggleButtonText}>
-                    {isMobile ? 'Hide' : 'Show Practice Mode'}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <EyeOffIcon />
-                  <Text style={styles.toggleButtonText}>
-                    {isMobile ? 'Show' : 'Show Answers'}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
         </View>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.testInfo}>
             <Text style={styles.testSource}>Based on note: {currentTest.noteName}</Text>
-            <Text style={styles.testCount}>{currentTest.questions.length} questions</Text>
+            <Text style={styles.testCount}>
+              Question {currentQuestionIndex + 1} of {currentTest.questions.length}
+            </Text>
           </View>
-          <View style={styles.questionsContainer}>
-            {currentTest.questions.map((question, index) => {
-              const userResponse = userResponses[question.id] || ''
-              const isCorrect = question.correctAnswer && 
-                (question.type === 'multiple-choice' 
-                  ? userResponse === question.correctAnswer
-                  : userResponse.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
-              
-              return (
-                <View key={question.id} style={styles.questionCard}>
-                  <View style={styles.questionHeader}>
-                    <Text style={styles.questionNumber}>Question {index + 1}</Text>
-                    <Text style={styles.questionType}>
-                      {question.type === 'multiple-choice' ? 'Multiple Choice' : 'Short Answer'}
-                    </Text>
-                  </View>
-                  <Text style={styles.questionText}>{question.question}</Text>
-                  
-                  {question.type === 'multiple-choice' && question.options && (
-                    <View style={styles.optionsContainer}>
-                      {question.options.map((option, optIndex) => {
-                        const isSelected = userResponse === option
-                        const isCorrectOption = showAnswers && question.correctAnswer === option
-                        const isWrongSelection = showAnswers && isSelected && question.correctAnswer !== option
-                        
-                        return (
-                          <Pressable
-                            key={optIndex}
-                            style={[
-                              styles.option,
-                              isSelected && styles.optionSelected,
-                              isCorrectOption && styles.optionCorrect,
-                              isWrongSelection && styles.optionIncorrect,
-                              !showAnswers && styles.optionClickable,
-                            ]}
-                            onPress={() => !showAnswers && handleResponseChange(question.id, option)}
-                            disabled={showAnswers}
-                          >
-                            <Text style={styles.optionLabel}>{String.fromCharCode(65 + optIndex)}.</Text>
-                            <Text style={styles.optionText}>{option}</Text>
-                            {isSelected && !showAnswers && (
-                              <Text style={styles.selectedIndicator}>✓ Selected</Text>
-                            )}
-                            {showAnswers && isCorrectOption && (
-                              <Text style={styles.correctIndicator}>✓ Correct</Text>
-                            )}
-                            {showAnswers && isWrongSelection && (
-                              <Text style={styles.incorrectIndicator}>✗ Incorrect</Text>
-                            )}
-                          </Pressable>
-                        )
-                      })}
-                    </View>
-                  )}
-                  
-                  {question.type === 'short-answer' && (
-                    <>
-                      {!showAnswers ? (
-                        <View style={styles.inputContainer}>
-                          <TextInput
-                            style={styles.shortAnswerInput}
-                            placeholder="Type your answer here..."
-                            value={userResponse}
-                            onChangeText={(text) => handleResponseChange(question.id, text)}
-                            multiline
-                            numberOfLines={3}
-                            textAlignVertical="top"
-                          />
-                        </View>
-                      ) : (
-                        <View style={styles.answerComparison}>
-                          <View style={userResponse 
-                            ? [styles.answerSection, isCorrect ? styles.answerSectionCorrect : styles.answerSectionIncorrect]
-                            : styles.answerSection}>
-                            <Text style={styles.answerSectionTitle}>
-                              Your Answer:
-                              {userResponse && (
-                                <Text style={isCorrect ? styles.correctStatus : styles.incorrectStatus}>
-                                  {isCorrect ? ' ✓ Correct' : ' ✗ Incorrect'}
-                                </Text>
-                              )}
-                            </Text>
-                            <Text style={styles.answerText}>{userResponse || '(No answer provided)'}</Text>
-                          </View>
-                          <View style={[styles.answerSection, styles.answerSectionCorrect]}>
-                            <Text style={styles.answerSectionTitle}>Correct Answer:</Text>
-                            <Text style={styles.answerText}>{question.correctAnswer}</Text>
-                          </View>
-                        </View>
-                      )}
-                    </>
-                  )}
+          
+          {currentTest.questions[currentQuestionIndex] && (() => {
+            const question = currentTest.questions[currentQuestionIndex]
+            const userResponse = userResponses[question.id] || ''
+            const isGraded = gradedQuestions[question.id] || false
+            const isCorrect = question.correctAnswer && 
+              (question.type === 'multiple-choice' 
+                ? userResponse === question.correctAnswer
+                : userResponse.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
+            
+            return (
+              <View style={styles.questionCard}>
+                <View style={styles.questionHeader}>
+                  <Text style={styles.questionNumber}>Question {currentQuestionIndex + 1}</Text>
+                  <Text style={styles.questionType}>
+                    {question.type === 'multiple-choice' ? 'Multiple Choice' : 'Short Answer'}
+                  </Text>
                 </View>
-              )
-            })}
+                <Text style={styles.questionText}>{question.question}</Text>
+                
+                {question.type === 'multiple-choice' && question.options && (
+                  <View style={styles.optionsContainer}>
+                    {question.options.map((option, optIndex) => {
+                      const isSelected = userResponse === option
+                      const isCorrectOption = isGraded && question.correctAnswer === option
+                      const isWrongSelection = isGraded && isSelected && question.correctAnswer !== option
+                      
+                      return (
+                        <Pressable
+                          key={optIndex}
+                          style={[
+                            styles.option,
+                            isSelected && styles.optionSelected,
+                            isCorrectOption && styles.optionCorrect,
+                            isWrongSelection && styles.optionIncorrect,
+                            !isGraded && styles.optionClickable,
+                          ]}
+                          onPress={() => !isGraded && handleResponseChange(question.id, option, 'multiple-choice')}
+                          disabled={isGraded}
+                        >
+                          <Text style={styles.optionLabel}>{String.fromCharCode(65 + optIndex)}.</Text>
+                          <Text style={styles.optionText}>{option}</Text>
+                          {isSelected && !isGraded && (
+                            <Text style={styles.selectedIndicator}>✓ Selected</Text>
+                          )}
+                          {isGraded && isCorrectOption && (
+                            <Text style={styles.correctIndicator}>✓ Correct</Text>
+                          )}
+                          {isGraded && isWrongSelection && (
+                            <Text style={styles.incorrectIndicator}>✗ Incorrect</Text>
+                          )}
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                )}
+                
+                {question.type === 'short-answer' && (
+                  <>
+                    {!isGraded ? (
+                      <View style={styles.inputContainer}>
+                        <TextInput
+                          style={styles.shortAnswerInput}
+                          placeholder="Type your answer here..."
+                          value={userResponse}
+                          onChangeText={(text) => handleResponseChange(question.id, text, 'short-answer')}
+                          multiline
+                          numberOfLines={3}
+                          textAlignVertical="top"
+                        />
+                        <Pressable
+                          style={[styles.submitButton, (!userResponse || !userResponse.trim()) && styles.submitButtonDisabled]}
+                          onPress={() => handleSubmitAnswer(question.id)}
+                          disabled={!userResponse || !userResponse.trim()}
+                        >
+                          <Text style={styles.submitButtonText}>Submit Answer</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={styles.answerComparison}>
+                        <View style={userResponse 
+                          ? [styles.answerSection, isCorrect ? styles.answerSectionCorrect : styles.answerSectionIncorrect]
+                          : styles.answerSection}>
+                          <Text style={styles.answerSectionTitle}>
+                            Your Answer:
+                            {userResponse && (
+                              <Text style={isCorrect ? styles.correctStatus : styles.incorrectStatus}>
+                                {isCorrect ? ' ✓ Correct' : ' ✗ Incorrect'}
+                              </Text>
+                            )}
+                          </Text>
+                          <Text style={styles.answerText}>{userResponse || '(No answer provided)'}</Text>
+                        </View>
+                        <View style={[styles.answerSection, styles.answerSectionCorrect]}>
+                          <Text style={styles.answerSectionTitle}>Correct Answer:</Text>
+                          <Text style={styles.answerText}>{question.correctAnswer}</Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+            )
+          })()}
+          
+          <View style={styles.navigation}>
+            <Pressable
+              style={[styles.navButton, currentQuestionIndex === 0 && styles.navButtonDisabled]}
+              onPress={handlePrevQuestion}
+              disabled={currentQuestionIndex === 0}
+            >
+              <ArrowLeftIcon />
+              <Text style={styles.navButtonText}>Previous</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.navButton, currentQuestionIndex === currentTest.questions.length - 1 && styles.navButtonDisabled]}
+              onPress={handleNextQuestion}
+              disabled={currentQuestionIndex === currentTest.questions.length - 1}
+            >
+              <Text style={styles.navButtonText}>Next</Text>
+              <ArrowRightIcon />
+            </Pressable>
           </View>
         </ScrollView>
       </View>
@@ -616,6 +655,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginTop: 8,
+    gap: 12,
   },
   shortAnswerInput: {
     borderWidth: 1,
@@ -627,6 +667,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  submitButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0f0f0f',
+    backgroundColor: '#0f0f0f',
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#d0d0d0',
+    borderColor: '#d0d0d0',
+    ...(Platform.OS === 'web' && {
+      cursor: 'not-allowed',
+    }),
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#ffffff',
   },
   answerComparison: {
     gap: 16,
@@ -663,6 +728,40 @@ const styles = StyleSheet.create({
   },
   incorrectStatus: {
     color: '#c62828',
+  },
+  navigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#d0d0d0',
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    backgroundColor: '#ffffff',
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  navButtonDisabled: {
+    opacity: 0.5,
+    ...(Platform.OS === 'web' && {
+      cursor: 'not-allowed',
+    }),
+  },
+  navButtonText: {
+    fontSize: 16,
+    fontWeight: '300',
+    color: '#0f0f0f',
   },
   grid: {
     padding: 10,
