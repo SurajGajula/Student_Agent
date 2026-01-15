@@ -120,7 +120,9 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
         Animated.timing(spinAnim, {
           toValue: 1,
           duration: 1000,
-          useNativeDriver: true,
+          // RN Web (and some native setups) don't have the native animated module, so
+          // using the native driver would warn and fall back anyway.
+          useNativeDriver: Platform.OS !== 'web',
         })
       ).start()
     } else {

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform } from 'react-native'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CreateFolderModal from '../modals/CreateFolderModal'
 import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
-import { BackIcon, FolderIcon, DeleteIcon, TestsIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
+import { BackIcon, FolderIcon, DeleteIcon, TestsIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
 
@@ -119,10 +119,10 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     }
   }
 
-  const handlePrevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1)
-    }
+  const handleRestartTest = () => {
+    setCurrentQuestionIndex(0)
+    setUserResponses({})
+    setGradedQuestions({})
   }
 
   const handleDeleteTest = async (testId: string) => {
@@ -153,6 +153,68 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     return () => setIsInDetailMode(false)
   }, [currentTestId, currentTest, setIsInDetailMode])
 
+  // PanResponder for swipe right gesture (mobile only, after question is answered)
+  const currentQuestionIdRef = useRef<string | null>(null)
+  const currentQuestionIsGradedRef = useRef<boolean>(false)
+  const currentQuestionIndexRef = useRef<number>(0)
+  const questionsLengthRef = useRef<number>(0)
+  
+  useEffect(() => {
+    if (currentTest && currentTest.questions[currentQuestionIndex]) {
+      currentQuestionIdRef.current = currentTest.questions[currentQuestionIndex].id
+      currentQuestionIsGradedRef.current = gradedQuestions[currentTest.questions[currentQuestionIndex].id] || false
+      currentQuestionIndexRef.current = currentQuestionIndex
+      questionsLengthRef.current = currentTest.questions.length
+    }
+  }, [currentTest, currentQuestionIndex, gradedQuestions])
+
+  const panResponder = useMemo(
+    () => {
+      if (Platform.OS === 'web') return null
+      
+      return PanResponder.create({
+        onStartShouldSetPanResponderCapture: (evt, gestureState) => {
+          // Capture gesture early if question is graded - helps compete with ScrollView
+          if (!currentQuestionIsGradedRef.current) return false
+          // Don't capture on initial touch, wait for movement
+          return false
+        },
+        onMoveShouldSetPanResponder: (evt, gestureState) => {
+          // Only respond to horizontal swipes (more horizontal than vertical)
+          // Only allow swipe if question is graded
+          if (!currentQuestionIsGradedRef.current) return false
+          // Require significant horizontal movement
+          return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 15
+        },
+        onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+          // Capture horizontal gestures to prevent ScrollView from taking them
+          if (!currentQuestionIsGradedRef.current) return false
+          // Capture if it's clearly a horizontal swipe
+          return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 15
+        },
+        onPanResponderTerminationRequest: () => false, // Don't allow other handlers to take over
+        onPanResponderGrant: () => {
+          // Prevent ScrollView from scrolling when we start a horizontal swipe
+        },
+        onPanResponderRelease: (evt, gestureState) => {
+          // Only trigger if question is graded and swipe is significant
+          if (!currentQuestionIsGradedRef.current) return
+          
+          const swipeThreshold = 50
+          const swipeVelocity = 0.5
+          
+          // Swipe left (next question) - only if not on last question
+          if ((gestureState.dx < -swipeThreshold || gestureState.vx < -swipeVelocity)) {
+            if (currentQuestionIndexRef.current < questionsLengthRef.current - 1) {
+              handleNextQuestion()
+            }
+          }
+        },
+      })
+    },
+    [handleNextQuestion]
+  )
+
   // Render test detail view with questions
   if (currentTestId && currentTest) {
     return (
@@ -179,9 +241,12 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
             <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentTest.name}</Text>
           </View>
         </View>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={Platform.OS === 'web' || !(currentTest.questions[currentQuestionIndex] && gradedQuestions[currentTest.questions[currentQuestionIndex].id])}
+        >
           <View style={styles.testInfo}>
-            <Text style={styles.testSource}>Based on note: {currentTest.noteName}</Text>
             <Text style={styles.testCount}>
               Question {currentQuestionIndex + 1} of {currentTest.questions.length}
             </Text>
@@ -197,7 +262,10 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                 : userResponse.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
             
             return (
-              <View style={styles.questionCard}>
+              <View 
+                style={styles.questionCard}
+                {...(panResponder?.panHandlers || {})}
+              >
                 <View style={styles.questionHeader}>
                   <Text style={styles.questionNumber}>Question {currentQuestionIndex + 1}</Text>
                   <Text style={styles.questionType}>
@@ -291,24 +359,25 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
             )
           })()}
           
-          <View style={styles.navigation}>
-            <Pressable
-              style={[styles.navButton, currentQuestionIndex === 0 && styles.navButtonDisabled]}
-              onPress={handlePrevQuestion}
-              disabled={currentQuestionIndex === 0}
-            >
-              <ArrowLeftIcon />
-              <Text style={styles.navButtonText}>Previous</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.navButton, currentQuestionIndex === currentTest.questions.length - 1 && styles.navButtonDisabled]}
-              onPress={handleNextQuestion}
-              disabled={currentQuestionIndex === currentTest.questions.length - 1}
-            >
-              <Text style={styles.navButtonText}>Next</Text>
-              <ArrowRightIcon />
-            </Pressable>
-          </View>
+          {currentTest.questions[currentQuestionIndex] && gradedQuestions[currentTest.questions[currentQuestionIndex].id] && (
+            <View style={styles.navigationContainer}>
+              {currentQuestionIndex < currentTest.questions.length - 1 ? (
+                <Pressable
+                  style={styles.nextButton}
+                  onPress={handleNextQuestion}
+                >
+                  <Text style={styles.nextButtonText}>Next</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.restartButton}
+                  onPress={handleRestartTest}
+                >
+                  <Text style={styles.restartButtonText}>Restart Test</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </ScrollView>
       </View>
     )
@@ -554,11 +623,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 8,
   },
-  testSource: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '300',
-  },
   testCount: {
     fontSize: 14,
     color: '#666',
@@ -729,39 +793,44 @@ const styles = StyleSheet.create({
   incorrectStatus: {
     color: '#c62828',
   },
-  navigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  navigationContainer: {
     marginTop: 20,
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#d0d0d0',
-  },
-  navButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+  },
+  nextButton: {
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 32,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
-    backgroundColor: '#ffffff',
+    borderColor: '#0f0f0f',
+    backgroundColor: '#0f0f0f',
     ...(Platform.OS === 'web' && {
       cursor: 'pointer',
     }),
   },
-  navButtonDisabled: {
-    opacity: 0.5,
+  nextButtonText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#ffffff',
+  },
+  restartButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0f0f0f',
+    backgroundColor: '#0f0f0f',
     ...(Platform.OS === 'web' && {
-      cursor: 'not-allowed',
+      cursor: 'pointer',
     }),
   },
-  navButtonText: {
+  restartButtonText: {
     fontSize: 16,
-    fontWeight: '300',
-    color: '#0f0f0f',
+    fontWeight: '400',
+    color: '#ffffff',
   },
   grid: {
     padding: 10,
