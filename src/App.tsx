@@ -184,7 +184,7 @@ function AppContent() {
           console.log('[App] No session found, skipping refresh')
           return false
         }
-      } catch (err) {
+        } catch (err) {
         console.error('[App] Error refreshing session on tab return:', err)
         return false
       }
@@ -376,7 +376,7 @@ function AppContent() {
       />
       <View style={styles.mainContent}>
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
-        {currentView === 'tests' && <TestsView onOpenLoginModal={openLoginModal} />}
+        {currentView === 'tests' && <TestsView key={`tests-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}

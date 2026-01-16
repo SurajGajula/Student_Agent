@@ -14,6 +14,8 @@ interface GenerateTestRequest {
   noteId: string
   noteName: string
   noteContent: string
+  wrongQuestionTexts?: string[] // Questions that were answered incorrectly
+  makeHarder?: boolean // If true, generate a harder test overall
 }
 
 interface VertexAIResponse {
@@ -54,7 +56,11 @@ interface GeneratedTestResponse {
 const router = express.Router()
 
 // Generate test questions using Gemini
-async function generateTestQuestions(noteContent: string): Promise<{ questions: GeneratedQuestion[], tokenUsage: number }> {
+async function generateTestQuestions(
+  noteContent: string, 
+  wrongQuestionTexts?: string[], 
+  makeHarder?: boolean
+): Promise<{ questions: GeneratedQuestion[], tokenUsage: number }> {
   let geminiClient = getGeminiClient()
   if (!geminiClient) {
     console.log('Initializing Gemini client...')
@@ -66,18 +72,34 @@ async function generateTestQuestions(noteContent: string): Promise<{ questions: 
     throw new Error('Failed to initialize Gemini client')
   }
 
+  let focusInstruction = ''
+  if (wrongQuestionTexts && wrongQuestionTexts.length > 0) {
+    focusInstruction = `IMPORTANT: The user previously answered these questions incorrectly:
+${wrongQuestionTexts.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+Generate questions that focus on the same concepts and topics as the questions above that were answered incorrectly. Create new questions (not repeats) that test similar knowledge areas where the user needs improvement.`
+  } else if (makeHarder) {
+    focusInstruction = `IMPORTANT: The user answered all previous questions correctly, so generate a significantly more challenging test. Use:
+- More complex, nuanced questions requiring deeper understanding
+- Questions that test application and analysis rather than just recall
+- Tricky options that require careful reasoning to distinguish
+- Advanced topics and subtleties from the notes
+- Questions that combine multiple concepts`
+  }
+
   const prompt = `You are an educational assistant. Generate exactly 10 test questions based on the following notes content.
 
 Notes Content:
 ${noteContent}
+${focusInstruction ? '\n' + focusInstruction + '\n' : ''}
 
 Requirements:
 1. Generate exactly 10 questions
 2. ALL questions must be multiple-choice with exactly 4 options each
 3. Questions should test understanding of key concepts, facts, and relationships from the notes
 4. For each multiple-choice question, include 4 options labeled A, B, C, D
-5. Make questions progressively more challenging
-6. Ensure questions cover different topics/sections from the notes
+5. Make questions progressively more challenging${makeHarder ? ' (overall significantly harder than typical questions)' : ''}
+6. Ensure questions cover different topics/sections from the notes${wrongQuestionTexts && wrongQuestionTexts.length > 0 ? ' (with emphasis on areas related to the incorrectly answered questions above)' : ''}
 7. Only one option should be correct for each question
 
 Return your response as a JSON object with this exact structure:
@@ -238,7 +260,7 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
     // Try to fix common JSON issues
     // Remove trailing commas before closing brackets/braces
     cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1')
-    
+
     const parsed = JSON.parse(cleanedResponse) as GeneratedTestResponse
 
     if (!parsed.questions || !Array.isArray(parsed.questions)) {
@@ -292,7 +314,7 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const { noteId, noteName, noteContent }: GenerateTestRequest = req.body
+    const { noteId, noteName, noteContent, wrongQuestionTexts, makeHarder }: GenerateTestRequest = req.body
 
     if (!noteId || !noteName) {
       return res.status(400).json({ 
@@ -323,7 +345,7 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
     console.log(`Generating test from note: ${noteName} (${noteId})`)
 
     // Generate test questions using Gemini
-    const { questions, tokenUsage } = await generateTestQuestions(noteContent)
+    const { questions, tokenUsage } = await generateTestQuestions(noteContent, wrongQuestionTexts, makeHarder)
 
     // Create test response
     const testData = {

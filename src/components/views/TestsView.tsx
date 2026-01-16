@@ -5,6 +5,8 @@ import CreateFolderModal from '../modals/CreateFolderModal'
 import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useNotesStore } from '../../stores/notesStore'
+import { getApiBaseUrl } from '../../lib/platform'
 import { BackIcon, FolderIcon, DeleteIcon, TestsIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
@@ -20,9 +22,12 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userResponses, setUserResponses] = useState<Record<string, string>>({})
   const [gradedQuestions, setGradedQuestions] = useState<Record<string, boolean>>({})
-  const { tests, removeTest, getTestById } = useTestsStore()
+  const [showResults, setShowResults] = useState(false)
+  const { tests, removeTest, getTestById, addTest } = useTestsStore()
   const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
+  const { notes } = useNotesStore()
+  const [isGeneratingTest, setIsGeneratingTest] = useState(false)
   const currentTest = currentTestId ? getTestById(currentTestId) : null
   const { setIsInDetailMode } = useDetailMode()
   
@@ -50,14 +55,23 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     setCurrentQuestionIndex(0)
     setUserResponses({})
     setGradedQuestions({})
+    setShowResults(false)
   }
 
   const handleBackClick = () => {
-    if (currentTestId) {
+    if (showResults) {
+      // From results screen, go back to test grid
       setCurrentTestId(null)
       setCurrentQuestionIndex(0)
       setUserResponses({})
       setGradedQuestions({})
+      setShowResults(false)
+    } else if (currentTestId) {
+      setCurrentTestId(null)
+      setCurrentQuestionIndex(0)
+      setUserResponses({})
+      setGradedQuestions({})
+      setShowResults(false)
     } else {
       setCurrentFolderId(null)
     }
@@ -123,6 +137,259 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     setCurrentQuestionIndex(0)
     setUserResponses({})
     setGradedQuestions({})
+    setShowResults(false)
+  }
+
+  const handleViewResults = () => {
+    setShowResults(true)
+  }
+
+  // Get wrong question texts for focused test generation
+  const getWrongQuestionTexts = (): string[] => {
+    if (!currentTest) return []
+    
+    const wrongTexts: string[] = []
+    currentTest.questions.forEach(question => {
+      if (gradedQuestions[question.id]) {
+        const userResponse = userResponses[question.id] || ''
+        const isCorrect = question.correctAnswer && 
+          (question.type === 'multiple-choice' 
+            ? userResponse === question.correctAnswer
+            : userResponse.trim().toLowerCase() === question.correctAnswer!.trim().toLowerCase())
+        
+        if (!isCorrect) {
+          wrongTexts.push(question.question)
+        }
+      }
+    })
+    
+    return wrongTexts
+  }
+
+  // Generate a new test focusing on wrong answers or making it harder
+  const handleGenerateNewTest = async () => {
+    if (!currentTest || !isLoggedIn) {
+      onOpenLoginModal?.()
+      return
+    }
+
+    setIsGeneratingTest(true)
+    
+    try {
+      // Find the note content
+      const note = notes.find(n => n.id === currentTest.noteId)
+      if (!note || !note.content) {
+        throw new Error('Note content not found. Please sync your notes.')
+      }
+
+      const wrongQuestionTexts = getWrongQuestionTexts()
+      const score = calculateTestScore()
+      const makeHarder = score.wrong === 0 // Make harder if no wrong answers
+
+      const { supabase } = await import('../../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('You must be logged in to use this feature')
+      }
+
+      const API_BASE_URL = getApiBaseUrl()
+      const response = await fetch(`${API_BASE_URL}/api/tests/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          noteId: currentTest.noteId,
+          noteName: currentTest.noteName,
+          noteContent: note.content,
+          wrongQuestionTexts: wrongQuestionTexts.length > 0 ? wrongQuestionTexts : undefined,
+          makeHarder: makeHarder || undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in to use this feature.')
+        }
+        
+        if (response.status === 429) {
+          const remaining = data.remaining || 0
+          const limit = data.limit || 0
+          throw new Error(
+            `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+            `Please upgrade your plan or wait until next month.`
+          )
+        }
+        
+        throw new Error(data.message || data.error || 'Failed to generate test')
+      }
+
+      if (data.success && data.test) {
+        // Create a new test name based on the focus
+        const testName = wrongQuestionTexts.length > 0 
+          ? `Test: ${currentTest.noteName} (Focus on Wrong Answers)`
+          : `Test: ${currentTest.noteName} (Harder)`
+        
+        await addTest({
+          name: testName,
+          folderId: currentTest.folderId || undefined,
+          noteId: data.test.noteId,
+          noteName: data.test.noteName,
+          questions: data.test.questions
+        })
+
+        // Navigate to the new test - wait a bit for store to update, then find it by testName
+        setTimeout(() => {
+          const newTest = tests.find(t => t.name === testName && t.noteId === currentTest.noteId)
+          
+          if (newTest) {
+            setCurrentTestId(newTest.id)
+            setCurrentQuestionIndex(0)
+            setUserResponses({})
+            setGradedQuestions({})
+            setShowResults(false)
+          }
+        }, 100)
+      }
+    } catch (error) {
+      console.error('Failed to generate new test:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate new test')
+    } finally {
+      setIsGeneratingTest(false)
+    }
+  }
+
+  // Calculate test score (session-only, not saved)
+  const calculateTestScore = () => {
+    if (!currentTest) return { correct: 0, wrong: 0, total: 0, wrongQuestions: [] }
+    
+    let correct = 0
+    let wrong = 0
+    const wrongQuestions: string[] = []
+    
+    currentTest.questions.forEach(question => {
+      if (gradedQuestions[question.id]) {
+        const userResponse = userResponses[question.id] || ''
+        const isCorrect = question.correctAnswer && 
+          (question.type === 'multiple-choice' 
+            ? userResponse === question.correctAnswer
+            : userResponse.trim().toLowerCase() === question.correctAnswer!.trim().toLowerCase())
+        
+        if (isCorrect) {
+          correct++
+        } else {
+          wrong++
+          wrongQuestions.push(question.question)
+        }
+      }
+    })
+    
+    return { correct, wrong, total: currentTest.questions.length, wrongQuestions }
+  }
+
+  const handleGenerateFocusedTest = async () => {
+    if (!currentTest || !isLoggedIn) {
+      onOpenLoginModal?.()
+      return
+    }
+
+    setIsGeneratingTest(true)
+    try {
+      // Find the note content
+      const note = notes.find(n => n.id === currentTest.noteId)
+      if (!note || !note.content) {
+        throw new Error('Note content not found. Please sync your notes.')
+      }
+
+      const wrongQuestionTexts = getWrongQuestionTexts()
+      const score = calculateTestScore()
+      const makeHarder = score.wrong === 0 // Make harder if no wrong answers
+
+      const { supabase } = await import('../../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('You must be logged in to use this feature')
+      }
+
+      const API_BASE_URL = getApiBaseUrl()
+      const response = await fetch(`${API_BASE_URL}/api/tests/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          noteId: currentTest.noteId,
+          noteName: currentTest.noteName,
+          noteContent: note.content,
+          wrongQuestionTexts: wrongQuestionTexts.length > 0 ? wrongQuestionTexts : undefined,
+          makeHarder: makeHarder || undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in to use this feature.')
+        }
+        
+        if (response.status === 429) {
+          const remaining = data.remaining || 0
+          const limit = data.limit || 0
+          throw new Error(
+            `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+            `Please upgrade your plan or wait until next month.`
+          )
+        }
+        
+        throw new Error(data.message || data.error || 'Failed to generate test')
+      }
+
+      if (data.success && data.test) {
+        // Create a new test name based on the focus
+        const testName = wrongQuestionTexts.length > 0 
+          ? `Test: ${currentTest.noteName} (Focus on Wrong Answers)`
+          : `Test: ${currentTest.noteName} (Harder)`
+        
+        await addTest({
+          name: testName,
+          folderId: currentTest.folderId || undefined,
+          noteId: data.test.noteId,
+          noteName: data.test.noteName,
+          questions: data.test.questions
+        })
+
+        // Sync tests to get the new test ID
+        const { syncFromSupabase } = useTestsStore.getState()
+        await syncFromSupabase()
+        
+        // Find the newly created test and navigate to it
+        const updatedTests = useTestsStore.getState().tests
+        const newTest = updatedTests.find(t => 
+          t.noteId === currentTest.noteId && 
+          (t.name === testName || t.name === data.test.name)
+        )
+
+        if (newTest) {
+          setCurrentTestId(newTest.id)
+          setCurrentQuestionIndex(0)
+          setUserResponses({})
+          setGradedQuestions({})
+          setShowResults(false)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to generate focused test:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate focused test')
+    } finally {
+      setIsGeneratingTest(false)
+    }
   }
 
   const handleDeleteTest = async (testId: string) => {
@@ -217,6 +484,76 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
 
   // Render test detail view with questions
   if (currentTestId && currentTest) {
+    // Render results screen
+    if (showResults) {
+      const score = calculateTestScore()
+      return (
+        <View style={styles.container}>
+          {isMobile && <MobileBackButton onPress={handleBackClick} />}
+          <View style={[
+            styles.header,
+            isMobile && {
+              paddingTop: Math.max(insets.top + 8 + 8, 28),
+              paddingLeft: 80,
+              paddingRight: 20,
+            }
+          ]}>
+            <View style={[styles.headerTitle, isMobile && {
+              flex: 0,
+              maxWidth: '100%',
+            }]}>
+              {!isMobile && (
+                <Pressable style={styles.backButton} onPress={handleBackClick}>
+                  <BackIcon />
+                </Pressable>
+              )}
+              <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">Test Results</Text>
+            </View>
+          </View>
+          <ScrollView 
+            style={styles.scrollView} 
+            contentContainerStyle={styles.scrollContent}
+          >
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreTitle}>Test Results</Text>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreLabel}>Correct:</Text>
+                <Text style={styles.scoreValueCorrect}>{score.correct}</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreLabel}>Wrong:</Text>
+                <Text style={styles.scoreValueWrong}>{score.wrong}</Text>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreLabel}>Total:</Text>
+                <Text style={styles.scoreValue}>{score.total}</Text>
+              </View>
+            </View>
+            <Pressable
+              style={[styles.generateTestButton, isGeneratingTest && styles.generateTestButtonDisabled]}
+              onPress={handleGenerateNewTest}
+              disabled={isGeneratingTest}
+            >
+              <Text style={styles.generateTestButtonText}>
+                {isGeneratingTest 
+                  ? 'Generating...' 
+                  : score.wrong > 0 
+                    ? 'Generate Test on Wrong Answers' 
+                    : 'Generate Harder Test'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.restartButton}
+              onPress={handleRestartTest}
+            >
+              <Text style={styles.restartButtonText}>Restart Test</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      )
+    }
+
+    // Render question view
     return (
       <View style={styles.container}>
         {isMobile && <MobileBackButton onPress={handleBackClick} />}
@@ -370,10 +707,10 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                 </Pressable>
               ) : (
                 <Pressable
-                  style={styles.restartButton}
-                  onPress={handleRestartTest}
+                  style={styles.nextButton}
+                  onPress={handleViewResults}
                 >
-                  <Text style={styles.restartButtonText}>Restart Test</Text>
+                  <Text style={styles.nextButtonText}>View Results</Text>
                 </Pressable>
               )}
             </View>
@@ -823,6 +1160,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#0f0f0f',
     backgroundColor: '#0f0f0f',
+    alignSelf: 'center',
     ...(Platform.OS === 'web' && {
       cursor: 'pointer',
     }),
@@ -831,6 +1169,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '400',
     color: '#ffffff',
+  },
+  scoreContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    width: '100%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: 400,
+      alignSelf: 'center',
+    }),
+  },
+  scoreTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0f0f0f',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  scoreLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+  },
+  scoreValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0f0f0f',
+  },
+  scoreValueCorrect: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#28a745',
+  },
+  scoreValueWrong: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#dc3545',
+  },
+  generateTestButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0f0f0f',
+    backgroundColor: '#ffffff',
+    alignSelf: 'center',
+    marginBottom: 16,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+    }),
+  },
+  generateTestButtonDisabled: {
+    opacity: 0.5,
+    ...(Platform.OS === 'web' && {
+      cursor: 'not-allowed',
+    }),
+  },
+  generateTestButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#0f0f0f',
   },
   grid: {
     padding: 10,

@@ -31,7 +31,7 @@ const createFormData = async (imageSource: File | Blob | string): Promise<FormDa
  */
 async function extractNotesFromYouTube(youtubeUrl: string): Promise<string> {
   const API_BASE_URL = getApiBaseUrl()
-  
+
   // Get auth token
   const { supabase } = await import('./supabase')
   const { data: { session } } = await supabase.auth.getSession()
