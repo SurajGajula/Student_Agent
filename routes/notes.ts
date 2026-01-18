@@ -1,5 +1,12 @@
 import express, { Response } from 'express'
 import multer from 'multer'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+
+const execAsync = promisify(exec)
 import { 
   getGeminiClient, 
   isVertexAI, 
@@ -65,26 +72,89 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
     let prompt = ''
     let estimatedTokens = 2000
     let parts: any[] = []
+    let videoTitleFromInfo: string | undefined = undefined
 
     if (hasYoutubeUrl) {
       // Validate YouTube URL format
       const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-      if (!youtubeRegex.test(youtubeUrl)) {
+      const videoIdMatch = youtubeUrl.match(youtubeRegex)
+      if (!videoIdMatch) {
         return res.status(400).json({ error: 'Invalid YouTube URL format' })
       }
+      
+      const videoId = videoIdMatch[1]
+      console.log(`Processing YouTube video: ${youtubeUrl} (ID: ${videoId})`)
 
-      console.log(`Processing YouTube video: ${youtubeUrl}`)
-
-      prompt = `Watch this YouTube video and generate comprehensive lecture notes. 
-Write the notes as if you are directly explaining the content and concepts yourself, using the video as a reference for the information.
+      // Extract audio only using yt-dlp (much more token-efficient than video)
+      console.log('Extracting audio only from YouTube video using yt-dlp')
+      
+      try {
+        // Create temporary file for audio output (yt-dlp will add extension)
+        const tempDir = os.tmpdir()
+        const tempFileBase = path.join(tempDir, `audio_${Date.now()}`)
+        
+        // Use yt-dlp to extract audio and get video title
+        console.log('Downloading audio with yt-dlp...')
+        
+        // First, get video title
+        try {
+          const { stdout: titleOutput } = await execAsync(`yt-dlp --get-title --no-warnings "${youtubeUrl}"`, {
+            timeout: 30000
+          })
+          videoTitleFromInfo = titleOutput.trim()
+          console.log(`Video title: ${videoTitleFromInfo}`)
+        } catch (titleError) {
+          console.log('Could not fetch video title, will extract from response:', titleError instanceof Error ? titleError.message : String(titleError))
+        }
+        
+        // Extract audio in best available format (opus is typically best quality)
+        // yt-dlp will automatically choose the best audio format if opus isn't available
+        await execAsync(`yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`, {
+          timeout: 600000 // 10 minute timeout for long videos
+        })
+        
+        // Find the actual file that was created (yt-dlp adds extension)
+        let tempFile = `${tempFileBase}.opus`
+        if (!fs.existsSync(tempFile)) {
+          // Try other common extensions
+          const extensions = ['opus', 'webm', 'm4a', 'mp3']
+          tempFile = extensions.find(ext => fs.existsSync(`${tempFileBase}.${ext}`)) ? 
+            `${tempFileBase}.${extensions.find(ext => fs.existsSync(`${tempFileBase}.${ext}`))}` : 
+            tempFile
+        }
+        
+        if (!fs.existsSync(tempFile)) {
+          throw new Error('Audio file was not created by yt-dlp')
+        }
+        
+        // Read the audio file
+        const audioBuffer = fs.readFileSync(tempFile)
+        console.log(`Downloaded audio: ${audioBuffer.length} bytes`)
+        
+        // Determine mime type from file extension
+        const ext = path.extname(tempFile).toLowerCase()
+        const audioMimeType = 
+          ext === '.opus' || ext === '.webm' ? 'audio/webm' :
+          ext === '.mp3' ? 'audio/mpeg' :
+          ext === '.m4a' ? 'audio/mp4' :
+          'audio/webm' // Default to webm
+        
+        // Clean up temp file
+        fs.unlinkSync(tempFile)
+        
+        // Convert audio buffer to base64
+        const base64Audio = audioBuffer.toString('base64')
+        
+        prompt = `Listen to this audio from a YouTube video and generate comprehensive lecture notes.
+Write the notes as if you are directly explaining the content and concepts yourself, using the audio as a reference.
 
 IMPORTANT: At the very beginning of your response, on the first line, provide ONLY the video title in this exact format:
-VIDEO_TITLE: [exact video title here]
+VIDEO_TITLE: ${videoTitleFromInfo}
 
 Then on the next line, start the notes content.
 
 Requirements for the notes:
-- Write in first person or direct explanation style (avoid phrases like "the video says", "the video explains", "here is the content", etc.)
+- Write in first person or direct explanation style (avoid phrases like "the video says", "the audio explains", "here is the content", etc.)
 - Include main topics and concepts covered
 - Include key points and explanations
 - Include important formulas or equations (preserve as written)
@@ -95,19 +165,26 @@ Requirements for the notes:
 - Use bullet points with plain text dashes (-) only
 - Return only the notes content after the VIDEO_TITLE line, no introductory or concluding text`
 
-      // YouTube videos typically require more tokens due to video processing
-      estimatedTokens = 10000
-
-      // Add YouTube URL as fileData
-      parts = [
-        { text: prompt },
-        {
-          fileData: {
-            mimeType: 'video/youtube',
-            fileUri: youtubeUrl,
+        // Audio processing uses much fewer tokens than video (88K vs 910K)
+        // Estimate: ~50-100K tokens for 1 hour of audio vs 900K+ for video
+        estimatedTokens = Math.ceil(audioBuffer.length / 100) + 3000 // Rough estimate
+        
+        // Send audio as inline data instead of video URL
+        parts = [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: audioMimeType,
+              data: base64Audio,
+            },
           },
-        },
-      ]
+        ]
+      } catch (audioError) {
+        console.error('Error extracting audio:', audioError)
+        return res.status(500).json({ 
+          error: 'Failed to extract audio from YouTube video. The video may be unavailable, private, or restricted.' 
+        })
+      }
     } else {
       // File processing (existing logic)
       if (!req.file) {
@@ -280,17 +357,24 @@ Do not add any commentary or explanations, just return the raw extracted text.`
       console.warn(`Skipping token recording - tokenUsage: ${tokenUsage}, userId: ${req.userId}`)
     }
 
-    // For YouTube videos, extract the video title from the response
+    // For YouTube videos, extract the video title from the response or use title from video info
     let videoTitle: string | undefined = undefined
     let notesText = textResponse
     
     if (hasYoutubeUrl) {
-      // Look for VIDEO_TITLE: prefix at the start of the response
-      const titleMatch = textResponse.match(/^VIDEO_TITLE:\s*(.+?)(?:\n|$)/i)
-      if (titleMatch && titleMatch[1]) {
-        videoTitle = titleMatch[1].trim()
-        // Remove the title line from the notes text
+      // Use title from video info if we extracted audio, otherwise try to extract from response
+      if (videoTitleFromInfo) {
+        videoTitle = videoTitleFromInfo
+        // Remove VIDEO_TITLE line from response if present
         notesText = textResponse.replace(/^VIDEO_TITLE:\s*.+?(?:\n|$)/i, '').trim()
+      } else {
+        // Look for VIDEO_TITLE: prefix at the start of the response (for transcript-based processing)
+        const titleMatch = textResponse.match(/^VIDEO_TITLE:\s*(.+?)(?:\n|$)/i)
+        if (titleMatch && titleMatch[1]) {
+          videoTitle = titleMatch[1].trim()
+          // Remove the title line from the notes text
+          notesText = textResponse.replace(/^VIDEO_TITLE:\s*.+?(?:\n|$)/i, '').trim()
+        }
       }
     }
 

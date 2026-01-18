@@ -134,6 +134,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>10 items per category</Text>
                     <Text style={styles.benefitItem}>Limited AI usage</Text>
+                    <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
                   </View>
                   <Pressable 
                     style={[styles.planButton, styles.currentPlanButton]}
@@ -157,8 +158,8 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
+                    <Text style={styles.benefitItem}>~100 hours YouTube transcription</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
-                    <Text style={styles.benefitItem}>Access to beta features</Text>
                   </View>
                   {isPro ? (
                     <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
@@ -232,6 +233,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
               <View style={styles.benefitsList}>
                 <Text style={styles.benefitItem}>10 items per category</Text>
                 <Text style={styles.benefitItem}>Limited AI usage</Text>
+                <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
               </View>
               <Pressable 
                 style={[styles.planButton, styles.currentPlanButton]}
@@ -255,8 +257,8 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
+                    <Text style={styles.benefitItem}>~100 hours YouTube transcription</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
-                    <Text style={styles.benefitItem}>Access to beta features</Text>
                   </View>
               {isPro ? (
                 <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
