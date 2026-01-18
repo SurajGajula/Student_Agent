@@ -273,8 +273,8 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
       console.warn(`Only received ${questions.length} questions, expected 10`)
     }
 
-    // Validate and clean each question
-    questions = questions.filter(q => {
+    // Validate and clean each question (without id first)
+    const cleanedQuestions = questions.filter(q => {
       if (!q.question || !q.type) {
         console.warn('Skipping invalid question:', q)
         return false
@@ -289,7 +289,7 @@ Return ONLY the JSON object, no additional text or markdown formatting.`
 
     // Add IDs to questions
     return {
-      questions: questions.map((q, index) => ({
+      questions: cleanedQuestions.map((q, index) => ({
         ...q,
         id: `q${index + 1}`,
       })) as GeneratedQuestion[],
