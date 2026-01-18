@@ -72,11 +72,11 @@ module.exports = {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.studentagent.app",
+      bundleIdentifier: "com.sfstudio.studentagent.app",
       orientation: "portrait"
     },
     android: {
-      package: "com.studentagent.app",
+      package: "com.sfstudio.studentagent.app",
       orientation: "portrait",
       ...(fs.existsSync('./assets/adaptive-icon.png') && {
         adaptiveIcon: {

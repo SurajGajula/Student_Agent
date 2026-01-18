@@ -22,6 +22,7 @@ import coursesRouter from './routes/courses/index.js' // Courses routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
 import configRouter from './routes/config.js'
+import supportRouter from './routes/support.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -78,6 +79,10 @@ app.use(express.json())
 // Config endpoint (public, no auth required)
 app.use('/api', configRouter)
 
+// Support page and API (must be before SPA routing)
+app.use('/support', supportRouter)
+app.use('/api/support', supportRouter)
+
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)
 app.use('/api', scheduleRouter)
@@ -110,8 +115,8 @@ if (process.env.NODE_ENV === 'production') {
   // This must be last to catch all remaining routes
   // Express 5: Use a function to match all routes not starting with /api
   app.use((req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    // Skip API routes, health check, and support page
+    if (req.path.startsWith('/api') || req.path.startsWith('/health') || req.path.startsWith('/support')) {
       return next()
     }
     // Serve index.html for all other routes

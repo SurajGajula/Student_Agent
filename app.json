@@ -11,10 +11,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.studentagent.app"
+      "bundleIdentifier": "com.sfstudio.studentagent.app"
     },
     "android": {
-      "package": "com.studentagent.app"
+      "package": "com.sfstudio.studentagent.app"
     }
   }
 }
