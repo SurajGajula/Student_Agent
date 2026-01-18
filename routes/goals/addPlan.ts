@@ -49,6 +49,15 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(400).json({ error: 'Courses array is required' })
     }
 
+    // Remove descriptions from courses before storing
+    const coursesWithoutDescriptions = courses.map((rec: any) => ({
+      ...rec,
+      course: {
+        ...rec.course,
+        description: undefined // Remove description field
+      }
+    }))
+
     // Check plan limits for free users
     const { data: usageData } = await supabase
       .from('user_usage')
@@ -80,7 +89,7 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
         query: query.trim(),
         school: schoolTrimmed,
         department: departmentTrimmed,
-        courses: courses, // JSONB handled automatically by Supabase
+        courses: coursesWithoutDescriptions, // JSONB handled automatically by Supabase (without descriptions)
       })
       .select()
       .single()
@@ -90,14 +99,22 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(500).json({ error: 'Failed to add goal', message: error.message })
     }
 
-    // Transform to camelCase
+    // Transform to camelCase and ensure descriptions are removed from courses
+    const coursesCleaned = (data.courses || []).map((rec: any) => ({
+      ...rec,
+      course: {
+        ...rec.course,
+        description: undefined // Ensure description is not included
+      }
+    }))
+
     const newGoal = {
       id: data.id,
       name: data.name,
       query: data.query,
       school: data.school,
       department: data.department,
-      courses: data.courses || [],
+      courses: coursesCleaned,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }

@@ -38,17 +38,27 @@ router.get('/list', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(500).json({ error: 'Failed to fetch goals', message: error.message })
     }
 
-    // Transform to camelCase
-    const goals = (data || []).map(goal => ({
-      id: goal.id,
-      name: goal.name,
-      query: goal.query,
-      school: goal.school,
-      department: goal.department,
-      courses: goal.courses || [],
-      createdAt: goal.created_at,
-      updatedAt: goal.updated_at,
-    }))
+    // Transform to camelCase and remove descriptions from courses
+    const goals = (data || []).map(goal => {
+      const coursesCleaned = (goal.courses || []).map((rec: any) => ({
+        ...rec,
+        course: {
+          ...rec.course,
+          description: undefined // Remove description field
+        }
+      }))
+
+      return {
+        id: goal.id,
+        name: goal.name,
+        query: goal.query,
+        school: goal.school,
+        department: goal.department,
+        courses: coursesCleaned,
+        createdAt: goal.created_at,
+        updatedAt: goal.updated_at,
+      }
+    })
 
     res.json({ goals })
   } catch (error) {

@@ -163,9 +163,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
                   </View>
                 </View>
                 <Text style={styles.courseName}>{rec.course.name}</Text>
-                {rec.course.description && (
-                  <Text style={styles.courseDescription}>{rec.course.description}</Text>
-                )}
                 <View style={styles.reasoningContainer}>
                   <Text style={styles.reasoningLabel}>Why this course:</Text>
                   <Text style={styles.reasoning}>{rec.reasoning}</Text>
