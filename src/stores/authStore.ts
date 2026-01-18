@@ -97,63 +97,101 @@ const clearAllStores = async () => {
   }
 
   // Use dynamic imports to avoid require cycles
-  const [
-    { useFolderStore },
-    { useClassesStore },
-    { useNotesStore },
-    { useTestsStore },
-    { useFlashcardsStore },
-    { useGoalsStore },
-  ] = await Promise.all([
-    import('./folderStore'),
-    import('./classesStore'),
-    import('./notesStore'),
-    import('./testsStore'),
-    import('./flashcardsStore'),
-    import('./goalsStore'),
-  ])
+  // Wrap in try-catch to handle module resolution errors during logout
+  try {
+    const [
+      folderStoreModule,
+      classesStoreModule,
+      notesStoreModule,
+      testsStoreModule,
+      flashcardsStoreModule,
+      goalsStoreModule,
+    ] = await Promise.allSettled([
+      import('./folderStore'),
+      import('./classesStore'),
+      import('./notesStore'),
+      import('./testsStore'),
+      import('./flashcardsStore'),
+      import('./goalsStore'),
+    ])
 
-  // Reset folder store
-  useFolderStore.setState({
-    folders: [],
-    isLoading: false,
-    error: null,
-  })
+    // Reset stores only if imports succeeded
+    // Wrap each setState in try-catch to handle errors gracefully
+    if (folderStoreModule.status === 'fulfilled' && folderStoreModule.value?.useFolderStore) {
+      try {
+        folderStoreModule.value.useFolderStore.setState({
+          folders: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting folderStore:', err)
+      }
+    }
 
-  // Reset classes store
-  useClassesStore.setState({
-    classes: [],
-    isLoading: false,
-    error: null,
-  })
+    if (classesStoreModule.status === 'fulfilled' && classesStoreModule.value?.useClassesStore) {
+      try {
+        classesStoreModule.value.useClassesStore.setState({
+          classes: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting classesStore:', err)
+      }
+    }
 
-  // Reset notes store
-  useNotesStore.setState({
-    notes: [],
-    isLoading: false,
-    error: null,
-  })
+    if (notesStoreModule.status === 'fulfilled' && notesStoreModule.value?.useNotesStore) {
+      try {
+        notesStoreModule.value.useNotesStore.setState({
+          notes: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting notesStore:', err)
+      }
+    }
 
-  // Reset tests store
-  useTestsStore.setState({
-    tests: [],
-    isLoading: false,
-    error: null,
-  })
+    if (testsStoreModule.status === 'fulfilled' && testsStoreModule.value?.useTestsStore) {
+      try {
+        testsStoreModule.value.useTestsStore.setState({
+          tests: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting testsStore:', err)
+      }
+    }
 
-  // Reset flashcards store
-  useFlashcardsStore.setState({
-    flashcardSets: [],
-    isLoading: false,
-    error: null,
-  })
+    if (flashcardsStoreModule.status === 'fulfilled' && flashcardsStoreModule.value?.useFlashcardsStore) {
+      try {
+        flashcardsStoreModule.value.useFlashcardsStore.setState({
+          flashcardSets: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting flashcardsStore:', err)
+      }
+    }
 
-  // Reset goals store
-  useGoalsStore.setState({
-    goals: [],
-    isLoading: false,
-    error: null,
-  })
+    if (goalsStoreModule.status === 'fulfilled' && goalsStoreModule.value?.useGoalsStore) {
+      try {
+        goalsStoreModule.value.useGoalsStore.setState({
+          goals: [],
+          isLoading: false,
+          error: null,
+        })
+      } catch (err) {
+        console.warn('[authStore] Error resetting goalsStore:', err)
+      }
+    }
+  } catch (error) {
+    console.warn('[authStore] Error clearing stores:', error)
+    // Continue with logout even if store clearing fails
+  }
 }
 
 // Helper function to sync Zustand state with actual Supabase session
