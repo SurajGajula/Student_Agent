@@ -41,6 +41,13 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
     }
   }, [isLoggedIn, syncFromSupabase])
 
+  // Reset local state when logged out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setCurrentGoalId(null)
+    }
+  }, [isLoggedIn])
+
   // Note: fetchUsage is already called by syncAllStores in initializeAuth,
   // so we don't need to call it here to avoid duplicates
   // The usage store will be populated when the app initializes

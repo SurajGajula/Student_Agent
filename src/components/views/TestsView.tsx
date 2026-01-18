@@ -50,6 +50,19 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     return () => subscription?.remove()
   }, [])
 
+  // Reset local state when logged out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setCurrentTestId(null)
+      setCurrentFolderId(null)
+      setCurrentQuestionIndex(0)
+      setUserResponses({})
+      setGradedQuestions({})
+      setShowResults(false)
+      setIsFolderModalOpen(false)
+    }
+  }, [isLoggedIn])
+
   const handleTestClick = (testId: string) => {
     setCurrentTestId(testId)
     setCurrentQuestionIndex(0)

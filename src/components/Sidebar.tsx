@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Pressable, ScrollView, Platform, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../stores/authStore'
@@ -21,6 +21,10 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const isMobile = windowWidth <= 768
   const insets = useSafeAreaInsets()
+  const usernameScrollRef = useRef<{ scrollElement: HTMLElement | null; scrollInterval: number | null; cleanup?: () => void }>({
+    scrollElement: null,
+    scrollInterval: null
+  })
 
   // Update window width on resize
   useEffect(() => {
@@ -29,6 +33,86 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
     })
     return () => subscription?.remove()
   }, [])
+
+  // Setup username scroll behavior on web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+
+    // Wait for DOM to be ready
+    const timeoutId = setTimeout(() => {
+      const usernameContainer = document.querySelector('[data-username-container]') as HTMLElement
+      const scrollElement = document.querySelector('[data-username-scroll]') as HTMLElement
+      
+      if (!usernameContainer || !scrollElement) return
+
+      usernameScrollRef.current.scrollElement = scrollElement
+
+      const handleMouseEnter = () => {
+        if (usernameScrollRef.current.scrollInterval) {
+          clearInterval(usernameScrollRef.current.scrollInterval)
+        }
+
+        const maxScroll = scrollElement.scrollWidth - scrollElement.clientWidth
+        if (maxScroll <= 0) return // No scrolling needed
+
+        const scrollSpeed = 1
+        let isScrollingToEnd = true
+
+        const scrollAnimation = () => {
+          if (!scrollElement) return
+          const max = scrollElement.scrollWidth - scrollElement.clientWidth
+          
+          if (isScrollingToEnd) {
+            if (scrollElement.scrollLeft >= max) {
+              // Reached end, cycle back to beginning
+              isScrollingToEnd = false
+              scrollElement.scrollTo({ left: 0, behavior: 'smooth' })
+              setTimeout(() => {
+                isScrollingToEnd = true
+              }, 500)
+            } else {
+              scrollElement.scrollLeft += scrollSpeed
+            }
+          }
+        }
+
+        usernameScrollRef.current.scrollInterval = window.setInterval(scrollAnimation, 16)
+      }
+
+      const handleMouseLeave = () => {
+        if (usernameScrollRef.current.scrollInterval) {
+          clearInterval(usernameScrollRef.current.scrollInterval)
+          usernameScrollRef.current.scrollInterval = null
+        }
+        // Reset to beginning
+        if (scrollElement) {
+          scrollElement.scrollTo({ left: 0, behavior: 'smooth' })
+        }
+      }
+
+      usernameContainer.addEventListener('mouseenter', handleMouseEnter)
+      usernameContainer.addEventListener('mouseleave', handleMouseLeave)
+
+      // Store cleanup function
+      usernameScrollRef.current.cleanup = () => {
+        usernameContainer.removeEventListener('mouseenter', handleMouseEnter)
+        usernameContainer.removeEventListener('mouseleave', handleMouseLeave)
+        if (usernameScrollRef.current.scrollInterval) {
+          clearInterval(usernameScrollRef.current.scrollInterval)
+        }
+      }
+    }, 100)
+
+    return () => {
+      clearTimeout(timeoutId)
+      if (usernameScrollRef.current.scrollInterval) {
+        clearInterval(usernameScrollRef.current.scrollInterval)
+      }
+      if (usernameScrollRef.current.cleanup) {
+        usernameScrollRef.current.cleanup()
+      }
+    }
+  }, [username, Platform.OS])
 
 
   const handleLogout = async () => {
@@ -113,8 +197,22 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
       <View style={styles.sidebarAuthSection}>
       {isLoggedIn ? (
           <>
-            <View style={styles.sidebarUserInfo}>
-              <Text style={styles.sidebarUsername}>{username}</Text>
+            <View 
+              style={styles.sidebarUserInfo}
+              {...(Platform.OS === 'web' && { 'data-username-container': true } as any)}
+            >
+              {Platform.OS === 'web' ? (
+                <View style={styles.usernameContainerWeb}>
+                  <View 
+                    style={styles.usernameScrollContainer}
+                    {...(Platform.OS === 'web' && { 'data-username-scroll': true } as any)}
+                  >
+                    <Text style={styles.sidebarUsername}>{username}</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.sidebarUsername}>{username}</Text>
+              )}
               <Pressable 
                 style={styles.sidebarUpgradeButton}
                 onPress={handleUpgrade}
@@ -278,14 +376,30 @@ const styles = StyleSheet.create({
       paddingHorizontal: 18,
     }),
   },
+  usernameContainerWeb: {
+    flex: 1,
+    position: 'relative' as any,
+    overflow: 'hidden' as any,
+    minWidth: 0, // Allow shrinking
+  },
+  usernameScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      overflowX: 'auto' as any,
+      overflowY: 'hidden' as any,
+      scrollbarWidth: 'none' as any,
+      msOverflowStyle: 'none' as any,
+      WebkitOverflowScrolling: 'touch' as any,
+    }),
+  },
   sidebarUsername: {
     color: '#0f0f0f',
     fontSize: 15,
     fontWeight: '300',
-    flex: 1,
     textAlign: 'left',
     ...(Platform.OS === 'web' && {
       fontSize: 16,
+      whiteSpace: 'nowrap' as any,
+      display: 'inline-block' as any,
     }),
   },
   sidebarUpgradeButton: {

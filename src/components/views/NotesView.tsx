@@ -72,6 +72,19 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
     return () => subscription?.remove()
   }, [])
 
+  // Reset local state when logged out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setCurrentFolderId(null)
+      setCurrentNoteId(null)
+      setIsNoteModalOpen(false)
+      setIsFolderModalOpen(false)
+      setIsUploadModalOpen(false)
+      setIsEditorFocused(false)
+      setSelection({ start: 0, end: 0 })
+    }
+  }, [isLoggedIn])
+
   // Initialize file input for web
   useEffect(() => {
     if (Platform.OS === 'web') {

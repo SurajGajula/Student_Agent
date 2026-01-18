@@ -615,6 +615,28 @@ body {
     flex: 1;
 }
 
+/* Username container with blur effect */
+[data-username-container] {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    mask-image: linear-gradient(to right, black 0%, black calc(100% - 30px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 0%, black calc(100% - 30px), transparent 100%);
+}
+
+[data-username-scroll] {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+[data-username-scroll]::-webkit-scrollbar {
+    display: none;
+}
+
 .sidebar-upgrade-button {
     padding: 6px 12px;
     background-color: #0f0f0f;

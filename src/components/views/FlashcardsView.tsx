@@ -55,6 +55,22 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     return () => subscription?.remove()
   }, [])
 
+  // Reset local state when logged out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setCurrentSetId(null)
+      setCurrentFolderId(null)
+      setCurrentCardIndex(0)
+      setIsFlipped(false)
+      setIsTransitioning(false)
+      setPrevCardIndex(null)
+      setIsFolderModalOpen(false)
+      flipAnim.setValue(0)
+      slideAnim.setValue(0)
+      prevSlideAnim.setValue(0)
+    }
+  }, [isLoggedIn])
+
   // Handle flip animation
   useEffect(() => {
     Animated.timing(flipAnim, {
