@@ -8,32 +8,6 @@ const __dirname = path.dirname(__filename)
 
 const router = express.Router()
 
-// Serve the support HTML page
-router.get('/', (req: Request, res: Response) => {
-  // Try multiple possible paths (works in both dev and production)
-  const possiblePaths = [
-    path.join(__dirname, '..', 'public', 'support.html'),
-    path.join(process.cwd(), 'public', 'support.html'),
-    path.join(process.cwd(), 'dist', '..', 'public', 'support.html'),
-  ]
-  
-  let supportHtmlPath: string | null = null
-  for (const possiblePath of possiblePaths) {
-    if (fs.existsSync(possiblePath)) {
-      supportHtmlPath = possiblePath
-      break
-    }
-  }
-  
-  if (supportHtmlPath) {
-    res.sendFile(path.resolve(supportHtmlPath))
-  } else {
-    // Fallback if file doesn't exist - log for debugging
-    console.error('Support HTML not found. Tried paths:', possiblePaths)
-    res.status(404).send('Support page not found. Please contact surajgajula@thesfstudio.com')
-  }
-})
-
 // Handle support form submissions
 router.post('/submit', (req: Request, res: Response) => {
   const { name, email, subject, message } = req.body

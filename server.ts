@@ -79,8 +79,7 @@ app.use(express.json())
 // Config endpoint (public, no auth required)
 app.use('/api', configRouter)
 
-// Support page and API (must be before SPA routing and static files)
-app.use('/support', supportRouter)
+// Support API endpoint (page is handled by React SPA)
 app.use('/api/support', supportRouter)
 
 // API Routes (must be before static file serving)
@@ -115,8 +114,8 @@ if (process.env.NODE_ENV === 'production') {
   // This must be last to catch all remaining routes
   // Express 5: Use a function to match all routes not starting with /api
   app.use((req, res, next) => {
-    // Skip API routes, health check, and support page
-    if (req.path.startsWith('/api') || req.path.startsWith('/health') || req.path.startsWith('/support')) {
+    // Skip API routes and health check
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
       return next()
     }
     // Serve index.html for all other routes

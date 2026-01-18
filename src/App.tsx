@@ -12,6 +12,7 @@ import GoalsView from './components/views/GoalsView'
 import SettingsView from './components/views/SettingsView'
 import PrivacyPolicyView from './components/views/PrivacyPolicyView'
 import TermsOfServiceView from './components/views/TermsOfServiceView'
+import SupportView from './components/views/SupportView'
 import ChatBar from './components/ChatBar'
 import LoginModal from './components/modals/LoginModal'
 import UpgradeModal from './components/modals/UpgradeModal'
@@ -23,6 +24,7 @@ const getViewFromUrl = (): string => {
     const path = window.location.pathname
     if (path === '/terms') return 'terms'
     if (path === '/privacy') return 'privacy'
+    if (path === '/support') return 'support'
     if (path === '/settings') return 'settings'
     if (path === '/tests') return 'tests'
     if (path === '/flashcards') return 'flashcards'
@@ -382,7 +384,8 @@ function AppContent() {
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
         {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
         {currentView === 'terms' && <TermsOfServiceView onNavigate={handleNavigate} />}
-        {currentView !== 'privacy' && currentView !== 'terms' && <ChatBar onOpenLoginModal={openLoginModal} />}
+        {currentView === 'support' && <SupportView onNavigate={handleNavigate} />}
+        {currentView !== 'privacy' && currentView !== 'terms' && currentView !== 'support' && <ChatBar onOpenLoginModal={openLoginModal} />}
       </View>
       <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />
       <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} />
