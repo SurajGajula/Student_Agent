@@ -62,7 +62,7 @@ function BetaModal({ isOpen, onClose }: BetaModalProps) {
               
               <View style={styles.body}>
                 <Text style={styles.message}>
-                  The Goals feature is currently in beta and supports CS courses from UC Berkeley, UC Santa Cruz, and Stanford.
+                  The Goals feature is currently in beta and supports CS and Engineering courses from UC Berkeley, UC Santa Cruz, Stanford, Western University, and University of Waterloo.
                 </Text>
                 <Text style={styles.submessage}>
                   We're working on expanding support to more schools and departments. Stay tuned for updates!
@@ -110,7 +110,7 @@ function BetaModal({ isOpen, onClose }: BetaModalProps) {
             
             <View style={styles.body}>
               <Text style={styles.message}>
-                The Goals feature is currently in beta and supports CS courses from UC Berkeley, UC Santa Cruz, and Stanford.
+                The Goals feature is currently in beta and supports CS and Engineering courses from UC Berkeley, UC Santa Cruz, Stanford, Western University, and University of Waterloo.
               </Text>
               <Text style={styles.submessage}>
                 We're working on expanding support to more schools and departments. Stay tuned for updates!
@@ -131,15 +131,12 @@ function BetaModal({ isOpen, onClose }: BetaModalProps) {
 
 const styles = StyleSheet.create({
   modalContainer: {
-    position: 'absolute',
+    position: Platform.OS === 'web' ? ('fixed' as any) : 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     zIndex: 10000,
-    ...(Platform.OS === 'web' && {
-      position: 'fixed',
-    }),
   },
   overlay: {
     flex: 1,
