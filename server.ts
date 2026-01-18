@@ -79,7 +79,7 @@ app.use(express.json())
 // Config endpoint (public, no auth required)
 app.use('/api', configRouter)
 
-// Support page and API (must be before SPA routing)
+// Support page and API (must be before SPA routing and static files)
 app.use('/support', supportRouter)
 app.use('/api/support', supportRouter)
 
