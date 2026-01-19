@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import CreateFolderModal from '../modals/CreateFolderModal'
 import { useTestsStore, type Test } from '../../stores/testsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -18,13 +17,12 @@ interface TestsViewProps {
 function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   const [currentTestId, setCurrentTestId] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userResponses, setUserResponses] = useState<Record<string, string>>({})
   const [gradedQuestions, setGradedQuestions] = useState<Record<string, boolean>>({})
   const [showResults, setShowResults] = useState(false)
   const { tests, removeTest, getTestById, addTest } = useTestsStore()
-  const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
+  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   const { notes } = useNotesStore()
   const [isGeneratingTest, setIsGeneratingTest] = useState(false)
@@ -59,7 +57,6 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
       setUserResponses({})
       setGradedQuestions({})
       setShowResults(false)
-      setIsFolderModalOpen(false)
     }
   }, [isLoggedIn])
 
@@ -94,25 +91,7 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     setCurrentFolderId(folderId)
   }
 
-  const handleCreateFolder = () => {
-    if (!isLoggedIn) {
-      onOpenLoginModal?.()
-      return
-    }
-    setIsFolderModalOpen(true)
-  }
-
-  const handleCloseFolderModal = () => {
-    setIsFolderModalOpen(false)
-  }
-
-  const handleSubmitFolder = async (folderName: string) => {
-    try {
-      await addFolder(folderName, 'test')
-    } catch (error) {
-      console.error('Failed to create folder:', error)
-    }
-  }
+  // Folder creation modal removed
 
   const handleResponseChange = (questionId: string, response: string, questionType?: 'multiple-choice' | 'short-answer') => {
     setUserResponses(prev => ({
@@ -774,12 +753,6 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
             { width: windowWidth } // Use actual screen width dynamically
           ]
         ]}>
-          {/* <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
-            <View style={isMobile && styles.iconWrapperMobile}>
-            <FolderIcon />
-            </View>
-            <Text style={[styles.createFolderButtonText, isMobile && styles.buttonTextMobile]}>Create Folder</Text>
-          </Pressable> */}
         </View>
       </View>
 
@@ -841,11 +814,6 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
         />
       )}
 
-      <CreateFolderModal
-        isOpen={isFolderModalOpen}
-        onClose={handleCloseFolderModal}
-        onSubmit={handleSubmitFolder}
-      />
     </View>
   )
 }
@@ -943,22 +911,6 @@ const styles = StyleSheet.create({
   },
   toggleButtonText: {
     fontSize: 14,
-    fontWeight: '300',
-    color: '#0f0f0f',
-  },
-  createFolderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-    backgroundColor: 'transparent',
-  },
-  createFolderButtonText: {
-    fontSize: 16,
     fontWeight: '300',
     color: '#0f0f0f',
   },

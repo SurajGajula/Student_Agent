@@ -12,7 +12,6 @@ import indexRouter from './routes/index.js'
 import scheduleRouter from './routes/schedule.js'
 import notesParseRouter from './routes/notes.js' // Keep parse-notes route
 import notesCRUDRouter from './routes/notes/index.js' // New CRUD routes
-import classesCRUDRouter from './routes/classes/index.js' // New classes CRUD routes
 import chatRouter from './routes/chat/index.js'
 import testsRouter from './routes/tests/index.js' // Updated to use index
 import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
@@ -87,7 +86,6 @@ app.use('/health', healthRouter)
 app.use('/api', scheduleRouter)
 app.use('/api', notesParseRouter) // Keep parse-notes route
 app.use('/api/notes', notesCRUDRouter) // New notes CRUD routes
-app.use('/api/classes', classesCRUDRouter) // New classes CRUD routes
 app.use('/api/folders', foldersCRUDRouter) // New folders CRUD routes
 app.use('/api', chatRouter)
 app.use('/api/tests', testsRouter) // Includes generate + CRUD

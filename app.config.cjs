@@ -71,7 +71,7 @@ module.exports = {
       "**/*"
     ],
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: "com.sfstudio.studentagent.app",
       orientation: "portrait"
     },

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, Keyboard } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AddNoteModal from '../modals/AddNoteModal'
-import CreateFolderModal from '../modals/CreateFolderModal'
 import UploadNotesModal from '../modals/UploadNotesModal'
 import { useNotesStore, type Note } from '../../stores/notesStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
@@ -29,7 +28,6 @@ const SpinnerIcon = () => (
 
 function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
-  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
@@ -37,7 +35,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const { notes, addNote, updateNoteContentLocal, updateNoteContent, removeNote, moveNoteToFolder } = useNotesStore()
-  const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
+  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   const { planName } = useUsageStore()
   const isPro = planName === 'pro'
@@ -78,7 +76,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
       setCurrentFolderId(null)
       setCurrentNoteId(null)
       setIsNoteModalOpen(false)
-      setIsFolderModalOpen(false)
       setIsUploadModalOpen(false)
       setIsEditorFocused(false)
       setSelection({ start: 0, end: 0 })
@@ -452,25 +449,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
     }
   }
 
-  const handleCreateFolder = () => {
-    if (!isLoggedIn) {
-      onOpenLoginModal()
-      return
-    }
-    setIsFolderModalOpen(true)
-  }
-
-  const handleCloseFolderModal = () => {
-    setIsFolderModalOpen(false)
-  }
-
-  const handleSubmitFolder = async (folderName: string) => {
-    try {
-      await addFolder(folderName, 'note')
-    } catch (error) {
-      console.error('Failed to create folder:', error)
-    }
-  }
+  // Folder creation modal removed
 
   const handleDeleteFolder = async (folderId: string) => {
     const folder = folders.find(f => f.id === folderId)
@@ -970,12 +949,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             { width: windowWidth } // Use actual screen width dynamically
           ]
         ]}>
-          {/* <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
-            <View style={isMobile && styles.iconWrapperMobile}>
-            <FolderIcon />
-            </View>
-            <Text style={[styles.createFolderButtonText, isMobile && styles.buttonTextMobile]}>Create Folder</Text>
-          </Pressable> */}
           <Pressable 
             style={[styles.uploadButton, isMobile && styles.buttonMobile]}
             onPress={handleUploadNotes}
@@ -1118,11 +1091,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
         onClose={handleCloseNoteModal}
         onSubmit={handleSubmitNote}
       />
-      <CreateFolderModal
-        isOpen={isFolderModalOpen}
-        onClose={handleCloseFolderModal}
-        onSubmit={handleSubmitFolder}
-      />
       <UploadNotesModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
@@ -1211,22 +1179,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     alignItems: 'center',
-  },
-  createFolderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-    backgroundColor: 'transparent',
-  },
-  createFolderButtonText: {
-    fontSize: 16,
-    fontWeight: '300',
-    color: '#0f0f0f',
   },
   uploadButton: {
     flexDirection: 'row',

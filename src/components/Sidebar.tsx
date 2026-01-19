@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useUsageStore } from '../stores/usageStore'
 import UpgradeModal from './modals/UpgradeModal'
 import { NotesIcon, TestsIcon, FlashcardsIcon, GoalsIcon, SettingsIcon, LogoutIcon, LoginIcon } from './icons'
+import { Text as RNText } from 'react-native'
 
 interface SidebarProps {
   onNavigate: (view: string) => void
@@ -191,6 +192,7 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
               <Text style={styles.betaBadgeText}>BETA</Text>
             </View>
           </Pressable>
+
         </View>
       </ScrollView>
 
@@ -222,6 +224,15 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
                 </Text>
               </Pressable>
             </View>
+            <Pressable 
+              style={styles.sidebarButton}
+              onPress={() => handleNavigate('chat-help')}
+            >
+              <View style={styles.iconWrapper}>
+                <RNText style={styles.iconText}>?</RNText>
+              </View>
+              <Text style={styles.sidebarButtonText}>Chat Help</Text>
+            </Pressable>
             <Pressable 
               style={styles.sidebarButton}
               onPress={handleSettings}
@@ -341,6 +352,11 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' && {
       transform: [{ scale: 1.15 }],
     }),
+  },
+  iconText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f0f0f',
   },
   sidebarButtonText: {
     color: '#0f0f0f',

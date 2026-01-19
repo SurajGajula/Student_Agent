@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, Animated, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import CreateFolderModal from '../modals/CreateFolderModal'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -16,13 +15,12 @@ interface FlashcardsViewProps {
 function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [currentSetId, setCurrentSetId] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
-  const { getFoldersByType, addFolder, removeFolder } = useFolderStore()
+  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   
   // Animation refs
@@ -64,7 +62,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
       setIsFlipped(false)
       setIsTransitioning(false)
       setPrevCardIndex(null)
-      setIsFolderModalOpen(false)
       flipAnim.setValue(0)
       slideAnim.setValue(0)
       prevSlideAnim.setValue(0)
@@ -102,25 +99,7 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     setCurrentFolderId(folderId)
   }
 
-  const handleCreateFolder = () => {
-    if (!isLoggedIn) {
-      onOpenLoginModal?.()
-      return
-    }
-    setIsFolderModalOpen(true)
-  }
-
-  const handleCloseFolderModal = () => {
-    setIsFolderModalOpen(false)
-  }
-
-  const handleSubmitFolder = async (folderName: string) => {
-    try {
-      await addFolder(folderName, 'flashcard')
-    } catch (error) {
-      console.error('Failed to create folder:', error)
-    }
-  }
+  // Folder creation modal removed
 
   const handleDeleteFolder = async (folderId: string) => {
     const folder = folders.find(f => f.id === folderId)
@@ -406,11 +385,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
             </Pressable>
           </View>
         </View>
-        <CreateFolderModal
-          isOpen={isFolderModalOpen}
-          onClose={handleCloseFolderModal}
-          onSubmit={handleSubmitFolder}
-        />
       </View>
     )
   }
@@ -456,12 +430,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
             { width: windowWidth } // Use actual screen width dynamically
           ]
         ]}>
-          {/* <Pressable style={[styles.createFolderButton, isMobile && styles.buttonMobile]} onPress={handleCreateFolder}>
-            <View style={isMobile && styles.iconWrapperMobile}>
-            <FolderIcon />
-            </View>
-            <Text style={[styles.createFolderButtonText, isMobile && styles.buttonTextMobile]}>Create Folder</Text>
-          </Pressable> */}
         </View>
       </View>
 
@@ -523,11 +491,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
         />
       )}
 
-      <CreateFolderModal
-        isOpen={isFolderModalOpen}
-        onClose={handleCloseFolderModal}
-        onSubmit={handleSubmitFolder}
-      />
     </View>
   )
 }
@@ -610,22 +573,6 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
     minHeight: 44, // Match NotesView button height (paddingVertical: 12 * 2 + text/icon height)
-  },
-  createFolderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0d0d0',
-    backgroundColor: 'transparent',
-  },
-  createFolderButtonText: {
-    fontSize: 16,
-    fontWeight: '300',
-    color: '#0f0f0f',
   },
   studyContainer: {
     flex: 1,

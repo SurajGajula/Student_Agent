@@ -8,12 +8,18 @@ import {
 } from '../../services/gemini.js'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth.js'
 import { checkTokenLimit, recordTokenUsage } from '../../services/usageTracking.js'
+import { buildContext } from './context/contextBuilder.js'
+import capabilityRegistry from './capabilities/index.js'
 
 interface VertexAIResponse {
   candidates?: Array<{
     content?: {
       parts?: Array<{
         text?: string
+        functionCall?: {
+          name: string
+          args: Record<string, any>
+        }
       }>
     }
     finishReason?: string
@@ -50,13 +56,16 @@ router.post('/route', authenticateUser, async (req: AuthenticatedRequest, res: R
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const { message, mentions } = req.body
+    const { message, mentions, pageContext } = req.body
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' })
     }
 
     const hasMentions = mentions && Array.isArray(mentions) && mentions.length > 0
+
+    // Build context from user profile, page context, and database
+    const chatContext = await buildContext(req.userId, pageContext, mentions)
 
     // Check token limit before making API call
     const estimatedTokens = 500 // Intent routing is lightweight
@@ -79,54 +88,27 @@ router.post('/route', authenticateUser, async (req: AuthenticatedRequest, res: R
       )
     }
 
-    // Build prompt for intent classification
-    const prompt = `You are an intent classifier for a student study assistant application. Analyze the user's message and determine their intent.
+    // Get all capabilities from registry (Vertex AI function calling format)
+    const functionDeclarations = capabilityRegistry.getFunctionDeclarations()
 
-Available capabilities:
-1. **test** - Generate a test/quiz from notes (requires a note mention like @[note name])
-2. **flashcard** - Generate flashcards from notes (requires a note mention like @[note name])
-3. **course_search** - Search for relevant courses based on career goals or interests
-4. **none** - The message doesn't match any of the above capabilities
+    // Build prompt for intent classification with context
+    const contextInfo = []
+    if (chatContext.user.planName) {
+      contextInfo.push(`User plan: ${chatContext.user.planName}`)
+    }
+    if (chatContext.page?.currentView) {
+      contextInfo.push(`Current page: ${chatContext.page.currentView}`)
+    }
+    if (hasMentions) {
+      contextInfo.push(`Note mentions: ${mentions.map((m: any) => m.noteName).join(', ')}`)
+    }
 
+    const prompt = `You are an intent classifier for a student study assistant application. Analyze the user's message and determine which function to call.
+
+${contextInfo.length > 0 ? `Context:\n${contextInfo.join('\n')}\n` : ''}
 User's message: "${message}"
-Has note mentions: ${hasMentions ? 'Yes' : 'No'}
 
-Instructions:
-- If the user wants to create a test/quiz from notes AND mentions are present, respond with intent: "test"
-- If the user wants to create flashcards from notes AND mentions are present, respond with intent: "flashcard"
-- If the user is asking about courses, course recommendations, career-related courses, or course search, respond with intent: "course_search" and extract:
-  * school: The university name (ONLY if mentioned in the message, leave undefined if not specified)
-  * department: The department/major (ONLY if mentioned in the message, leave undefined if not specified)
-- If the message doesn't clearly match any capability, respond with intent: "none"
-
-For course_search intent, extract the school and department from the message ONLY if explicitly mentioned. Common variations:
-- "Stanford CS courses", "MIT CS", "Berkeley Computer Science" → extract school and department
-- "CS courses", "Computer Science courses" → extract only department, leave school undefined
-- "courses for AI career" → leave both undefined (no school/department mentioned)
-- DO NOT default to any values if school or department are not mentioned
-
-IMPORTANT: Be flexible with phrasing. Users can express the same intent in many ways:
-- "turn @[note] into a test" = test
-- "make a quiz from @[note]" = test
-- "create flashcards from @[note]" = flashcard
-- "I want flashcards for @[note]" = flashcard
-- "find courses for AI career" = course_search (no school/department - leave undefined)
-- "what classes should I take to work at OpenAI" = course_search (no school/department - leave undefined)
-- "recommend stanford CS courses" = course_search (school: "Stanford", department: "CS")
-- "MIT CS courses for machine learning" = course_search (school: "MIT", department: "CS")
-- "Berkeley Computer Science courses" = course_search (school: "Berkeley", department: "CS")
-- "find CS courses at MIT" = course_search (school: "MIT", department: "CS")
-
-Respond with ONLY a valid JSON object in this exact format:
-{
-  "intent": "test" | "flashcard" | "course_search" | "none",
-  "school": "University Name" (only for course_search if mentioned, omit if not specified),
-  "department": "Department" (only for course_search if mentioned, omit if not specified),
-  "confidence": 0.0-1.0,
-  "reasoning": "brief explanation"
-}
-
-Return ONLY the JSON object, no other text or markdown formatting.`
+Analyze the user's message and call the appropriate function. If the message doesn't match any capability, do not call any function.`
 
     const accessToken = await getAccessToken()
     const location = 'us-central1'
@@ -151,10 +133,14 @@ Return ONLY the JSON object, no other text or markdown formatting.`
           role: 'user',
           parts: [{ text: prompt }],
         }],
+        tools: [
+          {
+            functionDeclarations,
+          },
+        ],
         generationConfig: {
           temperature: 0.1, // Lower temperature for more consistent classification
           maxOutputTokens: 500, // Intent routing doesn't need much output
-          responseMimeType: 'application/json',
         },
       }),
     })
@@ -178,57 +164,104 @@ Return ONLY the JSON object, no other text or markdown formatting.`
 
     const data = (await response.json()) as VertexAIResponse
     
-    let textResponse = ''
+    // Parse function call response
+    let intentResult: IntentResponse
+    
     if (data.candidates && data.candidates[0] && data.candidates[0].content) {
       const content = data.candidates[0].content
-      if (content.parts && content.parts[0]) {
-        textResponse = content.parts[0].text || ''
+      const parts = content.parts || []
+      
+      // Look for function call in response
+      const functionCall = parts.find(part => part.functionCall)
+      
+      if (functionCall && functionCall.functionCall) {
+        const { name, args } = functionCall.functionCall
+        
+        // Map function name to intent
+        if (name === 'generate_test') {
+          // Validate that mentions are present
+          if (!hasMentions) {
+            intentResult = {
+              intent: 'none',
+              confidence: 0,
+              reasoning: 'Test generation requires note mentions'
+            }
+          } else {
+            // Validate mentions array exists and has items
+            const mentionArray = Array.isArray(mentions) ? mentions : []
+            if (mentionArray.length === 0) {
+              intentResult = {
+                intent: 'none',
+                confidence: 0,
+                reasoning: 'Test generation requires note mentions'
+              }
+            } else {
+              intentResult = {
+                intent: 'test',
+                confidence: 0.9,
+                reasoning: 'User wants to generate a test from notes'
+              }
+              // Frontend will use mentions as before for backward compatibility
+            }
+          }
+        } else if (name === 'generate_flashcard') {
+          if (!hasMentions) {
+            intentResult = {
+              intent: 'none',
+              confidence: 0,
+              reasoning: 'Flashcard generation requires note mentions'
+            }
+          } else {
+            intentResult = {
+              intent: 'flashcard',
+              confidence: 0.9,
+              reasoning: 'User wants to generate flashcards from notes'
+            }
+          }
+        } else if (name === 'search_courses') {
+          intentResult = {
+            intent: 'course_search',
+            school: args.school || undefined,
+            department: args.department || undefined,
+            confidence: 0.9,
+            reasoning: 'User wants to search for courses'
+          }
+        } else {
+          intentResult = {
+            intent: 'none',
+            confidence: 0,
+            reasoning: `Unknown function called: ${name}`
+          }
+        }
       } else {
-        throw new Error('Unexpected response format from Vertex AI: missing parts')
+        // No function call - user message doesn't match any capability
+        intentResult = {
+          intent: 'none',
+          confidence: 0.8,
+          reasoning: 'Message does not match any available capability'
+        }
       }
     } else {
       console.error('Unexpected Vertex AI response structure:', JSON.stringify(data, null, 2))
-      throw new Error('Unexpected response format from Vertex AI')
-    }
-
-    console.log('Intent routing response:', textResponse)
-
-    // Parse JSON response
-    let intentResult: IntentResponse
-    try {
-      // Clean the response - remove markdown code blocks if present
-      let cleanedResponse = textResponse.trim()
-      if (cleanedResponse.startsWith('```json')) {
-        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '')
-      } else if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '')
-      }
-
-      intentResult = JSON.parse(cleanedResponse) as IntentResponse
-
-      // Validate intent value
-      if (!['test', 'flashcard', 'course_search', 'none'].includes(intentResult.intent)) {
-        console.warn('Invalid intent value, defaulting to none:', intentResult.intent)
-        intentResult.intent = 'none'
-      }
-
-      // Validate course_search - do not set defaults, only use what was extracted
-      // School and department are optional and should only be included if extracted from the message
-
-      // Ensure test/flashcard intents require mentions
-      if ((intentResult.intent === 'test' || intentResult.intent === 'flashcard') && !hasMentions) {
-        console.warn('Test/flashcard intent detected but no mentions present, changing to none')
-        intentResult.intent = 'none'
-      }
-
-    } catch (error) {
-      console.error('Error parsing intent response:', error)
-      // Fallback to 'none' if parsing fails
       intentResult = {
         intent: 'none',
         confidence: 0,
-        reasoning: 'Failed to parse intent response'
+        reasoning: 'Unexpected response format from Vertex AI'
       }
+    }
+
+    console.log('Intent routing result:', intentResult)
+
+    // Validate intent value
+    if (!['test', 'flashcard', 'course_search', 'none'].includes(intentResult.intent)) {
+      console.warn('Invalid intent value, defaulting to none:', intentResult.intent)
+      intentResult.intent = 'none'
+    }
+
+    // Ensure test/flashcard intents require mentions
+    if ((intentResult.intent === 'test' || intentResult.intent === 'flashcard') && !hasMentions) {
+      console.warn('Test/flashcard intent detected but no mentions present, changing to none')
+      intentResult.intent = 'none'
     }
 
     // Extract and record token usage

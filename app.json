@@ -10,7 +10,7 @@
       "web"
     ],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.sfstudio.studentagent.app"
     },
     "android": {

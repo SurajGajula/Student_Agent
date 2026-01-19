@@ -81,7 +81,6 @@ export const syncAllStores = async () => {
 const clearAllStores = async () => {
   const storageKeys = [
     'folders-storage',
-    'classes-storage',
     'notes-storage',
     'tests-storage',
     'flashcards-storage',
@@ -101,14 +100,12 @@ const clearAllStores = async () => {
   try {
     const [
       folderStoreModule,
-      classesStoreModule,
       notesStoreModule,
       testsStoreModule,
       flashcardsStoreModule,
       goalsStoreModule,
     ] = await Promise.allSettled([
       import('./folderStore'),
-      import('./classesStore'),
       import('./notesStore'),
       import('./testsStore'),
       import('./flashcardsStore'),
@@ -126,18 +123,6 @@ const clearAllStores = async () => {
         })
       } catch (err) {
         console.warn('[authStore] Error resetting folderStore:', err)
-      }
-    }
-
-    if (classesStoreModule.status === 'fulfilled' && classesStoreModule.value?.useClassesStore) {
-      try {
-        classesStoreModule.value.useClassesStore.setState({
-          classes: [],
-          isLoading: false,
-          error: null,
-        })
-      } catch (err) {
-        console.warn('[authStore] Error resetting classesStore:', err)
       }
     }
 

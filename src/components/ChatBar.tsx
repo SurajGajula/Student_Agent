@@ -21,9 +21,10 @@ interface Mention {
 
 interface ChatBarProps {
   onOpenLoginModal: () => void
+  currentView?: string
 }
 
-function ChatBar({ onOpenLoginModal }: ChatBarProps) {
+function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
   const [message, setMessage] = useState('')
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [autocompleteQuery, setAutocompleteQuery] = useState('')
@@ -192,7 +193,10 @@ function ChatBar({ onOpenLoginModal }: ChatBarProps) {
       },
       body: JSON.stringify({
         message: msg,
-        mentions: mentionsList
+        mentions: mentionsList,
+        pageContext: currentView ? {
+          currentView: currentView
+        } : undefined
       }),
     })
 
