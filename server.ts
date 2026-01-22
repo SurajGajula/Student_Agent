@@ -18,10 +18,12 @@ import flashcardsRouter from './routes/flashcards/index.js' // Updated to use in
 import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
 import goalsRouter from './routes/goals/index.js' // Goals routes
 import coursesRouter from './routes/courses/index.js' // Courses routes
+import userRouter from './routes/user/index.js' // User routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
 import configRouter from './routes/config.js'
 import supportRouter from './routes/support.js'
+import iapRouter from './routes/iap.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -80,6 +82,8 @@ app.use('/api', configRouter)
 
 // Support API endpoint (page is handled by React SPA)
 app.use('/api/support', supportRouter)
+// IAP (In-App Purchase) endpoints
+app.use('/api/iap', iapRouter)
 
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)
@@ -92,6 +96,7 @@ app.use('/api/tests', testsRouter) // Includes generate + CRUD
 app.use('/api/flashcards', flashcardsRouter) // Includes generate + CRUD
 app.use('/api/goals', goalsRouter) // Goals CRUD routes
 app.use('/api/courses', coursesRouter) // Course search routes
+app.use('/api/user', userRouter) // User account management routes
 app.use('/api', usageRouter)
 app.use('/', indexRouter)
 

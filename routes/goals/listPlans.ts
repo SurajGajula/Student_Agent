@@ -49,14 +49,14 @@ router.get('/list', authenticateUser, async (req: AuthenticatedRequest, res: Res
       }))
 
       return {
-        id: goal.id,
-        name: goal.name,
-        query: goal.query,
-        school: goal.school,
-        department: goal.department,
+      id: goal.id,
+      name: goal.name,
+      query: goal.query,
+      school: goal.school,
+      department: goal.department,
         courses: coursesCleaned,
-        createdAt: goal.created_at,
-        updatedAt: goal.updated_at,
+      createdAt: goal.created_at,
+      updatedAt: goal.updated_at,
       }
     })
 

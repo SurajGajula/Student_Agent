@@ -1,10 +1,31 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { getApiBaseUrl } from '../../lib/platform'
+
+// Lazy load IAP module to avoid crashes if module isn't installed
+const getInAppPurchases = (): any => {
+  if (Platform.OS !== 'ios') {
+    return null
+  }
+  
+  try {
+    const iapModule = require('expo-in-app-purchases')
+    if (iapModule && 
+        typeof iapModule === 'object' && 
+        typeof iapModule.isAvailableAsync === 'function') {
+      return iapModule
+    }
+  } catch (error) {
+    // Silently fail if module isn't available
+    return null
+  }
+  
+  return null
+}
 
 interface SubscriptionDetails {
   hasSubscription: boolean
@@ -31,6 +52,8 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   const [loadingSubscription, setLoadingSubscription] = useState(false)
   const [restoringPurchases, setRestoringPurchases] = useState(false)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const { signOut } = useAuthStore()
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
   const isMobile = windowWidth <= 768
@@ -276,22 +299,75 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/stripe/sync-subscription`, {
+      let restored = false
+
+      // On iOS, try to restore IAP purchases first
+      const InAppPurchases = getInAppPurchases()
+      if (Platform.OS === 'ios' && InAppPurchases) {
+        try {
+          const isAvailable = await InAppPurchases.isAvailableAsync()
+          if (isAvailable) {
+            await InAppPurchases.connectAsync()
+            const history = await InAppPurchases.getPurchaseHistoryAsync()
+            
+            if (history.results && history.results.length > 0) {
+              // Verify each purchase receipt
+              for (const purchase of history.results) {
+                try {
+                  const verifyResponse = await fetch(`${API_BASE_URL}/api/iap/verify-receipt`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-      })
+                    body: JSON.stringify({
+                      receipt: purchase.receipt || purchase.transactionReceipt,
+                      productId: purchase.productId,
+                      transactionId: purchase.orderId || purchase.transactionId,
+                    }),
+                  })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || error.error || 'Failed to restore purchases')
+                  if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json()
+                    if (verifyData.success) {
+                      restored = true
+                      break // Found active subscription
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error verifying IAP purchase:', err)
+                }
+              }
+            }
+            await InAppPurchases.disconnectAsync()
+          }
+        } catch (iapError) {
+          console.error('IAP restore error:', iapError)
+          // Continue to try Stripe restore
+        }
       }
 
+      // Also try Stripe restore (for web/external subscriptions)
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/stripe/sync-subscription`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
       const data = await response.json()
-      
       if (data.success && data.hasSubscription) {
+            restored = true
+          }
+        }
+      } catch (stripeError) {
+        console.error('Stripe restore error:', stripeError)
+      }
+
+      if (restored) {
         setRestoreMessage('Purchases restored successfully! Your subscription has been activated.')
         // Refresh subscription details and usage
         await fetchSubscriptionDetails()
@@ -307,6 +383,69 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
       // Clear message after 5 seconds
       setTimeout(() => setRestoreMessage(null), 5000)
     }
+  }
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your notes, tests, flashcards, goals, and other data.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true)
+            try {
+              const { data: { session } } = await supabase.auth.getSession()
+              
+              if (!session) {
+                throw new Error('Not authenticated')
+              }
+
+              const API_BASE_URL = getApiBaseUrl()
+              
+              // Check if API URL is localhost on native - this won't work on physical devices
+              if (Platform.OS !== 'web' && API_BASE_URL.includes('localhost')) {
+                Alert.alert('Error', 'Cannot delete account: API URL is localhost. Please check your configuration.')
+                setDeletingAccount(false)
+                return
+              }
+
+              const response = await fetch(`${API_BASE_URL}/api/user/delete`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              if (!response.ok) {
+                const error = await response.json()
+                throw new Error(error.message || error.error || 'Failed to delete account')
+              }
+
+              // Account deleted successfully, sign out
+              await signOut()
+              
+              Alert.alert('Account Deleted', 'Your account has been successfully deleted.')
+            } catch (error) {
+              console.error('Error deleting account:', error)
+              Alert.alert(
+                'Error',
+                error instanceof Error ? error.message : 'Failed to delete account. Please try again.'
+              )
+            } finally {
+              setDeletingAccount(false)
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    )
   }
 
   const usagePercentage = monthlyLimit > 0 ? (tokensUsed / monthlyLimit) * 100 : 0
@@ -529,6 +668,29 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
                 <Text style={styles.linkText}>Terms of Service</Text>
                 <Text style={styles.linkArrow}>→</Text>
               </Pressable>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Account</Text>
+              <Pressable
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount || !isLoggedIn}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  (deletingAccount || !isLoggedIn) && styles.deleteButtonDisabled,
+                  pressed && !deletingAccount && isLoggedIn && styles.deleteButtonPressed
+                ]}
+              >
+                <Text style={[
+                  styles.deleteButtonText,
+                  (deletingAccount || !isLoggedIn) && styles.deleteButtonTextDisabled
+                ]}>
+                  {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                </Text>
+              </Pressable>
+              <Text style={styles.deleteWarning}>
+                This will permanently delete your account and all associated data. This action cannot be undone.
+              </Text>
             </View>
           </View>
         )}
@@ -776,6 +938,38 @@ const styles = StyleSheet.create({
   },
   restoreButtonTextDisabled: {
     color: '#cccccc',
+  },
+  deleteButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 44, // Minimum touch target for iOS
+  },
+  deleteButtonPressed: {
+    backgroundColor: '#c82333',
+    opacity: 0.9,
+  },
+  deleteButtonDisabled: {
+    backgroundColor: '#999',
+    opacity: 0.6,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '400',
+  },
+  deleteButtonTextDisabled: {
+    color: '#cccccc',
+  },
+  deleteWarning: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 })
 

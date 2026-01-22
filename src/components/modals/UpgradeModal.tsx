@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, Modal, Pressable, Platform, ScrollView, Dimensions } from 'react-native'
 import { createPortal } from 'react-dom'
 import { Svg, Line } from 'react-native-svg'
@@ -7,6 +7,63 @@ import { useUsageStore } from '../../stores/usageStore'
 import { supabase } from '../../lib/supabase'
 import { getApiBaseUrl } from '../../lib/platform'
 import { openURL, showAlert } from '../../lib/platformHelpers'
+
+// IAP Product ID - matches the subscription in App Store Connect
+const IAP_PRODUCT_ID = 'com.studentagent.app.pro'
+
+const IAP_ENABLED = true
+
+// Lazy load IAP module to avoid crashes if module isn't installed
+// Note: This module requires native code to be linked via pod install and native rebuild
+let iapModuleCache: any = null
+let iapModuleChecked = false
+let iapModuleFailed = false
+
+const getInAppPurchases = (): any => {
+  // Temporarily disabled until native rebuild
+  if (!IAP_ENABLED) {
+    return null
+  }
+  
+  if (Platform.OS !== 'ios') {
+    return null
+  }
+  
+  // If we've already determined it failed, don't try again
+  if (iapModuleFailed) {
+    return null
+  }
+  
+  // Only check once
+  if (iapModuleChecked) {
+    return iapModuleCache
+  }
+  
+  iapModuleChecked = true
+  
+  try {
+    const iapModule = require('expo-in-app-purchases')
+    const targetModule = iapModule.InAppPurchases || iapModule
+    
+    const hasCoreMethods = targetModule &&
+      typeof targetModule === 'object' &&
+      typeof targetModule.connectAsync === 'function' &&
+      typeof targetModule.purchaseItemAsync === 'function' &&
+      typeof targetModule.setPurchaseListener === 'function'
+
+    if (hasCoreMethods) {
+      iapModuleCache = targetModule
+      return targetModule
+    } else {
+      iapModuleFailed = true
+    }
+  } catch (error: any) {
+    iapModuleFailed = true
+    iapModuleCache = null
+  }
+  
+  return null
+}
 
 interface UpgradeModalProps {
   isOpen: boolean
@@ -23,8 +80,193 @@ const CloseIcon = () => (
 function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isUnsubscribing, setIsUnsubscribing] = useState(false)
+  const [isIAPLoading, setIsIAPLoading] = useState(false)
+  const [iapAvailable, setIapAvailable] = useState(false)
+  const [iapConnected, setIapConnected] = useState(false)
   const { user } = useAuthStore()
   const { planName, fetchUsage } = useUsageStore()
+
+  // Initialize IAP on iOS and set up purchase listener
+  useEffect(() => {
+    let isMounted = true
+    let iapModule: any = null
+
+    if (Platform.OS === 'ios' && isOpen) {
+      // Lazy load the module only when needed
+      iapModule = getInAppPurchases()
+
+      if (iapModule) {
+        // Wrap async initialization in a safe way
+        const initIAP = async () => {
+          try {
+            const isAvailable = typeof iapModule.isAvailableAsync === 'function'
+              ? await iapModule.isAvailableAsync()
+              : true // If method not exposed, assume available and let connectAsync fail if not
+
+            if (isMounted) setIapAvailable(isAvailable)
+            
+            if (isAvailable && isMounted) {
+              if (!iapConnected) {
+                try {
+                  await iapModule.connectAsync()
+                  if (isMounted) setIapConnected(true)
+                } catch (err: any) {
+                  // If already connected, mark as connected and continue
+                  if (String(err?.message || '').includes('Already connected') || err?.code === 'ERR_IN_APP_PURCHASES_CONNECTION') {
+                    if (isMounted) setIapConnected(true)
+                  } else {
+                    throw err
+                  }
+                }
+              }
+              
+              // Set up purchase listener once
+              iapModule.setPurchaseListener(async ({ response, errorCode }: any) => {
+                if (errorCode) {
+                  if (errorCode === iapModule.IAPResponseCode?.USER_CANCELED) {
+                    showAlert('Purchase Canceled', 'Purchase was canceled')
+                  } else {
+                    showAlert('Purchase Error', `Purchase failed: ${errorCode}`)
+                  }
+                  setIsIAPLoading(false)
+                  return
+                }
+
+                if (response && response.length > 0) {
+                  // Verify receipt with backend
+                  await verifyIAPReceipt(response[0])
+                } else {
+                  setIsIAPLoading(false)
+                }
+              })
+            }
+          } catch (error) {
+            if (isMounted) setIapAvailable(false)
+          }
+        }
+
+        initIAP().catch(() => {
+          if (isMounted) setIapAvailable(false)
+        })
+      } else {
+        // Module not available, set IAP as unavailable
+        if (isMounted) setIapAvailable(false)
+      }
+    } else {
+      // Not iOS, IAP not available
+      if (isMounted) setIapAvailable(false)
+    }
+
+    return () => {
+      isMounted = false
+      // Don't disconnect - keep the connection alive for future purchases
+      // Disconnecting and reconnecting causes "Must be connected" errors
+    }
+  }, [isOpen, iapConnected])
+
+  const handleIAPPurchase = async () => {
+    if (!user) {
+      showAlert('Upgrade', 'Please log in to upgrade')
+      return
+    }
+
+    const iapModule = getInAppPurchases()
+    if (!iapModule || !iapAvailable) {
+      showAlert('Error', 'In-App Purchases are not available. Please try the web payment option.')
+      return
+    }
+
+    setIsIAPLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      // Ensure IAP is connected
+      try {
+        await iapModule.connectAsync()
+        setIapConnected(true)
+      } catch (err: any) {
+        if (String(err?.message || '').includes('Already connected') || err?.code === 'ERR_IN_APP_PURCHASES_CONNECTION') {
+          setIapConnected(true)
+        } else {
+          throw err
+        }
+      }
+      
+      // Wait for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Fetch product from App Store with timeout
+      const timeoutDuration = 30000 // 30 seconds
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout: App Store not responding. Please try again.')), timeoutDuration)
+      )
+      
+      const { results, errorCode } = await Promise.race([
+        iapModule.getProductsAsync([IAP_PRODUCT_ID]),
+        timeoutPromise
+      ]) as any
+      
+      if (errorCode) {
+        throw new Error(`Failed to fetch product: ${errorCode}`)
+      }
+      
+      if (!results || results.length === 0) {
+        throw new Error('Product not found in App Store.')
+      }
+
+      // Purchase the subscription (listener handles the rest)
+      await iapModule.purchaseItemAsync(IAP_PRODUCT_ID)
+    } catch (error) {
+      showAlert('Error', error instanceof Error ? error.message : 'Failed to start purchase')
+      setIsIAPLoading(false)
+    }
+  }
+
+  const verifyIAPReceipt = async (purchase: any) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const API_BASE_URL = getApiBaseUrl()
+      const response = await fetch(`${API_BASE_URL}/api/iap/verify-receipt`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          receipt: purchase.receipt || purchase.transactionReceipt,
+          productId: purchase.productId,
+          transactionId: purchase.orderId || purchase.transactionId,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || error.error || 'Failed to verify purchase')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        showAlert('Success', 'Subscription activated successfully!')
+        await fetchUsage()
+        onClose()
+      } else {
+        throw new Error(data.error || 'Purchase verification failed')
+      }
+    } catch (error) {
+      console.error('Receipt verification error:', error)
+      showAlert('Error', error instanceof Error ? error.message : 'Failed to verify purchase')
+    } finally {
+      setIsIAPLoading(false)
+    }
+  }
 
   const handleUpgrade = async () => {
     if (!user) {
@@ -265,6 +507,22 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <Text style={styles.proPlanButtonText}>Current Plan</Text>
                 </Pressable>
               ) : (
+                <View style={styles.buttonContainer}>
+                  {Platform.OS === 'ios' ? (
+                    // On iOS, ONLY show App Store subscription to comply with Guideline 3.1.1
+                    <Pressable 
+                      style={[styles.planButton, styles.proPlanButton, styles.iapButton]}
+                      onPress={handleIAPPurchase}
+                      disabled={isIAPLoading || !iapAvailable}
+                    >
+                      <Text style={styles.proPlanButtonText}>
+                        {!IAP_ENABLED ? 'IAP Disabled' : 
+                         !iapAvailable ? 'IAP Not Available' :
+                         isIAPLoading ? 'Processing...' : 'Subscribe via App Store'}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    // On Web/Android, show standard Stripe checkout
                 <Pressable 
                   style={[styles.planButton, styles.proPlanButton]}
                   onPress={handleUpgrade}
@@ -274,6 +532,8 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     {isLoading ? 'Loading...' : 'Upgrade to Pro'}
                   </Text>
                 </Pressable>
+                  )}
+                </View>
               )}
             </View>
           </View>
@@ -457,6 +717,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     color: '#f0f0f0',
+  },
+  buttonContainer: {
+    gap: 12,
+  },
+  iapButton: {
+    backgroundColor: '#0f0f0f',
+  },
+  externalButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#0f0f0f',
+  },
+  externalButtonText: {
+    fontSize: 16,
+    fontWeight: '300',
+    color: '#0f0f0f',
   },
 })
 
