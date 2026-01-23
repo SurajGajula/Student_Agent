@@ -444,30 +444,32 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      presentationStyle="overFullScreen"
     >
       <Pressable style={styles.overlayNative} onPress={onClose}>
-        <Pressable 
-          style={[
-            styles.content, 
-            isMobile && styles.contentMobile,
-            !isMobile && styles.contentTablet
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>Upgrade Plan</Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <CloseIcon />
-            </Pressable>
-          </View>
-          
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={true}
-            bounces={true}
-            scrollEnabled={true}
+        <View style={styles.contentWrapperNative}>
+          <Pressable 
+            style={[
+              styles.content, 
+              isMobile && styles.contentMobile,
+              !isMobile && styles.contentTablet
+            ]}
+            onPress={(e) => e.stopPropagation()}
           >
+            <View style={styles.header}>
+              <Text style={styles.title}>Upgrade Plan</Text>
+              <Pressable onPress={onClose} style={styles.closeButton}>
+                <CloseIcon />
+              </Pressable>
+            </View>
+            
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              scrollEnabled={true}
+            >
           <View style={styles.plansContainer}>
             <View style={[styles.planCard, styles.freePlan]}>
               <View style={styles.planHeader}>
@@ -543,7 +545,8 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
             </View>
           </View>
           </ScrollView>
-        </Pressable>
+          </Pressable>
+        </View>
       </Pressable>
     </Modal>
   )
@@ -594,6 +597,18 @@ const styles = StyleSheet.create({
       padding: 16, // Less padding on mobile for more space
     }),
   },
+  contentWrapperNative: {
+    width: '100%',
+    maxWidth: 700,
+    maxHeight: '90%',
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS !== 'web' && {
+      width: '100%',
+      maxWidth: 700,
+    }),
+  },
   contentWrapper: {
     ...(Platform.OS === 'web' && {
       width: '100%',
@@ -607,7 +622,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     width: '100%',
-    maxWidth: 700,
     flexDirection: 'column',
     ...(Platform.OS === 'web' && {
       maxWidth: 700,
@@ -617,7 +631,7 @@ const styles = StyleSheet.create({
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     }),
     ...(Platform.OS !== 'web' && {
-      maxHeight: '90%',
+      maxHeight: '100%',
     }),
   },
   contentMobile: {
@@ -628,7 +642,8 @@ const styles = StyleSheet.create({
     maxWidth: 700,
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   scrollContent: {
     paddingBottom: 20,
