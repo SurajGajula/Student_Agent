@@ -435,6 +435,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   if (!isOpen) return null
 
   const windowWidth = Dimensions.get('window').width
+  const windowHeight = Dimensions.get('window').height
   const isMobile = windowWidth <= 768
 
   return (
@@ -448,7 +449,8 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
         <Pressable 
           style={[
             styles.content, 
-            isMobile && styles.contentMobile
+            isMobile && styles.contentMobile,
+            !isMobile && styles.contentTablet
           ]}
           onPress={(e) => e.stopPropagation()}
         >
@@ -460,8 +462,11 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
           </View>
           
           <ScrollView 
+            style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={true}
+            bounces={true}
+            scrollEnabled={true}
           >
           <View style={styles.plansContainer}>
             <View style={[styles.planCard, styles.freePlan]}>
@@ -611,14 +616,23 @@ const styles = StyleSheet.create({
       pointerEvents: 'auto',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     }),
+    ...(Platform.OS !== 'web' && {
+      maxHeight: '90%',
+    }),
   },
   contentMobile: {
     maxWidth: '100%',
     width: '100%',
-    maxHeight: '90%',
+  },
+  contentTablet: {
+    maxWidth: 700,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
