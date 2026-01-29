@@ -364,6 +364,11 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                 </Pressable>
               </View>
               
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={true}
+              >
               <View style={styles.plansContainer}>
                 <View style={[styles.planCard, styles.freePlan]}>
                   <View style={styles.planHeader}>
@@ -374,9 +379,9 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </View>
                   </View>
                   <View style={styles.benefitsList}>
-                    <Text style={styles.benefitItem}>10 items per category</Text>
+                      <Text style={styles.benefitItem}>10 items per category</Text>
                     <Text style={styles.benefitItem}>Limited AI usage</Text>
-                    <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
+                      <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
                   </View>
                   <Pressable 
                     style={[styles.planButton, styles.currentPlanButton]}
@@ -396,6 +401,12 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                       <Text style={styles.planPrice}>$9.99</Text>
                       <Text style={styles.planPeriod}>/month</Text>
                     </View>
+                    <Text style={styles.infoText}>
+                      Auto-renewing monthly subscription billed to your Apple ID.
+                    </Text>
+                    <Text style={styles.infoText}>
+                      Renews every month unless canceled at least 24 hours before the end of the period.
+                    </Text>
                   </View>
                   <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
@@ -420,6 +431,34 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   )}
                 </View>
               </View>
+
+                <View style={styles.subscriptionInfo}>
+                  <Text style={styles.infoTitle}>Legal</Text>
+                  <Text style={styles.infoText}>
+                    By subscribing, you agree to our Privacy Policy, Terms of Use, and End-User License Agreement (EULA).
+                  </Text>
+                  <View style={styles.linksRow}>
+                    <Pressable onPress={() => openURL('https://studentagent.site/privacy')}>
+                      <Text style={styles.linkText}>Privacy Policy</Text>
+                    </Pressable>
+                    <Pressable onPress={() => openURL('https://studentagent.site/terms')}>
+                      <Text style={styles.linkText}>Terms of Use</Text>
+                    </Pressable>
+                    <Pressable onPress={() => openURL('https://studentagent.site/eula')}>
+                      <Text style={styles.linkText}>EULA</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.eulaText}>
+                    This license is between you and Student Agent only, not Apple. Student Agent is solely responsible for the app, including support, warranties, product claims, and compliance with legal and regulatory requirements.
+                  </Text>
+                  <Text style={styles.eulaText}>
+                    In the event of an app failure to meet warranty, you may notify Apple and Apple may refund the purchase price (if any); to the maximum extent allowed by law, Apple has no other warranty obligations with respect to the app.
+                  </Text>
+                  <Text style={styles.eulaText}>
+                    Student Agent, not Apple, is responsible for any third-party intellectual property claims arising from your possession or use of the app. By using the app, you represent that you are not in an embargoed country and not on any U.S. Government restricted list, and you will comply with all applicable third-party terms when using the app.
+                  </Text>
+                </View>
+              </ScrollView>
             </Pressable>
           </View>
         </Pressable>
@@ -437,6 +476,7 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   const windowWidth = Dimensions.get('window').width
   const windowHeight = Dimensions.get('window').height
   const isMobile = windowWidth <= 768
+  const cardHeight = Math.min(Math.round(windowHeight * 0.9), 720)
 
   return (
       <Modal
@@ -446,108 +486,138 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <Pressable style={styles.overlayNative} onPress={onClose}>
-        <View style={styles.contentWrapperNative}>
-          <Pressable 
-            style={[
-              styles.content, 
-              isMobile && styles.contentMobile,
-              !isMobile && styles.contentTablet
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
+      <View style={styles.overlayNative}>
+        <Pressable style={styles.backdropNative} onPress={onClose} />
+        <View
+          style={[
+            styles.contentWrapperNative,
+            { height: cardHeight },
+            isMobile && styles.contentMobile,
+            !isMobile && styles.contentTablet,
+          ]}
+        >
+          <View style={styles.content}>
             <View style={styles.header}>
               <Text style={styles.title}>Upgrade Plan</Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
                 <CloseIcon />
               </Pressable>
             </View>
-            
-            <ScrollView 
+
+            <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={true}
-              scrollEnabled={true}
             >
-          <View style={styles.plansContainer}>
-            <View style={[styles.planCard, styles.freePlan]}>
-              <View style={styles.planHeader}>
-                <Text style={styles.planName}>Free</Text>
-                <View style={styles.planPriceContainer}>
-                  <Text style={styles.planPrice}>$0</Text>
-                  <Text style={styles.planPeriod}>/month</Text>
+              <View style={styles.plansContainer}>
+                <View style={[styles.planCard, styles.freePlan]}>
+                  <View style={styles.planHeader}>
+                    <Text style={styles.planName}>Free</Text>
+                    <View style={styles.planPriceContainer}>
+                      <Text style={styles.planPrice}>$0</Text>
+                      <Text style={styles.planPeriod}>/month</Text>
+                    </View>
+                  </View>
+                  <View style={styles.benefitsList}>
+                    <Text style={styles.benefitItem}>10 items per category</Text>
+                    <Text style={styles.benefitItem}>Limited AI usage</Text>
+                    <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.planButton, styles.currentPlanButton]}
+                    onPress={isPro ? handleUnsubscribe : undefined}
+                    disabled={!isPro || isUnsubscribing}
+                  >
+                    <Text style={styles.currentPlanButtonText}>
+                      {isPro ? (isUnsubscribing ? 'Canceling...' : 'Unsubscribe') : 'Current Plan'}
+                    </Text>
+                  </Pressable>
                 </View>
-              </View>
-              <View style={styles.benefitsList}>
-                <Text style={styles.benefitItem}>10 items per category</Text>
-                <Text style={styles.benefitItem}>Limited AI usage</Text>
-                <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
-              </View>
-              <Pressable 
-                style={[styles.planButton, styles.currentPlanButton]}
-                onPress={isPro ? handleUnsubscribe : undefined}
-                disabled={!isPro || isUnsubscribing}
-              >
-                <Text style={styles.currentPlanButtonText}>
-                  {isPro ? (isUnsubscribing ? 'Canceling...' : 'Unsubscribe') : 'Current Plan'}
-                </Text>
-              </Pressable>
-            </View>
-            
-            <View style={[styles.planCard, styles.proPlan]}>
-              <View style={styles.planHeader}>
-                <Text style={styles.planName}>Pro</Text>
-                <View style={styles.planPriceContainer}>
-                  <Text style={styles.planPrice}>$9.99</Text>
-                  <Text style={styles.planPeriod}>/month</Text>
-                </View>
-              </View>
+
+                <View style={[styles.planCard, styles.proPlan]}>
+                  <View style={styles.planHeader}>
+                    <Text style={styles.planName}>Pro</Text>
+                    <View style={styles.planPriceContainer}>
+                      <Text style={styles.planPrice}>$9.99</Text>
+                      <Text style={styles.planPeriod}>/month</Text>
+                    </View>
+                    <Text style={styles.infoText}>Auto-renewing monthly subscription billed to your Apple ID.</Text>
+                    <Text style={styles.infoText}>
+                      Renews every month unless canceled at least 24 hours before the end of the period.
+                    </Text>
+                  </View>
                   <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
                     <Text style={styles.benefitItem}>10x AI usage</Text>
                     <Text style={styles.benefitItem}>~100 hours YouTube transcription</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
                   </View>
-              {isPro ? (
-                <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
-                  <Text style={styles.proPlanButtonText}>Current Plan</Text>
-                </Pressable>
-              ) : (
-                <View style={styles.buttonContainer}>
-                  {Platform.OS === 'ios' ? (
-                    // On iOS, ONLY show App Store subscription to comply with Guideline 3.1.1
-                    <Pressable 
-                      style={[styles.planButton, styles.proPlanButton, styles.iapButton]}
-                      onPress={handleIAPPurchase}
-                      disabled={isIAPLoading || !iapAvailable}
-                    >
-                      <Text style={styles.proPlanButtonText}>
-                        {!IAP_ENABLED ? 'IAP Disabled' : 
-                         !iapAvailable ? 'IAP Not Available' :
-                         isIAPLoading ? 'Processing...' : 'Subscribe via App Store'}
-                      </Text>
+
+                  {isPro ? (
+                    <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
+                      <Text style={styles.proPlanButtonText}>Current Plan</Text>
                     </Pressable>
                   ) : (
-                    // On Web/Android, show standard Stripe checkout
-                <Pressable 
-                  style={[styles.planButton, styles.proPlanButton]}
-                  onPress={handleUpgrade}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.proPlanButtonText}>
-                    {isLoading ? 'Loading...' : 'Upgrade to Pro'}
-                  </Text>
-                </Pressable>
+                    <View style={styles.buttonContainer}>
+                      {Platform.OS === 'ios' ? (
+                        <Pressable
+                          style={[styles.planButton, styles.proPlanButton, styles.iapButton]}
+                          onPress={handleIAPPurchase}
+                          disabled={isIAPLoading || !iapAvailable}
+                        >
+                          <Text style={styles.proPlanButtonText}>
+                            {!IAP_ENABLED
+                              ? 'IAP Disabled'
+                              : !iapAvailable
+                                ? 'IAP Not Available'
+                                : isIAPLoading
+                                  ? 'Processing...'
+                                  : 'Subscribe via App Store'}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[styles.planButton, styles.proPlanButton]}
+                          onPress={handleUpgrade}
+                          disabled={isLoading}
+                        >
+                          <Text style={styles.proPlanButtonText}>{isLoading ? 'Loading...' : 'Upgrade to Pro'}</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   )}
                 </View>
-              )}
-            </View>
+              </View>
+
+              <View style={styles.subscriptionInfo}>
+                <Text style={styles.infoTitle}>Legal</Text>
+                <Text style={styles.infoText}>
+                  By subscribing, you agree to our Privacy Policy, Terms of Use, and End-User License Agreement (EULA).
+                </Text>
+                <View style={styles.linksRow}>
+                  <Pressable onPress={() => openURL('https://studentagent.site/privacy')}>
+                    <Text style={styles.linkText}>Privacy Policy</Text>
+                  </Pressable>
+                  <Pressable onPress={() => openURL('https://studentagent.site/terms')}>
+                    <Text style={styles.linkText}>Terms of Use</Text>
+                  </Pressable>
+                  <Pressable onPress={() => openURL('https://studentagent.site/eula')}>
+                    <Text style={styles.linkText}>EULA</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.eulaText}>
+                  This license is between you and Student Agent only, not Apple. Student Agent is solely responsible for the app, including support, warranties, product claims, and compliance with legal and regulatory requirements.
+                </Text>
+                <Text style={styles.eulaText}>
+                  In the event of an app failure to meet warranty, you may notify Apple and Apple may refund the purchase price (if any); to the maximum extent allowed by law, Apple has no other warranty obligations with respect to the app.
+                </Text>
+                <Text style={styles.eulaText}>
+                  Student Agent, not Apple, is responsible for any third-party intellectual property claims arising from your possession or use of the app. By using the app, you represent that you are not in an embargoed country and not on any U.S. Government restricted list, and you will comply with all applicable third-party terms when using the app.
+                </Text>
+              </View>
+            </ScrollView>
           </View>
-          </ScrollView>
-          </Pressable>
         </View>
-      </Pressable>
+      </View>
     </Modal>
   )
 }
@@ -592,22 +662,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    ...(Platform.OS !== 'web' && {
-      padding: 16, // Less padding on mobile for more space
-    }),
+    padding: 16,
+  },
+  backdropNative: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   contentWrapperNative: {
     width: '100%',
     maxWidth: 700,
     maxHeight: '90%',
-    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    ...(Platform.OS !== 'web' && {
-      width: '100%',
-      maxWidth: 700,
-    }),
   },
   contentWrapper: {
     ...(Platform.OS === 'web' && {
@@ -631,7 +700,8 @@ const styles = StyleSheet.create({
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     }),
     ...(Platform.OS !== 'web' && {
-      maxHeight: '100%',
+      overflow: 'hidden',
+      height: '100%',
     }),
   },
   contentMobile: {
@@ -642,12 +712,11 @@ const styles = StyleSheet.create({
     maxWidth: 700,
   },
   scrollView: {
-    flexGrow: 1,
-    flexShrink: 1,
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
-    flexGrow: 1,
+    padding: 20,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
@@ -762,6 +831,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     color: '#0f0f0f',
+  },
+  subscriptionInfo: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 4,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0f0f0f',
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#444',
+    fontWeight: '300',
+  },
+  linksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  linkText: {
+    fontSize: 12,
+    color: '#0066cc',
+    textDecorationLine: 'underline',
+  },
+  eulaText: {
+    fontSize: 11,
+    color: '#555',
+    fontWeight: '300',
+    marginTop: 4,
   },
 })
 

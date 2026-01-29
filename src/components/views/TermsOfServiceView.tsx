@@ -281,9 +281,8 @@ function TermsOfServiceView({ onNavigate }: TermsOfServiceViewProps) {
               If you have any questions about these Terms, please contact us:
             </Text>
             <Text style={styles.paragraph}>
-              <Text style={styles.bold}>Email:</Text> support@studentagent.site{'\n'}
-              <Text style={styles.bold}>Website:</Text> https://studentagent.site{'\n'}
-              <Text style={styles.bold}>Support:</Text> https://studentagent.site/support
+              <Text style={styles.bold}>Email:</Text> surajgajula@thesfstudio.com{'\n'}
+              <Text style={styles.bold}>Website:</Text> https://studentagent.site
             </Text>
           </View>
 

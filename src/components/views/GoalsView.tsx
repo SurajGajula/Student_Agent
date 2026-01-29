@@ -6,8 +6,6 @@ import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, DeleteIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
 import { useDetailMode } from '../../contexts/DetailModeContext'
-import BetaModal from '../modals/BetaModal'
-import { getStorage } from '../../lib/storage'
 
 interface GoalsViewProps {
   onOpenLoginModal?: () => void
@@ -24,7 +22,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const insets = useSafeAreaInsets()
   const isMobile = windowWidth <= 768
-  const [showBetaModal, setShowBetaModal] = useState(false)
 
   // Update window width on resize
   useEffect(() => {
@@ -47,45 +44,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
       setCurrentGoalId(null)
     }
   }, [isLoggedIn])
-
-  // Note: fetchUsage is already called by syncAllStores in initializeAuth,
-  // so we don't need to call it here to avoid duplicates
-  // The usage store will be populated when the app initializes
-
-  // Check if beta modal should be shown on mount
-  useEffect(() => {
-    const checkBetaModal = async () => {
-      const storage = getStorage()
-      if (!storage) {
-        // If no storage available, show modal by default
-        setShowBetaModal(true)
-        return
-      }
-
-      try {
-        let dismissed = false
-        if (Platform.OS === 'web') {
-          // Web: localStorage is synchronous
-          const result = storage.getItem('goals-beta-modal-dismissed')
-          dismissed = result === 'true'
-        } else {
-          // Native: AsyncStorage is asynchronous
-          const result = await storage.getItem('goals-beta-modal-dismissed')
-          dismissed = result === 'true'
-        }
-
-        if (!dismissed) {
-          setShowBetaModal(true)
-        }
-      } catch (error) {
-        console.error('Failed to check beta modal dismissal status:', error)
-        // Show modal if we can't check (better to show than not show)
-        setShowBetaModal(true)
-      }
-    }
-
-    checkBetaModal()
-  }, [])
 
   const handleGoalClick = (goalId: string) => {
     setCurrentGoalId(goalId)
@@ -141,11 +99,11 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
               <Text style={[styles.headerTitleText, isMobile && styles.headerTitleTextMobile]}>
                 {currentGoal.name}
               </Text>
-            <Text style={styles.headerSubtitle}>
+              <Text style={styles.headerSubtitle}>
                 {currentGoal.department 
                   ? `${currentGoal.school} ${currentGoal.department} • ${currentGoal.courses.length} courses`
                   : `${currentGoal.school} • ${currentGoal.courses.length} courses`}
-            </Text>
+              </Text>
             </View>
           </View>
         </View>
@@ -193,7 +151,6 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
   // Render goals grid
   return (
     <View style={styles.container}>
-      <BetaModal isOpen={showBetaModal} onClose={() => setShowBetaModal(false)} />
       <View style={[
         styles.header,
         isMobile && {
@@ -233,13 +190,13 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
             >
               <Pressable
                 style={styles.cardDeleteButton}
-                    onPress={(e) => {
-                      e.stopPropagation()
+                onPress={(e) => {
+                  e.stopPropagation()
                   handleDeleteGoal(goal.id)
-                    }}
-                  >
-                    <DeleteIcon />
-                  </Pressable>
+                }}
+              >
+                <DeleteIcon />
+              </Pressable>
               <Text style={styles.goalCardTitle} numberOfLines={2}>
                 {goal.name}
               </Text>
@@ -247,11 +204,11 @@ function GoalsView({ onOpenLoginModal, onOpenUpgradeModal }: GoalsViewProps = {}
                 {goal.department 
                   ? `${goal.school} ${goal.department}`
                   : goal.school}
-                </Text>
+              </Text>
               <Text style={styles.goalCardMeta}>
                 {goal.courses.length} {goal.courses.length === 1 ? 'course' : 'courses'}
-                </Text>
-              </Pressable>
+              </Text>
+            </Pressable>
           )}
         />
       )}
@@ -293,7 +250,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   title: {
-      fontSize: 32,
+    fontSize: 32,
     fontWeight: '300',
     letterSpacing: -0.5,
     color: '#0f0f0f',

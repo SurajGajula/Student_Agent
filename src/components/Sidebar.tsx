@@ -100,7 +100,7 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
         usernameContainer.removeEventListener('mouseleave', handleMouseLeave)
         if (usernameScrollRef.current.scrollInterval) {
           clearInterval(usernameScrollRef.current.scrollInterval)
-        }
+  }
       }
     }, 100)
 
@@ -183,14 +183,11 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
           <Pressable 
             style={styles.sidebarButton}
             onPress={() => handleNavigate('goals')}
-        >
+          >
             <View style={styles.iconWrapper}>
               <GoalsIcon />
             </View>
             <Text style={styles.sidebarButtonText}>Goals</Text>
-            <View style={styles.betaBadge}>
-              <Text style={styles.betaBadgeText}>BETA</Text>
-            </View>
           </Pressable>
 
         </View>
@@ -213,7 +210,7 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
                   </View>
                 </View>
               ) : (
-                <Text style={styles.sidebarUsername}>{username}</Text>
+              <Text style={styles.sidebarUsername}>{username}</Text>
               )}
               <Pressable 
                 style={styles.sidebarUpgradeButton}
@@ -435,26 +432,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...(Platform.OS === 'web' && {
       fontSize: 15,
-    }),
-  },
-  betaBadge: {
-    backgroundColor: '#ff9800',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 4,
-    ...(Platform.OS === 'web' && {
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-    }),
-  },
-  betaBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    ...(Platform.OS === 'web' && {
-      fontSize: 11,
     }),
   },
 })

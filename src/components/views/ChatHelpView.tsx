@@ -65,11 +65,6 @@ function ChatHelpView() {
       </Text>
       {capabilities.map(cap => (
         <View key={cap.id} style={styles.card}>
-          {cap.id === 'course_search' && (
-            <View style={styles.betaBadge}>
-              <Text style={styles.betaBadgeText}>BETA</Text>
-            </View>
-          )}
           <Text style={styles.capTitle}>{cap.id}</Text>
           <Text style={styles.capDescription}>{cap.description}</Text>
           {cap.id === 'course_search' && (
@@ -145,21 +140,6 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#fff',
     gap: 8,
-    position: 'relative',
-  },
-  betaBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#ff9800',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  betaBadgeText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 11,
   },
   capTitle: {
     fontSize: 16,

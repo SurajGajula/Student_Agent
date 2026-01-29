@@ -226,9 +226,8 @@ function PrivacyPolicyView({ onNavigate }: PrivacyPolicyViewProps) {
               If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
             </Text>
             <Text style={styles.paragraph}>
-              <Text style={styles.bold}>Email:</Text> support@studentagent.site{'\n'}
-              <Text style={styles.bold}>Website:</Text> https://studentagent.site{'\n'}
-              <Text style={styles.bold}>Support:</Text> https://studentagent.site/support
+              <Text style={styles.bold}>Email:</Text> surajgajula@thesfstudio.com{'\n'}
+              <Text style={styles.bold}>Website:</Text> https://studentagent.site
             </Text>
           </View>
 
