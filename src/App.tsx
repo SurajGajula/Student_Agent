@@ -12,6 +12,7 @@ import GoalsView from './components/views/GoalsView'
 import SettingsView from './components/views/SettingsView'
 import PrivacyPolicyView from './components/views/PrivacyPolicyView'
 import TermsOfServiceView from './components/views/TermsOfServiceView'
+import EulaView from './components/views/EulaView'
 import SupportView from './components/views/SupportView'
 import ChatHelpView from './components/views/ChatHelpView'
 import ChatBar from './components/ChatBar'
@@ -25,6 +26,7 @@ const getViewFromUrl = (): string => {
     const path = window.location.pathname
     if (path === '/terms') return 'terms'
     if (path === '/privacy') return 'privacy'
+    if (path === '/eula') return 'eula'
     if (path === '/support') return 'support'
     if (path === '/chat-help') return 'chat-help'
     if (path === '/settings') return 'settings'
@@ -386,9 +388,15 @@ function AppContent() {
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
         {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
         {currentView === 'terms' && <TermsOfServiceView onNavigate={handleNavigate} />}
+        {currentView === 'eula' && <EulaView onNavigate={handleNavigate} />}
         {currentView === 'support' && <SupportView onNavigate={handleNavigate} />}
         {currentView === 'chat-help' && <ChatHelpView />}
-        {currentView !== 'privacy' && currentView !== 'terms' && currentView !== 'support' && currentView !== 'chat-help' && currentView !== 'settings' && (
+        {currentView !== 'privacy' &&
+          currentView !== 'terms' &&
+          currentView !== 'eula' &&
+          currentView !== 'support' &&
+          currentView !== 'chat-help' &&
+          currentView !== 'settings' && (
           <ChatBar onOpenLoginModal={openLoginModal} currentView={currentView} />
         )}
       </View>
