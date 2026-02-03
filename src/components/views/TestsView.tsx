@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTestsStore, type Test } from '../../stores/testsStore'
-import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { getApiBaseUrl } from '../../lib/platform'
@@ -16,25 +15,18 @@ interface TestsViewProps {
 
 function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   const [currentTestId, setCurrentTestId] = useState<string | null>(null)
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userResponses, setUserResponses] = useState<Record<string, string>>({})
   const [gradedQuestions, setGradedQuestions] = useState<Record<string, boolean>>({})
   const [showResults, setShowResults] = useState(false)
   const { tests, removeTest, getTestById, addTest } = useTestsStore()
-  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   const { notes } = useNotesStore()
   const [isGeneratingTest, setIsGeneratingTest] = useState(false)
   const currentTest = currentTestId ? getTestById(currentTestId) : null
   const { setIsInDetailMode } = useDetailMode()
   
-  const folders = getFoldersByType('test')
-  const currentFolder = currentFolderId ? folders.find(f => f.id === currentFolderId) : null
-  const displayedTests = currentFolderId 
-    ? tests.filter(t => t.folderId === currentFolderId)
-    : tests.filter(t => !t.folderId)
-  const displayedFolders = currentFolderId ? [] : folders
+  const displayedTests = tests
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const insets = useSafeAreaInsets()
@@ -52,7 +44,6 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   useEffect(() => {
     if (!isLoggedIn) {
       setCurrentTestId(null)
-      setCurrentFolderId(null)
       setCurrentQuestionIndex(0)
       setUserResponses({})
       setGradedQuestions({})
@@ -82,14 +73,9 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
       setUserResponses({})
       setGradedQuestions({})
       setShowResults(false)
-    } else {
-      setCurrentFolderId(null)
     }
   }
 
-  const handleFolderClick = (folderId: string) => {
-    setCurrentFolderId(folderId)
-  }
 
   // Folder creation modal removed
 
@@ -391,20 +377,6 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     }
   }
 
-  const handleDeleteFolder = async (folderId: string) => {
-    const folder = folders.find(f => f.id === folderId)
-    if (!folder) return
-
-    try {
-      await removeFolder(folderId, 'test')
-      // If we're inside the deleted folder, navigate back
-      if (currentFolderId === folderId) {
-        setCurrentFolderId(null)
-      }
-    } catch (error) {
-      console.error('Failed to delete folder:', error)
-    }
-  }
 
   // Update detail mode when entering/exiting test detail
   useEffect(() => {
@@ -713,9 +685,8 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   }
 
   // Render tests grid/list view
-  type GridItem = (Folder & { itemType: 'folder' }) | (Test & { itemType: 'test' })
+  type GridItem = Test & { itemType: 'test' }
   const gridData: GridItem[] = [
-    ...displayedFolders.map(f => ({ ...f, itemType: 'folder' as const })),
     ...displayedTests.map(t => ({ ...t, itemType: 'test' as const })),
   ]
 
@@ -735,16 +706,7 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
           flex: 0, // Don't take flex space on mobile
           maxWidth: '100%', // Prevent overflow
         }]}>
-          {currentFolder ? (
-            <>
-              <Pressable style={styles.backButton} onPress={handleBackClick}>
-                <BackIcon />
-              </Pressable>
-              <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentFolder.name}</Text>
-            </>
-          ) : (
-            <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Tests</Text>
-          )}
+          <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Tests</Text>
         </View>
         <View style={[
           styles.headerButtons, 
@@ -770,46 +732,27 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => {
-            if (item.itemType === 'folder') {
-              const folder = item as Folder & { itemType: 'folder' }
-              return (
-                <Pressable style={styles.folderCard} onPress={() => handleFolderClick(folder.id)}>
-                  <Pressable 
-                    style={styles.cardDeleteButton}
-                    onPress={async (e) => {
-                      e.stopPropagation()
-                      await handleDeleteFolder(folder.id)
-                    }}
-                  >
-                    <DeleteIcon />
-                  </Pressable>
-                  <FolderIcon />
-                  <Text style={styles.folderCardTitle}>{folder.name}</Text>
+            const test = item as Test & { itemType: 'test' }
+            return (
+              <Pressable style={styles.testCard} onPress={() => handleTestClick(test.id)}>
+                <Pressable 
+                  style={styles.cardDeleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation()
+                    handleDeleteTest(test.id)
+                  }}
+                >
+                  <DeleteIcon />
                 </Pressable>
-              )
-            } else {
-              const test = item as Test & { itemType: 'test' }
-              return (
-                <Pressable style={styles.testCard} onPress={() => handleTestClick(test.id)}>
-                  <Pressable 
-                    style={styles.cardDeleteButton}
-                    onPress={(e) => {
-                      e.stopPropagation()
-                      handleDeleteTest(test.id)
-                    }}
-                  >
-                    <DeleteIcon />
-                  </Pressable>
-                  <View style={styles.testCardIcon}>
-                    <TestsIcon />
-                  </View>
-                  <Text style={styles.testCardTitle} numberOfLines={2} ellipsizeMode="tail">{test.name}</Text>
-                  <Text style={styles.testCardMeta} numberOfLines={1} ellipsizeMode="tail">
-                    {test.questions.length} questions • From: {test.noteName}
-                  </Text>
-                </Pressable>
-              )
-            }
+                <View style={styles.testCardIcon}>
+                  <TestsIcon />
+                </View>
+                <Text style={styles.testCardTitle} numberOfLines={2} ellipsizeMode="tail">{test.name}</Text>
+                <Text style={styles.testCardMeta} numberOfLines={1} ellipsizeMode="tail">
+                  {test.questions.length} questions • From: {test.noteName}
+                </Text>
+              </Pressable>
+            )
           }}
         />
       )}

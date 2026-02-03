@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../stores/authStore'
 import { useUsageStore } from '../stores/usageStore'
 import UpgradeModal from './modals/UpgradeModal'
-import { NotesIcon, TestsIcon, FlashcardsIcon, GoalsIcon, SettingsIcon, LogoutIcon, LoginIcon } from './icons'
+import { NotesIcon, TestsIcon, FlashcardsIcon, GoalsIcon, CareerIcon, SettingsIcon, LogoutIcon, LoginIcon } from './icons'
 import { Text as RNText } from 'react-native'
 
 interface SidebarProps {
@@ -188,6 +188,16 @@ function Sidebar({ onNavigate, onClose, isOpen, onOpenUpgradeModal, onOpenLoginM
               <GoalsIcon />
             </View>
             <Text style={styles.sidebarButtonText}>Goals</Text>
+          </Pressable>
+          
+          <Pressable 
+            style={styles.sidebarButton}
+            onPress={() => handleNavigate('career')}
+          >
+            <View style={styles.iconWrapper}>
+              <CareerIcon />
+            </View>
+            <Text style={styles.sidebarButtonText}>Career</Text>
           </Pressable>
 
         </View>

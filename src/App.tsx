@@ -9,6 +9,7 @@ import NotesView from './components/views/NotesView'
 import TestsView from './components/views/TestsView'
 import FlashcardsView from './components/views/FlashcardsView'
 import GoalsView from './components/views/GoalsView'
+import CareerView from './components/views/CareerView'
 import SettingsView from './components/views/SettingsView'
 import PrivacyPolicyView from './components/views/PrivacyPolicyView'
 import TermsOfServiceView from './components/views/TermsOfServiceView'
@@ -33,6 +34,7 @@ const getViewFromUrl = (): string => {
     if (path === '/tests') return 'tests'
     if (path === '/flashcards') return 'flashcards'
     if (path === '/goals') return 'goals'
+    if (path === '/career') return 'career'
     if (path === '/notes' || path === '/') return 'notes'
   }
   return 'notes'
@@ -211,7 +213,6 @@ function AppContent() {
           // Reset store guards to allow re-fetch
           const { useUsageStore } = await import('./stores/usageStore')
           const { useNotesStore } = await import('./stores/notesStore')
-          const { useFolderStore } = await import('./stores/folderStore')
           const { useFlashcardsStore } = await import('./stores/flashcardsStore')
           const { useTestsStore } = await import('./stores/testsStore')
           const { useGoalsStore } = await import('./stores/goalsStore')
@@ -332,14 +333,18 @@ function AppContent() {
     setIsUpgradeModalOpen(false)
   }
 
-  const handleNavigate = (view: string) => {
+  const handleNavigate = (view: string, noteId?: string) => {
     setCurrentView(view)
     setNavCounter(c => c + 1) // Increment nav counter to trigger view reset
     
     // Update URL to reflect current view (web only)
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const path = view === 'notes' ? '/' : `/${view}`
-      window.history.pushState({ view }, '', path)
+      window.history.pushState({ view, noteId }, '', path)
+      // If noteId is provided, store it for NotesView to pick up
+      if (noteId) {
+        (window as any).__pendingNoteId = noteId
+      }
     }
   }
 
@@ -385,6 +390,7 @@ function AppContent() {
         {currentView === 'tests' && <TestsView key={`tests-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
         {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
+        {currentView === 'career' && <CareerView onNavigate={handleNavigate} />}
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
         {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
         {currentView === 'terms' && <TermsOfServiceView onNavigate={handleNavigate} />}

@@ -27,7 +27,7 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const { name, folderId, noteId, noteName, cards } = req.body
+    const { name, noteId, noteName, cards } = req.body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Flashcard set name is required' })
@@ -69,7 +69,6 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       .insert({
         user_id: req.userId,
         name: name.trim(),
-        folder_id: folderId || null,
         note_id: noteId,
         note_name: noteName,
         cards: cards, // JSONB handled automatically by Supabase
@@ -86,7 +85,6 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
     const newSet = {
       id: data.id,
       name: data.name,
-      folderId: data.folder_id || null,
       noteId: data.note_id,
       noteName: data.note_name,
       cards: data.cards || [],

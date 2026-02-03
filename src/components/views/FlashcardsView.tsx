@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { View, Text, StyleSheet, Pressable, FlatList, Dimensions, Animated, Platform, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFlashcardsStore, type FlashcardSet } from '../../stores/flashcardsStore'
-import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { BackIcon, FolderIcon, DeleteIcon, FlashcardsIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons'
 import MobileBackButton from '../MobileBackButton'
@@ -14,13 +13,11 @@ interface FlashcardsViewProps {
 
 function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [currentSetId, setCurrentSetId] = useState<string | null>(null)
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
-  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   
   // Animation refs
@@ -28,12 +25,7 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const slideAnim = useRef(new Animated.Value(0)).current
   const prevSlideAnim = useRef(new Animated.Value(0)).current
   
-  const folders = getFoldersByType('flashcard')
-  const currentFolder = currentFolderId ? folders.find(f => f.id === currentFolderId) : null
-  const displayedFlashcardSets = currentFolderId 
-    ? flashcardSets.filter(s => s.folderId === currentFolderId)
-    : flashcardSets.filter(s => !s.folderId)
-  const displayedFolders = currentFolderId ? [] : folders
+  const displayedFlashcardSets = flashcardSets
   
   const currentSet = currentSetId ? getFlashcardSetById(currentSetId) : null
   const cards = currentSet ? currentSet.cards : []
@@ -57,7 +49,6 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   useEffect(() => {
     if (!isLoggedIn) {
       setCurrentSetId(null)
-      setCurrentFolderId(null)
       setCurrentCardIndex(0)
       setIsFlipped(false)
       setIsTransitioning(false)
@@ -92,27 +83,11 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   }
 
   const handleBackClick = () => {
-    setCurrentFolderId(null)
-  }
-
-  const handleFolderClick = (folderId: string) => {
-    setCurrentFolderId(folderId)
-  }
-
-  // Folder creation modal removed
-
-  const handleDeleteFolder = async (folderId: string) => {
-    const folder = folders.find(f => f.id === folderId)
-    if (!folder) return
-
-    try {
-      await removeFolder(folderId, 'flashcard')
-      // If we're inside the deleted folder, navigate back
-      if (currentFolderId === folderId) {
-        setCurrentFolderId(null)
-      }
-    } catch (error) {
-      console.error('Failed to delete folder:', error)
+    if (currentSetId) {
+      setCurrentSetId(null)
+      setCurrentCardIndex(0)
+      setIsFlipped(false)
+      flipAnim.setValue(0)
     }
   }
 
@@ -390,9 +365,8 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   }
 
   // Render flashcard sets grid view
-  type GridItem = (Folder & { itemType: 'folder' }) | (FlashcardSet & { itemType: 'set' })
+  type GridItem = FlashcardSet & { itemType: 'set' }
   const gridData: GridItem[] = [
-    ...displayedFolders.map(f => ({ ...f, itemType: 'folder' as const })),
     ...displayedFlashcardSets.map(s => ({ ...s, itemType: 'set' as const })),
   ]
 
@@ -412,16 +386,7 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
           flex: 0, // Don't take flex space on mobile
           maxWidth: '100%', // Prevent overflow
         }]}>
-          {currentFolder ? (
-            <>
-              <Pressable style={styles.backButton} onPress={handleBackClick}>
-                <BackIcon />
-              </Pressable>
-              <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentFolder.name}</Text>
-            </>
-          ) : (
-            <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Flashcards</Text>
-          )}
+          <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Flashcards</Text>
         </View>
         <View style={[
           styles.headerButtons, 
@@ -447,46 +412,27 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => {
-            if (item.itemType === 'folder') {
-              const folder = item as Folder & { itemType: 'folder' }
-              return (
-                <Pressable style={styles.folderCard} onPress={() => handleFolderClick(folder.id)}>
-                  <Pressable 
-                    style={styles.cardDeleteButton}
-                    onPress={async (e) => {
-                      e.stopPropagation()
-                      await handleDeleteFolder(folder.id)
-                    }}
-                  >
-                    <DeleteIcon />
-                  </Pressable>
-                  <FolderIcon />
-                  <Text style={styles.folderCardTitle}>{folder.name}</Text>
+            const set = item as FlashcardSet & { itemType: 'set' }
+            return (
+              <Pressable style={styles.setCard} onPress={() => handleSetClick(set.id)}>
+                <Pressable 
+                  style={styles.cardDeleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation()
+                    handleDeleteSet(set.id)
+                  }}
+                >
+                  <DeleteIcon />
                 </Pressable>
-              )
-            } else {
-              const set = item as FlashcardSet & { itemType: 'set' }
-              return (
-                <Pressable style={styles.setCard} onPress={() => handleSetClick(set.id)}>
-                  <Pressable 
-                    style={styles.cardDeleteButton}
-                    onPress={(e) => {
-                      e.stopPropagation()
-                      handleDeleteSet(set.id)
-                    }}
-                  >
-                    <DeleteIcon />
-                  </Pressable>
-                  <View style={styles.setCardIcon}>
-                    <FlashcardsIcon />
-                  </View>
-                  <Text style={styles.setCardTitle}>{set.name}</Text>
-                  <Text style={styles.setCardMeta}>
-                {set.cards.length} cards • From: {set.noteName}
-                  </Text>
-                </Pressable>
-              )
-            }
+                <View style={styles.setCardIcon}>
+                  <FlashcardsIcon />
+                </View>
+                <Text style={styles.setCardTitle}>{set.name}</Text>
+                <Text style={styles.setCardMeta}>
+                  {set.cards.length} cards • From: {set.noteName}
+                </Text>
+              </Pressable>
+            )
           }}
         />
       )}

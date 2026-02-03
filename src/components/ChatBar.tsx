@@ -176,7 +176,7 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
   }
 
   // Route intent using Gemini AI
-  const routeIntent = async (msg: string, mentionsList: Mention[]): Promise<{ intent: 'test' | 'flashcard' | 'course_search' | 'none'; school?: string; department?: string }> => {
+  const routeIntent = async (msg: string, mentionsList: Mention[]): Promise<{ intent: 'test' | 'flashcard' | 'course_search' | 'career_path' | 'none'; school?: string; department?: string; role?: string; company?: string; seniority?: string; major?: string }> => {
     const { supabase } = await import('../lib/supabase')
     const { data: { session } } = await supabase.auth.getSession()
     
@@ -223,7 +223,11 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
       return {
         intent: data.intent || 'none',
         school: data.school,
-        department: data.department
+        department: data.department,
+        role: data.role,
+        company: data.company,
+        seniority: data.seniority,
+        major: data.major
       }
     }
 
@@ -508,7 +512,7 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
             if (goalName.length < 5) {
               if (department) {
                 goalName = `${school} ${department} Courses`
-              } else {
+      } else {
                 goalName = `${school} Courses`
               }
             }
@@ -528,6 +532,98 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
           } catch (error) {
             console.error('Failed to add goal:', error)
             setStatusMessage({ type: 'error', text: 'Failed to save goal. Please try again.' })
+          }
+        }
+      }
+      // Handle career path generation
+      else if (intentResult.intent === 'career_path') {
+        const { supabase } = await import('../lib/supabase')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          throw new Error('You must be logged in to use this feature')
+        }
+
+        console.log('[ChatBar] Career path intent received:', {
+          role: intentResult.role,
+          company: intentResult.company,
+          seniority: intentResult.seniority,
+          major: intentResult.major,
+          fullIntent: intentResult
+        })
+
+        if (!intentResult.role || !intentResult.company) {
+          console.warn('[ChatBar] Missing role or company:', {
+            role: intentResult.role,
+            company: intentResult.company,
+            reasoning: intentResult.reasoning
+          })
+          setStatusMessage({ 
+            type: 'error', 
+            text: `Please specify both a role and company. Received: role="${intentResult.role || 'missing'}", company="${intentResult.company || 'missing'}". Try: "I want to work as a fullstack engineer at OpenAI"` 
+          })
+          setMessage('')
+          setIsLoading(false)
+          return
+        }
+
+        const API_BASE_URL = getApiBaseUrl()
+        const response = await fetch(`${API_BASE_URL}/api/career/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            role: intentResult.role,
+            company: intentResult.company,
+            seniority: intentResult.seniority || 'mid',
+            major: intentResult.major
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication required. Please log in to use this feature.')
+          }
+          
+          if (response.status === 429) {
+            const remaining = data.remaining || 0
+            const limit = data.limit || 0
+            throw new Error(
+              `Monthly token limit exceeded. You have used ${limit - remaining} of ${limit} tokens. ` +
+              `Please upgrade your plan or wait until next month.`
+            )
+          }
+          
+          throw new Error(data.message || data.error || 'Failed to generate career path')
+        }
+
+        if (data.success) {
+          try {
+            const { useCareerStore } = await import('../stores/careerStore')
+            await useCareerStore.getState().addCareerPath(
+              data.targetId,
+              data.graphId,
+              data.role,
+              data.company,
+              data.seniority,
+              data.major,
+              data.nodes || []
+            )
+            setStatusMessage({ 
+              type: 'success', 
+              text: `Career path generated for ${intentResult.role} at ${intentResult.company}!` 
+            })
+            setMessage('')
+          } catch (error) {
+            console.error('Failed to save career path:', error)
+            setStatusMessage({ 
+              type: 'error', 
+              text: 'Career path generated but failed to save. Please try again.' 
+            })
           }
         }
       }

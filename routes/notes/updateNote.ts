@@ -4,6 +4,7 @@ import '../../load-env.js'
 import express, { Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth.js'
+import { autoTagSkills } from './autoTagSkills.js'
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
@@ -28,18 +29,63 @@ router.put('/update/:id', authenticateUser, async (req: AuthenticatedRequest, re
     }
 
     const { id } = req.params
-    const { content } = req.body
+    const { content, skillIds } = req.body
 
-    if (content === undefined) {
-      return res.status(400).json({ error: 'Content is required' })
+    if (content === undefined && skillIds === undefined) {
+      return res.status(400).json({ error: 'Either content or skillIds is required' })
+    }
+
+    // Get existing note to check if we need to auto-tag
+    const { data: existingNote } = await supabase
+      .from('notes')
+      .select('name, content, skill_ids')
+      .eq('id', id)
+      .eq('user_id', req.userId)
+      .single()
+
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    let finalSkillIds: string[] | undefined = undefined
+
+    if (content !== undefined) {
+      updateData.content = typeof content === 'string' ? content : ''
+      
+      // Auto-tag skills if content is being updated and skillIds are not explicitly provided
+      // Only auto-tag if content changed significantly (more than 50 chars difference)
+      // AND if note doesn't already have skills tagged (to avoid overwriting manual tags)
+      const newContent = typeof content === 'string' ? content.trim() : ''
+      const oldContent = existingNote?.content || ''
+      const existingSkillIds = existingNote?.skill_ids || []
+      const contentChanged = Math.abs(newContent.length - oldContent.length) > 50 || 
+                            newContent.substring(0, 100) !== oldContent.substring(0, 100)
+      
+      if (newContent && contentChanged && skillIds === undefined && existingSkillIds.length === 0) {
+        try {
+          const autoTaggedSkills = await autoTagSkills(
+            req.userId, 
+            newContent, 
+            existingNote?.name || 'Untitled'
+          )
+          finalSkillIds = autoTaggedSkills
+          console.log(`Auto-tagged note "${existingNote?.name || id}" with ${autoTaggedSkills.length} skills`)
+        } catch (error) {
+          console.error('Error auto-tagging skills:', error)
+          // Continue without auto-tagging if it fails
+        }
+      }
+    }
+
+    if (skillIds !== undefined) {
+      updateData.skill_ids = Array.isArray(skillIds) ? skillIds : []
+    } else if (finalSkillIds !== undefined) {
+      updateData.skill_ids = finalSkillIds
     }
 
     const { data, error } = await supabase
       .from('notes')
-      .update({
-        content: typeof content === 'string' ? content : '',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .eq('user_id', req.userId)
       .select()
@@ -57,8 +103,8 @@ router.put('/update/:id', authenticateUser, async (req: AuthenticatedRequest, re
     const updatedNote = {
       id: data.id,
       name: data.name,
-      folderId: data.folder_id || null,
       content: data.content || '',
+      skillIds: data.skill_ids || [],
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }

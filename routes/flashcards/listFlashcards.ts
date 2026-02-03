@@ -42,7 +42,6 @@ router.get('/list', authenticateUser, async (req: AuthenticatedRequest, res: Res
     const transformedSets = (flashcardSets || []).map((set: any) => ({
       id: set.id,
       name: set.name,
-      folderId: set.folder_id || null,
       noteId: set.note_id,
       noteName: set.note_name,
       cards: set.cards || [],

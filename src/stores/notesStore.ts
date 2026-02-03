@@ -9,6 +9,7 @@ export interface Note {
   name: string
   folderId?: string | null
   content?: string
+  skillIds?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -22,6 +23,7 @@ interface NotesStore {
   removeNote: (id: string) => Promise<void>
   updateNoteContentLocal: (id: string, content: string) => void
   updateNoteContent: (id: string, content: string) => Promise<void>
+  updateNoteSkills: (id: string, skillIds: string[]) => Promise<void>
   moveNoteToFolder: (id: string, folderId: string | null) => Promise<void>
   reset: () => void
 }
@@ -67,7 +69,7 @@ export const useNotesStore = create<NotesStore>()(
         }
       },
 
-      addNote: async (name: string, folderId?: string) => {
+      addNote: async (name: string, folderId?: string, content?: string) => {
         // Dynamic import to avoid require cycle
         const { useAuthStore } = await import('./authStore')
         const { authReady, session } = useAuthStore.getState()
@@ -82,7 +84,7 @@ export const useNotesStore = create<NotesStore>()(
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ name, folderId })
+            body: JSON.stringify({ name, content })
           })
 
           if (!response.ok) {
@@ -96,6 +98,18 @@ export const useNotesStore = create<NotesStore>()(
           set((state) => ({
             notes: [...state.notes, newNote]
           }))
+
+          // Sync from Supabase to get auto-tagged skills if content was provided
+          if (content) {
+            // Small delay to allow backend to complete auto-tagging
+            setTimeout(async () => {
+              try {
+                await get().syncFromSupabase()
+              } catch (syncError) {
+                console.warn('Failed to sync notes after auto-tagging:', syncError)
+              }
+            }, 2000)
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
           set({ error: errorMessage })
@@ -156,6 +170,44 @@ export const useNotesStore = create<NotesStore>()(
         }
       },
 
+      updateNoteSkills: async (id: string, skillIds: string[]) => {
+        const { useAuthStore } = await import('./authStore')
+        const { authReady, session } = useAuthStore.getState()
+        if (!authReady || !session) throw new Error('Not authenticated')
+
+        set({ error: null })
+        try {
+          const API_BASE_URL = getApiBaseUrl()
+          const response = await fetch(`${API_BASE_URL}/api/notes/update/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ skillIds })
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            const errorMessage = errorData.error || errorData.message || 'Failed to update note skills'
+            throw new Error(errorMessage)
+          }
+
+          const updatedNote: Note = await response.json()
+
+          // Update state to ensure it matches API response
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.id === id ? updatedNote : note
+            )
+          }))
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to update note skills'
+          set({ error: errorMessage })
+          throw error
+        }
+      },
+
       removeNote: async (id: string) => {
         const { useAuthStore } = await import('./authStore')
         const { authReady, session } = useAuthStore.getState()
@@ -201,7 +253,7 @@ export const useNotesStore = create<NotesStore>()(
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ folderId })
+            body: JSON.stringify({})
           })
 
           if (!response.ok) {

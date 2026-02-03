@@ -27,35 +27,39 @@ router.get('/list', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const { data: tests, error } = await supabase
-      .from('tests')
+    const { data, error } = await supabase
+      .from('user_career_paths')
       .select('*')
       .eq('user_id', req.userId)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error listing tests:', error)
-      return res.status(500).json({ error: 'Failed to list tests', message: error.message })
+      console.error('Error fetching career paths:', error)
+      return res.status(500).json({ error: 'Failed to fetch career paths', message: error.message })
     }
 
-    // Transform from snake_case to camelCase and parse JSONB questions
-    const transformedTests = (tests || []).map((test: any) => ({
-      id: test.id,
-      name: test.name,
-      noteId: test.note_id,
-      noteName: test.note_name,
-      questions: test.questions || [],
-      createdAt: test.created_at,
-      updatedAt: test.updated_at,
+    const careerPaths = (data || []).map(cp => ({
+      id: cp.id,
+      targetId: cp.target_id,
+      graphId: cp.graph_id,
+      role: cp.role,
+      company: cp.company,
+      seniority: cp.seniority,
+      major: cp.major,
+      nodes: cp.nodes || [],
+      createdAt: cp.created_at,
+      updatedAt: cp.updated_at
     }))
 
-    res.json(transformedTests)
+    res.json({
+      success: true,
+      careerPaths
+    })
   } catch (error) {
-    console.error('Error in listTests:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to list tests'
+    console.error('Error in listCareerPaths:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to list career paths'
     res.status(500).json({ error: errorMessage })
   }
 })
 
 export default router
-

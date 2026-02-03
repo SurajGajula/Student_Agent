@@ -90,7 +90,6 @@ export const useTestsStore = create<TestsStore>()(
             },
             body: JSON.stringify({
               name: testData.name,
-              folderId: testData.folderId,
               noteId: testData.noteId,
               noteName: testData.noteName,
               questions: testData.questions
@@ -164,7 +163,7 @@ export const useTestsStore = create<TestsStore>()(
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ folderId })
+            body: JSON.stringify({})
           })
 
           if (!response.ok) {

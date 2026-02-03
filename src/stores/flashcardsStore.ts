@@ -88,7 +88,6 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
             },
             body: JSON.stringify({
               name: setData.name,
-              folderId: setData.folderId,
               noteId: setData.noteId,
               noteName: setData.noteName,
               cards: setData.cards
@@ -162,7 +161,7 @@ export const useFlashcardsStore = create<FlashcardsStore>()(
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ folderId })
+            body: JSON.stringify({})
           })
 
           if (!response.ok) {

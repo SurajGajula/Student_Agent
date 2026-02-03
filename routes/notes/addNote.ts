@@ -4,6 +4,7 @@ import '../../load-env.js'
 import express, { Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth.js'
+import { autoTagSkills } from './autoTagSkills.js'
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
@@ -27,10 +28,23 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
-    const { name, folderId } = req.body
+    const { name, skillIds, content } = req.body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Note name is required' })
+    }
+
+    // Auto-tag skills if content is provided and skillIds are not explicitly provided
+    let finalSkillIds: string[] = Array.isArray(skillIds) ? skillIds : []
+    if (content && typeof content === 'string' && content.trim() && finalSkillIds.length === 0) {
+      try {
+        const autoTaggedSkills = await autoTagSkills(req.userId, content.trim(), name.trim())
+        finalSkillIds = autoTaggedSkills
+        console.log(`Auto-tagged note "${name}" with ${autoTaggedSkills.length} skills`)
+      } catch (error) {
+        console.error('Error auto-tagging skills:', error)
+        // Continue without auto-tagging if it fails
+      }
     }
 
     // Check plan limits for free users
@@ -61,8 +75,8 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
       .insert({
         user_id: req.userId,
         name: name.trim(),
-        folder_id: folderId || null,
-        content: '',
+        content: (content && typeof content === 'string') ? content.trim() : '',
+        skill_ids: finalSkillIds,
       })
       .select()
       .single()
@@ -76,8 +90,8 @@ router.post('/add', authenticateUser, async (req: AuthenticatedRequest, res: Res
     const newNote = {
       id: data.id,
       name: data.name,
-      folderId: data.folder_id || null,
       content: data.content || '',
+      skillIds: data.skill_ids || [],
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }

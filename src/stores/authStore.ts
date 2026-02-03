@@ -45,14 +45,12 @@ export const syncAllStores = async () => {
   try {
     // Use dynamic imports to avoid require cycles
     const [
-      { useFolderStore },
       { useNotesStore },
       { useTestsStore },
       { useFlashcardsStore },
       { useGoalsStore },
       { useUsageStore },
     ] = await Promise.all([
-      import('./folderStore'),
       import('./notesStore'),
       import('./testsStore'),
       import('./flashcardsStore'),
@@ -61,7 +59,6 @@ export const syncAllStores = async () => {
     ])
     
     await Promise.all([
-      useFolderStore.getState().syncFromSupabase().catch(err => console.error('Folder sync error:', err)),
       // Classes store removed - page is commented out
       useNotesStore.getState().syncFromSupabase().catch(err => console.error('Notes sync error:', err)),
       useTestsStore.getState().syncFromSupabase().catch(err => console.error('Tests sync error:', err)),
@@ -80,7 +77,6 @@ export const syncAllStores = async () => {
 // Uses dynamic imports to avoid require cycles
 const clearAllStores = async () => {
   const storageKeys = [
-    'folders-storage',
     'notes-storage',
     'tests-storage',
     'flashcards-storage',
@@ -95,36 +91,23 @@ const clearAllStores = async () => {
     await Promise.all(storageKeys.map(key => AsyncStorage.removeItem(key)))
   }
 
-  // Use dynamic imports to avoid require cycles
-  // Wrap in try-catch to handle module resolution errors during logout
-  try {
-    const [
-      folderStoreModule,
-      notesStoreModule,
-      testsStoreModule,
-      flashcardsStoreModule,
-      goalsStoreModule,
-    ] = await Promise.allSettled([
-      import('./folderStore'),
-      import('./notesStore'),
-      import('./testsStore'),
-      import('./flashcardsStore'),
-      import('./goalsStore'),
-    ])
+    // Use dynamic imports to avoid require cycles
+    // Wrap in try-catch to handle module resolution errors during logout
+    try {
+      const [
+        notesStoreModule,
+        testsStoreModule,
+        flashcardsStoreModule,
+        goalsStoreModule,
+      ] = await Promise.allSettled([
+        import('./notesStore'),
+        import('./testsStore'),
+        import('./flashcardsStore'),
+        import('./goalsStore'),
+      ])
 
-    // Reset stores only if imports succeeded
-    // Wrap each setState in try-catch to handle errors gracefully
-    if (folderStoreModule.status === 'fulfilled' && folderStoreModule.value?.useFolderStore) {
-      try {
-        folderStoreModule.value.useFolderStore.setState({
-          folders: [],
-          isLoading: false,
-          error: null,
-        })
-      } catch (err) {
-        console.warn('[authStore] Error resetting folderStore:', err)
-      }
-    }
+      // Reset stores only if imports succeeded
+      // Wrap each setState in try-catch to handle errors gracefully
 
     if (notesStoreModule.status === 'fulfilled' && notesStoreModule.value?.useNotesStore) {
       try {

@@ -6,6 +6,7 @@ import registry from './registry.js'
 import './test.js'
 import './flashcard.js'
 import './courseSearch.js'
+import './careerPath.js'
 
 export default registry
 

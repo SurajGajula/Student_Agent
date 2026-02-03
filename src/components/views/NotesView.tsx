@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AddNoteModal from '../modals/AddNoteModal'
 import UploadNotesModal from '../modals/UploadNotesModal'
 import { useNotesStore, type Note } from '../../stores/notesStore'
-import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useUsageStore } from '../../stores/usageStore'
 import { parseNotesImage, parseNotesFromYouTube } from '../../lib/notesParser'
@@ -29,13 +28,11 @@ const SpinnerIcon = () => (
 function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const { notes, addNote, updateNoteContentLocal, updateNoteContent, removeNote, moveNoteToFolder } = useNotesStore()
-  const { getFoldersByType, removeFolder } = useFolderStore()
   const { isLoggedIn } = useAuthStore()
   const { planName } = useUsageStore()
   const isPro = planName === 'pro'
@@ -45,19 +42,13 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const editorInputRef = useRef<TextInput>(null)
   const isInsertingSymbolRef = useRef(false)
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
-  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
   const insets = useSafeAreaInsets()
   const { setIsInDetailMode } = useDetailMode()
 
-  const folders = getFoldersByType('note')
-  const currentFolder = currentFolderId ? folders.find(f => f.id === currentFolderId) : null
   const currentNote = currentNoteId ? notes.find(n => n.id === currentNoteId) : null
-  const displayedNotes = currentFolderId 
-    ? notes.filter(n => n.folderId === currentFolderId)
-    : notes.filter(n => !n.folderId)
-  const displayedFolders = currentFolderId ? [] : folders
+  const displayedNotes = notes
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const numColumns = windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
   const isMobile = windowWidth <= 768
@@ -73,7 +64,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   // Reset local state when logged out
   useEffect(() => {
     if (!isLoggedIn) {
-      setCurrentFolderId(null)
       setCurrentNoteId(null)
       setIsNoteModalOpen(false)
       setIsUploadModalOpen(false)
@@ -81,6 +71,17 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
       setSelection({ start: 0, end: 0 })
     }
   }, [isLoggedIn])
+
+  // Handle navigation to specific note (from career graph)
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const pendingNoteId = (window as any).__pendingNoteId
+      if (pendingNoteId && notes.some(n => n.id === pendingNoteId)) {
+        setCurrentNoteId(pendingNoteId)
+        delete (window as any).__pendingNoteId
+      }
+    }
+  }, [notes])
 
   // Initialize file input for web
   useEffect(() => {
@@ -218,39 +219,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const handleDragEnd = () => {
     if (Platform.OS !== 'web') return
     setDraggedItemId(null)
-    setDragOverFolderId(null)
-  }
-
-  const handleDragOver = (folderId: string | null) => {
-    if (Platform.OS !== 'web') return
-    setDragOverFolderId(folderId)
-  }
-
-  const handleDragLeave = () => {
-    if (Platform.OS !== 'web') return
-    setDragOverFolderId(null)
-  }
-
-  const handleDrop = async (targetFolderId: string | null) => {
-    if (Platform.OS !== 'web' || !draggedItemId) return
-    
-    const note = notes.find(n => n.id === draggedItemId)
-    if (!note) return
-
-    if (note.folderId === targetFolderId) {
-      setDragOverFolderId(null)
-      return
-    }
-
-    try {
-      await moveNoteToFolder(draggedItemId, targetFolderId)
-    } catch (error) {
-      console.error('Failed to move note:', error)
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to move note')
-      setTimeout(() => setErrorMessage(null), 3000)
-    }
-    
-    setDragOverFolderId(null)
   }
 
   const handleAddNote = () => {
@@ -267,7 +235,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
 
   const handleSubmitNote = async (noteName: string) => {
     try {
-      await addNote(noteName, currentFolderId || undefined)
+      await addNote(noteName, undefined)
       setIsNoteModalOpen(false)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
@@ -276,15 +244,9 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
     }
   }
 
-  const handleFolderClick = (folderId: string) => {
-    setCurrentFolderId(folderId)
-  }
-
   const handleBackClick = () => {
     if (currentNoteId) {
       setCurrentNoteId(null)
-    } else {
-      setCurrentFolderId(null)
     }
   }
 
@@ -451,22 +413,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
 
   // Folder creation modal removed
 
-  const handleDeleteFolder = async (folderId: string) => {
-    const folder = folders.find(f => f.id === folderId)
-    if (!folder) return
-
-    try {
-      await removeFolder(folderId, 'note')
-      // If we're inside the deleted folder, navigate back
-      if (currentFolderId === folderId) {
-        setCurrentFolderId(null)
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete folder'
-      setErrorMessage(errorMessage)
-      setTimeout(() => setErrorMessage(null), 3000)
-    }
-  }
 
   const handleUploadNotes = () => {
     if (!isLoggedIn) {
@@ -505,13 +451,14 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
         }
 
         try {
-          await addNote(noteTitle, currentFolderId || undefined)
+          // Create note with content so auto-tagging can happen
+          await addNote(noteTitle, undefined, extractedText)
         
           const currentState = useNotesStore.getState()
           const allNotes = currentState.notes
           
           const newNote = allNotes
-            .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
+            .filter(n => n.name === noteTitle)
             .sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -519,7 +466,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             })[0]
 
           if (newNote) {
-            await updateNoteContent(newNote.id, extractedText)
             setCurrentNoteId(newNote.id)
             setSuccessMessage('Notes generated successfully!')
             setTimeout(() => setSuccessMessage(null), 3000)
@@ -581,13 +527,14 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
         }
 
         try {
-          await addNote(noteTitle, currentFolderId || undefined)
+          // Create note with content so auto-tagging can happen
+          await addNote(noteTitle, undefined, extractedText)
         
         const currentState = useNotesStore.getState()
         const allNotes = currentState.notes
         
         const newNote = allNotes
-          .filter(n => n.name === noteTitle && (n.folderId || null) === currentFolderId)
+          .filter(n => n.name === noteTitle)
             .sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -595,7 +542,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             })[0]
         
         if (newNote) {
-            await updateNoteContent(newNote.id, extractedText)
           setCurrentNoteId(newNote.id)
           setSuccessMessage('Notes uploaded successfully')
           setTimeout(() => setSuccessMessage(null), 3000)
@@ -793,15 +739,15 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
           </View>
         )}
         <ScrollView 
-          ref={scrollViewRef}
-          style={styles.editorContainer}
-          contentContainerStyle={styles.editorContentContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          {...(Platform.OS === 'web' && {
-            className: 'note-editor-scroll',
-          })}
-        >
+            ref={scrollViewRef}
+            style={styles.editorContainer}
+            contentContainerStyle={styles.editorContentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            {...(Platform.OS === 'web' && {
+              className: 'note-editor-scroll',
+            })}
+          >
           <Pressable
             style={styles.editorWrapper}
             {...(Platform.OS !== 'web' && !isEditorFocused && {
@@ -908,10 +854,9 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
     )
   }
 
-  // Render notes grid/folder view
-  type GridItem = (Folder & { itemType: 'folder' }) | (Note & { itemType: 'note' })
+  // Render notes grid
+  type GridItem = Note & { itemType: 'note' }
   const gridData: GridItem[] = [
-    ...displayedFolders.map(f => ({ ...f, itemType: 'folder' as const })),
     ...displayedNotes.map(n => ({ ...n, itemType: 'note' as const })),
   ]
 
@@ -931,16 +876,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
           flex: 0, // Don't take flex space on mobile
           maxWidth: '100%', // Prevent overflow
         }]}>
-          {currentFolder ? (
-            <>
-              <Pressable style={styles.backButton} onPress={handleBackClick}>
-                <BackIcon />
-              </Pressable>
-              <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1} ellipsizeMode="tail">{currentFolder.name}</Text>
-            </>
-          ) : (
-            <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Notes</Text>
-          )}
+          <Text style={[styles.title, isMobile && styles.titleMobile]} numberOfLines={1}>Notes</Text>
         </View>
         <View style={[
           styles.headerButtons, 
@@ -1001,10 +937,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
                 setDragOverFolderId(null)
               }
             },
-            onDrop: (e: any) => {
-              e.preventDefault()
-              handleDrop(null)
-            },
           })}
         >
           <FlatList
@@ -1014,73 +946,37 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.grid}
             renderItem={({ item }) => {
-              if (item.itemType === 'folder') {
-                const folder = item as Folder & { itemType: 'folder' }
-                const isDragOver = dragOverFolderId === folder.id
-                return (
+              const note = item as Note & { itemType: 'note' }
+              const isDragging = draggedItemId === note.id
+              return (
+                <Pressable
+                  style={[styles.noteCard, isDragging && styles.noteCardDragging]}
+                  onPress={() => handleNoteClick(note.id)}
+                  {...(Platform.OS === 'web' && {
+                    draggable: true,
+                    onDragStart: () => handleDragStart(note.id),
+                    onDragEnd: handleDragEnd,
+                  })}
+                >
                   <Pressable 
-                    style={[styles.folderCard, isDragOver && styles.folderCardDragOver]}
-                    onPress={() => handleFolderClick(folder.id)}
-                    {...(Platform.OS === 'web' && {
-                      onDragOver: (e: any) => {
-                        e.preventDefault()
+                    style={styles.cardDeleteButton}
+                    onPress={async (e) => {
                     e.stopPropagation()
-                        handleDragOver(folder.id)
-                      },
-                      onDragLeave: handleDragLeave,
-                      onDrop: (e: any) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleDrop(folder.id)
-                      },
-                    })}
+                      try {
+                        await removeNote(note.id)
+                      } catch (error) {
+                        console.error('Failed to remove note:', error)
+                      }
+                    }}
                   >
-                    <Pressable 
-                      style={styles.cardDeleteButton}
-                      onPress={async (e) => {
-                        e.stopPropagation()
-                        await handleDeleteFolder(folder.id)
-                      }}
-                    >
-                      <DeleteIcon />
-                    </Pressable>
-                    <FolderIcon />
-                    <Text style={styles.folderCardTitle}>{folder.name}</Text>
+                    <DeleteIcon />
                   </Pressable>
-                )
-              } else {
-                const note = item as Note & { itemType: 'note' }
-                const isDragging = draggedItemId === note.id
-                return (
-                  <Pressable
-                    style={[styles.noteCard, isDragging && styles.noteCardDragging]}
-                    onPress={() => handleNoteClick(note.id)}
-                    {...(Platform.OS === 'web' && {
-                      draggable: true,
-                      onDragStart: () => handleDragStart(note.id),
-                      onDragEnd: handleDragEnd,
-                    })}
-                  >
-                    <Pressable 
-                      style={styles.cardDeleteButton}
-                      onPress={async (e) => {
-                    e.stopPropagation()
-                    try {
-                      await removeNote(note.id)
-                    } catch (error) {
-                      console.error('Failed to remove note:', error)
-                    }
-                  }}
-                    >
-                      <DeleteIcon />
-                    </Pressable>
-                    <View style={styles.noteCardIcon}>
-                      <NotesIcon />
-                    </View>
-                    <Text style={styles.noteCardTitle} numberOfLines={2} ellipsizeMode="tail">{note.name}</Text>
-                  </Pressable>
-                )
-              }
+                  <View style={styles.noteCardIcon}>
+                    <NotesIcon />
+                  </View>
+                  <Text style={styles.noteCardTitle} numberOfLines={2} ellipsizeMode="tail">{note.name}</Text>
+                </Pressable>
+              )
             }}
           />
         </View>

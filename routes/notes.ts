@@ -98,7 +98,7 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
         
         // First, get video title
         try {
-          const { stdout: titleOutput } = await execAsync(`yt-dlp --get-title --no-warnings "${youtubeUrl}"`, {
+          const { stdout: titleOutput } = await execAsync(`yt-dlp --get-title --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${youtubeUrl}"`, {
             timeout: 30000
           })
           videoTitleFromInfo = titleOutput.trim()
@@ -108,10 +108,46 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
         }
         
         // Extract audio in best available format (opus is typically best quality)
-        // yt-dlp will automatically choose the best audio format if opus isn't available
-        await execAsync(`yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`, {
-          timeout: 600000 // 10 minute timeout for long videos
-        })
+        // Add user agent and other options to avoid 403 errors
+        // Try multiple strategies to bypass YouTube's restrictions
+        const ytDlpStrategies = [
+          // Strategy 1: Android client (often more reliable)
+          `yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings --user-agent "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36" --extractor-args "youtube:player_client=android" -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`,
+          // Strategy 2: Web client with modern user agent
+          `yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --extractor-args "youtube:player_client=web" -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`,
+          // Strategy 3: iOS client
+          `yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15" --extractor-args "youtube:player_client=ios" -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`,
+          // Strategy 4: TV client
+          `yt-dlp -x --audio-format opus --audio-quality 0 --no-warnings --extractor-args "youtube:player_client=tv" -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`
+        ]
+        
+        let downloadSuccess = false
+        let lastError: Error | null = null
+        
+        for (let i = 0; i < ytDlpStrategies.length; i++) {
+          try {
+            console.log(`Trying download strategy ${i + 1}/${ytDlpStrategies.length}...`)
+            await execAsync(ytDlpStrategies[i], {
+              timeout: 600000 // 10 minute timeout for long videos
+            })
+            downloadSuccess = true
+            console.log(`Download successful with strategy ${i + 1}`)
+            break
+          } catch (strategyError) {
+            lastError = strategyError instanceof Error ? strategyError : new Error(String(strategyError))
+            console.log(`Strategy ${i + 1} failed:`, lastError.message)
+            if (i < ytDlpStrategies.length - 1) {
+              // Wait a bit before trying next strategy
+              await new Promise(resolve => setTimeout(resolve, 2000))
+            }
+          }
+        }
+        
+        if (!downloadSuccess) {
+          // If all strategies fail, try to use transcript API as fallback
+          console.log('All download strategies failed, attempting to use transcript API as fallback...')
+          throw new Error('YT_DLP_FALLBACK_TO_TRANSCRIPT')
+        }
         
         // Find the actual file that was created (yt-dlp adds extension)
         let tempFile = `${tempFileBase}.opus`
@@ -181,9 +217,112 @@ Requirements for the notes:
         ]
       } catch (audioError) {
         console.error('Error extracting audio:', audioError)
-        return res.status(500).json({ 
-          error: 'Failed to extract audio from YouTube video. The video may be unavailable, private, or restricted.' 
-        })
+        
+        // If yt-dlp fails, try to use YouTube transcript API as fallback
+        if (audioError instanceof Error && audioError.message === 'YT_DLP_FALLBACK_TO_TRANSCRIPT') {
+          console.log('Attempting to use YouTube transcript API...')
+          try {
+            // Try to get transcript using yt-dlp's transcript feature
+            let transcriptText = ''
+            try {
+              const { stdout: transcriptOutput } = await execAsync(`yt-dlp --write-auto-sub --sub-lang en --skip-download --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${youtubeUrl}" 2>&1 || yt-dlp --list-subs --no-warnings "${youtubeUrl}"`, {
+                timeout: 30000
+              })
+              
+              // Try to extract transcript directly
+              const transcriptCommand = `yt-dlp --write-auto-sub --sub-lang en --skip-download --convert-subs srt --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${tempFileBase}.%(ext)s" "${youtubeUrl}"`
+              await execAsync(transcriptCommand, { timeout: 60000 })
+              
+              // Look for SRT file
+              const srtFile = `${tempFileBase}.en.srt`
+              if (fs.existsSync(srtFile)) {
+                const srtContent = fs.readFileSync(srtFile, 'utf-8')
+                // Parse SRT: remove timestamps and sequence numbers, keep only text
+                transcriptText = srtContent
+                  .replace(/\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n/g, '')
+                  .replace(/^\d+\n/gm, '')
+                  .split('\n')
+                  .filter(line => line.trim().length > 0)
+                  .join(' ')
+                fs.unlinkSync(srtFile)
+              }
+            } catch (transcriptDlpError) {
+              console.log('yt-dlp transcript extraction failed, trying direct API...')
+            }
+            
+            // If yt-dlp transcript failed, try direct YouTube API
+            if (!transcriptText || transcriptText.length < 100) {
+              const transcriptUrl = `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}&fmt=srv3`
+              const transcriptResponse = await fetch(transcriptUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+              })
+              
+              if (transcriptResponse.ok) {
+                const transcriptXml = await transcriptResponse.text()
+                // Parse XML transcript to text
+                const textMatches = transcriptXml.match(/<text[^>]*>([^<]+)<\/text>/g)
+                if (textMatches && textMatches.length > 0) {
+                  transcriptText = textMatches
+                    .map(match => match.replace(/<text[^>]*>|<\/text>/g, '').trim())
+                    .filter(text => text.length > 0)
+                    .join(' ')
+                }
+              }
+            }
+            
+            if (transcriptText && transcriptText.length > 100) {
+              console.log(`Using transcript (${transcriptText.length} chars) instead of audio`)
+              
+              // Use transcript text instead of audio
+              prompt = `Generate comprehensive lecture notes from this YouTube video transcript.
+
+Video Title: ${videoTitleFromInfo || 'Unknown'}
+
+Transcript:
+${transcriptText.substring(0, 100000)}${transcriptText.length > 100000 ? '...' : ''}
+
+IMPORTANT: At the very beginning of your response, on the first line, provide ONLY the video title in this exact format:
+VIDEO_TITLE: ${videoTitleFromInfo || 'Unknown'}
+
+Then on the next line, start the notes content.
+
+Requirements for the notes:
+- Write in first person or direct explanation style (avoid phrases like "the transcript says", "the video explains", etc.)
+- Include main topics and concepts covered
+- Include key points and explanations
+- Include important formulas or equations (preserve as written)
+- Include examples and use cases
+- Include any course codes, dates, or references
+- Use plain text only - NO markdown formatting (no **, ###, ##, *, etc.)
+- Format with clear sections using plain text headers (just capitalized text, no markdown)
+- Use bullet points with plain text dashes (-) only
+- Return only the notes content after the VIDEO_TITLE line, no introductory or concluding text`
+
+              estimatedTokens = Math.ceil(transcriptText.length / 4) + 3000 // Rough estimate: ~4 chars per token
+              
+              parts = [
+                { text: prompt }
+              ]
+            } else {
+              throw new Error('Could not extract transcript - video may not have captions enabled')
+            }
+          } catch (transcriptError) {
+            console.error('Transcript fallback also failed:', transcriptError)
+            return res.status(500).json({ 
+              error: 'Failed to extract audio or transcript from YouTube video. The video may be unavailable, private, restricted, or may not have captions enabled. Please ensure the video has captions/subtitles available.',
+              suggestion: 'Try: 1) Ensure the video has captions enabled, 2) Update yt-dlp: pip install --upgrade yt-dlp, or 3) Try a different video',
+              details: process.env.NODE_ENV === 'development' ? (audioError instanceof Error ? audioError.message : String(audioError)) : undefined
+            })
+          }
+        } else {
+          return res.status(500).json({ 
+            error: 'Failed to extract audio from YouTube video. The video may be unavailable, private, or restricted.',
+            suggestion: 'Try: 1) Update yt-dlp: pip install --upgrade yt-dlp, 2) Ensure the video is public and accessible, or 3) Try a different video',
+            details: process.env.NODE_ENV === 'development' ? (audioError instanceof Error ? audioError.message : String(audioError)) : undefined
+          })
+        }
       }
     } else {
       // File processing (existing logic)

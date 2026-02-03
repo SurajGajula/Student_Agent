@@ -28,7 +28,6 @@ router.put('/move/:id', authenticateUser, async (req: AuthenticatedRequest, res:
     }
 
     const { id } = req.params
-    const { folderId } = req.body
 
     // First check if note exists and belongs to user
     const { data: existingNote, error: checkError } = await supabase
@@ -45,7 +44,6 @@ router.put('/move/:id', authenticateUser, async (req: AuthenticatedRequest, res:
     const { data, error } = await supabase
       .from('notes')
       .update({
-        folder_id: folderId || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -62,7 +60,6 @@ router.put('/move/:id', authenticateUser, async (req: AuthenticatedRequest, res:
     const updatedNote = {
       id: data.id,
       name: data.name,
-      folderId: data.folder_id || null,
       content: data.content || '',
       createdAt: data.created_at,
       updatedAt: data.updated_at,

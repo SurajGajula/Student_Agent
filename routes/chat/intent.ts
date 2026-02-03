@@ -39,9 +39,13 @@ interface VertexAIError {
 }
 
 interface IntentResponse {
-  intent: 'test' | 'flashcard' | 'course_search' | 'none'
+  intent: 'test' | 'flashcard' | 'course_search' | 'career_path' | 'none'
   school?: string
   department?: string
+  role?: string
+  company?: string
+  seniority?: string
+  major?: string
   confidence?: number
   reasoning?: string
 }
@@ -226,6 +230,28 @@ Analyze the user's message and call the appropriate function. If the message doe
             confidence: 0.9,
             reasoning: 'User wants to search for courses'
           }
+        } else if (name === 'generate_career_path') {
+          console.log('[Intent Router] Career path function called with args:', JSON.stringify(args, null, 2))
+          
+          // Validate required parameters
+          if (!args.role || !args.company) {
+            console.warn('[Intent Router] Missing role or company in function call args:', args)
+            intentResult = {
+              intent: 'none',
+              confidence: 0,
+              reasoning: `Career path generation requires both role and company. Received: role=${args.role || 'missing'}, company=${args.company || 'missing'}`
+            }
+          } else {
+            intentResult = {
+              intent: 'career_path',
+              role: String(args.role).trim(),
+              company: String(args.company).trim(),
+              seniority: args.seniority ? String(args.seniority).trim() : 'mid',
+              major: args.major ? String(args.major).trim() : undefined,
+              confidence: 0.9,
+              reasoning: 'User wants to generate a career path skill graph'
+            }
+          }
         } else {
           intentResult = {
             intent: 'none',
@@ -253,7 +279,7 @@ Analyze the user's message and call the appropriate function. If the message doe
     console.log('Intent routing result:', intentResult)
 
     // Validate intent value
-    if (!['test', 'flashcard', 'course_search', 'none'].includes(intentResult.intent)) {
+    if (!['test', 'flashcard', 'course_search', 'career_path', 'none'].includes(intentResult.intent)) {
       console.warn('Invalid intent value, defaulting to none:', intentResult.intent)
       intentResult.intent = 'none'
     }

@@ -15,9 +15,9 @@ import notesCRUDRouter from './routes/notes/index.js' // New CRUD routes
 import chatRouter from './routes/chat/index.js'
 import testsRouter from './routes/tests/index.js' // Updated to use index
 import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
-import foldersCRUDRouter from './routes/folders/index.js' // New folders CRUD routes
 import goalsRouter from './routes/goals/index.js' // Goals routes
 import coursesRouter from './routes/courses/index.js' // Courses routes
+import careerRouter from './routes/career/index.js' // Career routes
 import userRouter from './routes/user/index.js' // User routes
 import usageRouter from './routes/usage.js'
 import stripeRouter from './routes/stripe.js'
@@ -90,12 +90,12 @@ app.use('/health', healthRouter)
 app.use('/api', scheduleRouter)
 app.use('/api', notesParseRouter) // Keep parse-notes route
 app.use('/api/notes', notesCRUDRouter) // New notes CRUD routes
-app.use('/api/folders', foldersCRUDRouter) // New folders CRUD routes
 app.use('/api', chatRouter)
 app.use('/api/tests', testsRouter) // Includes generate + CRUD
 app.use('/api/flashcards', flashcardsRouter) // Includes generate + CRUD
 app.use('/api/goals', goalsRouter) // Goals CRUD routes
 app.use('/api/courses', coursesRouter) // Course search routes
+app.use('/api/career', careerRouter) // Career path routes
 app.use('/api/user', userRouter) // User account management routes
 app.use('/api', usageRouter)
 app.use('/', indexRouter)
