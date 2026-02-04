@@ -88,10 +88,12 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
       // Extract audio only using yt-dlp (much more token-efficient than video)
       console.log('Extracting audio only from YouTube video using yt-dlp')
       
+      // Create temporary file for audio output (yt-dlp will add extension)
+      // Defined outside try block so it's accessible in catch block for transcript fallback
+      const tempDir = os.tmpdir()
+      const tempFileBase = path.join(tempDir, `audio_${Date.now()}`)
+      
       try {
-        // Create temporary file for audio output (yt-dlp will add extension)
-        const tempDir = os.tmpdir()
-        const tempFileBase = path.join(tempDir, `audio_${Date.now()}`)
         
         // Use yt-dlp to extract audio and get video title
         console.log('Downloading audio with yt-dlp...')
@@ -334,7 +336,7 @@ Requirements for the notes:
 
       const fileBuffer = req.file.buffer
       const base64File = fileBuffer.toString('base64')
-      const mimeType = req.file.mimetype || 'image/png'
+    const mimeType = req.file.mimetype || 'image/png'
 
       // Validate mime type and set appropriate prompt
       const isPdf = mimeType === 'application/pdf'
@@ -367,7 +369,7 @@ Preserve the structure, formatting, and organization of the notes including:
 Return the extracted text exactly as it appears, maintaining the original formatting and structure.
 Do not add any commentary or explanations, just return the raw extracted text.`
 
-      // Check token limit before making API call
+    // Check token limit before making API call
       // Estimate tokens needed - PDFs can be larger so increase estimate
       estimatedTokens = isPdf ? 5000 : 2000
 

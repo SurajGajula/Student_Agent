@@ -164,7 +164,7 @@ async function processReceipt(
 
     // Store IAP transaction info (optional, for tracking)
     if (transactionId) {
-      await supabase
+      const { error } = await supabase
         .from('iap_transactions')
         .insert({
           user_id: userId,
@@ -173,10 +173,11 @@ async function processReceipt(
           receipt_data: JSON.stringify(receiptData),
           expires_at: expiresDate?.toISOString() || null,
         })
-        .catch(err => {
-          // Log but don't fail if table doesn't exist
-          console.warn('Could not store IAP transaction:', err)
-        })
+      
+      if (error) {
+        // Log but don't fail if table doesn't exist
+        console.warn('Could not store IAP transaction:', error)
+      }
     }
 
     res.json({ 
