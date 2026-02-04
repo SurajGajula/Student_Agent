@@ -16,6 +16,7 @@ import TermsOfServiceView from './components/views/TermsOfServiceView'
 import EulaView from './components/views/EulaView'
 import SupportView from './components/views/SupportView'
 import ChatHelpView from './components/views/ChatHelpView'
+import HomeView from './components/views/HomeView'
 import ChatBar from './components/ChatBar'
 import LoginModal from './components/modals/LoginModal'
 import UpgradeModal from './components/modals/UpgradeModal'
@@ -25,6 +26,7 @@ import { DetailModeProvider, useDetailMode } from './contexts/DetailModeContext'
 const getViewFromUrl = (): string => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const path = window.location.pathname
+    if (path === '/home') return 'home'
     if (path === '/terms') return 'terms'
     if (path === '/privacy') return 'privacy'
     if (path === '/eula') return 'eula'
@@ -48,6 +50,7 @@ function AppContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
   const { isInDetailMode } = useDetailMode()
+  const { isLoggedIn, authReady } = useAuthStore()
 
   // Initialize Supabase and auth on all platforms
   useEffect(() => {
@@ -339,7 +342,14 @@ function AppContent() {
     
     // Update URL to reflect current view (web only)
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const path = view === 'notes' ? '/' : `/${view}`
+      let path: string
+      if (view === 'notes') {
+        path = '/'
+      } else if (view === 'home') {
+        path = '/home'
+      } else {
+        path = `/${view}`
+      }
       window.history.pushState({ view, noteId }, '', path)
       // If noteId is provided, store it for NotesView to pick up
       if (noteId) {
@@ -360,6 +370,70 @@ function AppContent() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  // Redirect to /home if not logged in and not already there (web only)
+  // This must be called before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (authReady && !isLoggedIn && Platform.OS === 'web' && typeof window !== 'undefined') {
+      const legalPages = ['privacy', 'terms', 'eula', 'support', 'chat-help']
+      if (!legalPages.includes(currentView) && currentView !== 'home') {
+        window.history.replaceState({ view: 'home' }, '', '/home')
+        setCurrentView('home')
+      }
+    }
+  }, [authReady, isLoggedIn, currentView])
+
+  // Redirect to notes view when user logs in and close login modal
+  useEffect(() => {
+    if (authReady && isLoggedIn) {
+      // Close login modal if open
+      if (isLoginModalOpen) {
+        setIsLoginModalOpen(false)
+      }
+      // Redirect to notes view if currently on home
+      if (currentView === 'home') {
+        setCurrentView('notes')
+        setNavCounter(c => c + 1)
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.history.replaceState({ view: 'notes' }, '', '/')
+        }
+      }
+    }
+  }, [authReady, isLoggedIn, isLoginModalOpen, currentView])
+
+  // Show home page with login modal when not logged in (but only after auth is ready)
+  if (authReady && !isLoggedIn) {
+    // Allow access to legal pages even when not logged in
+    const legalPages = ['privacy', 'terms', 'eula', 'support', 'chat-help']
+    if (legalPages.includes(currentView)) {
+      return (
+        <KeyboardProvider>
+        <SafeAreaProvider>
+        <View style={styles.app}>
+          <View style={styles.mainContent}>
+            {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}
+            {currentView === 'terms' && <TermsOfServiceView onNavigate={handleNavigate} />}
+            {currentView === 'eula' && <EulaView onNavigate={handleNavigate} />}
+            {currentView === 'support' && <SupportView onNavigate={handleNavigate} />}
+            {currentView === 'chat-help' && <ChatHelpView />}
+          </View>
+        </View>
+        </SafeAreaProvider>
+        </KeyboardProvider>
+      )
+    }
+    
+    // Show home page with login modal for all other views
+    return (
+      <KeyboardProvider>
+      <SafeAreaProvider>
+      <View style={styles.app}>
+        <HomeView onCloseLoginModal={closeLoginModal} onOpenLoginModal={openLoginModal} />
+      </View>
+      </SafeAreaProvider>
+      </KeyboardProvider>
+    )
+  }
 
   return (
     <KeyboardProvider>
@@ -386,6 +460,7 @@ function AppContent() {
         onOpenLoginModal={openLoginModal}
       />
       <View style={styles.mainContent}>
+        {currentView === 'home' && <HomeView onCloseLoginModal={closeLoginModal} onOpenLoginModal={openLoginModal} />}
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'tests' && <TestsView key={`tests-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
@@ -402,7 +477,8 @@ function AppContent() {
           currentView !== 'eula' &&
           currentView !== 'support' &&
           currentView !== 'chat-help' &&
-          currentView !== 'settings' && (
+          currentView !== 'settings' &&
+          currentView !== 'home' && (
           <ChatBar onOpenLoginModal={openLoginModal} currentView={currentView} />
         )}
       </View>
