@@ -37,52 +37,91 @@ interface CourseRecommendation {
   reasoning: string
 }
 
+/**
+ * Generate common abbreviations/variations for a school name
+ */
+function getSchoolVariations(school: string): string[] {
+  const variations: string[] = [school]
+  const lowerSchool = school.toLowerCase()
+  
+  // Handle "University of California, X" -> "UC X", "UCX"
+  const ucMatch = lowerSchool.match(/university of california[,\s]+(\w+)/)
+  if (ucMatch) {
+    const campus = ucMatch[1]
+    variations.push(`UC ${campus.charAt(0).toUpperCase() + campus.slice(1)}`)
+    variations.push(`UC${campus.charAt(0).toUpperCase()}${campus.slice(1)}`)
+    // Common abbreviations
+    const abbrevMap: Record<string, string> = {
+      'santa': 'UCSC',
+      'berkeley': 'UCB',
+      'los': 'UCLA',
+      'san': 'UCSD',
+      'davis': 'UCD',
+      'irvine': 'UCI',
+      'riverside': 'UCR',
+      'merced': 'UCM',
+    }
+    if (abbrevMap[campus]) {
+      variations.push(abbrevMap[campus])
+    }
+  }
+  
+  // Handle common patterns
+  if (lowerSchool.includes('massachusetts institute')) {
+    variations.push('MIT')
+  }
+  if (lowerSchool.includes('stanford')) {
+    variations.push('Stanford')
+    variations.push('Stanford University')
+  }
+  
+  return [...new Set(variations)] // Remove duplicates
+}
+
 // Fetch all courses from Supabase
 async function getAllCourses(school?: string, department?: string): Promise<Course[]> {
-  let query = supabase
-    .from('course_directory')
-    .select('*')
+  const deptUpper = department?.toUpperCase().trim() || ''
   
-  // If school is provided, filter by school
-  if (school && school.trim()) {
-    const schoolNormalized = school.trim()
-    query = query.eq('school', schoolNormalized) // Try exact match first
+  if (!school || !school.trim()) {
+    // No school filter - just query all (or by department)
+    let query = supabase.from('course_directory').select('*')
+    if (deptUpper) {
+      query = query.ilike('course_code', `${deptUpper}%`)
   }
-  
-  // If department is provided, filter by department prefix
-  if (department && department.trim()) {
-    const deptUpper = department.toUpperCase().trim()
-    query = query.ilike('course_code', `${deptUpper}%`) // Case-insensitive match for course codes starting with department
-  }
-  
-  const { data, error } = await query.order('course_code')
-
+    const { data, error } = await query.order('course_code').limit(500)
   if (error) {
     console.error('Supabase query error:', error)
     throw new Error(`Failed to fetch courses: ${error.message}`)
   }
-
-  // If school/department were provided but no results, try case-insensitive matching as fallback
-  if ((school || department) && (!data || data.length === 0)) {
-    const schoolNormalized = school?.trim() || ''
-    const deptUpper = department?.toUpperCase().trim() || ''
-    console.log(`No courses found with exact match. Trying case-insensitive match for school="${schoolNormalized}", department="${deptUpper}"`)
-    
-    let fallbackQuery = supabase.from('course_directory').select('*')
-    
-    if (schoolNormalized) {
-      fallbackQuery = fallbackQuery.ilike('school', `%${schoolNormalized}%`) // Case-insensitive partial match
-    }
-    
+    return (data || []).map(course => ({
+      id: course.id,
+      course_number: course.course_code || course.course_number,
+      name: course.course_name || course.name,
+      description: course.description,
+      prerequisites: course.prerequisites,
+      credits: course.credits,
+      department: course.department || (deptUpper || null),
+      semesters: course.semesters || null,
+    }))
+  }
+  
+  // Get school name variations to try
+  const schoolVariations = getSchoolVariations(school.trim())
+  console.log(`[getAllCourses] Trying school variations: ${schoolVariations.join(', ')}`)
+  
+  // Try each variation
+  for (const schoolVariant of schoolVariations) {
+    // Try exact match first
+    let query = supabase.from('course_directory').select('*').eq('school', schoolVariant)
     if (deptUpper) {
-      fallbackQuery = fallbackQuery.ilike('course_code', `${deptUpper}%`)
+      query = query.ilike('course_code', `${deptUpper}%`)
     }
     
-    const { data: fallbackData, error: fallbackError } = await fallbackQuery.order('course_code')
+    const { data, error } = await query.order('course_code')
     
-    if (!fallbackError && fallbackData && fallbackData.length > 0) {
-      console.log(`Found ${fallbackData.length} courses with case-insensitive match`)
-      return fallbackData.map(course => ({
+    if (!error && data && data.length > 0) {
+      console.log(`[getAllCourses] Found ${data.length} courses with school="${schoolVariant}"`)
+      return data.map(course => ({
         id: course.id,
         course_number: course.course_code || course.course_number,
         name: course.course_name || course.name,
@@ -95,17 +134,64 @@ async function getAllCourses(school?: string, department?: string): Promise<Cour
     }
   }
 
-  // Map results to Course format
-  return (data || []).map(course => ({
+  // Try case-insensitive partial match as last resort
+  console.log(`[getAllCourses] No exact match found. Trying partial match for: ${school}`)
+  let fallbackQuery = supabase.from('course_directory').select('*')
+  
+  // Try matching any word from the school name
+  const schoolWords = school.trim().split(/[\s,]+/).filter(w => w.length > 3)
+  if (schoolWords.length > 0) {
+    // Try matching the most specific word (usually the campus name)
+    const searchWord = schoolWords[schoolWords.length - 1]
+    fallbackQuery = fallbackQuery.ilike('school', `%${searchWord}%`)
+  } else {
+    fallbackQuery = fallbackQuery.ilike('school', `%${school.trim()}%`)
+  }
+  
+  if (deptUpper) {
+    fallbackQuery = fallbackQuery.ilike('course_code', `${deptUpper}%`)
+  }
+  
+  const { data: fallbackData, error: fallbackError } = await fallbackQuery.order('course_code')
+  
+  if (!fallbackError && fallbackData && fallbackData.length > 0) {
+    console.log(`[getAllCourses] Found ${fallbackData.length} courses with partial match`)
+    return fallbackData.map(course => ({
+      id: course.id,
+      course_number: course.course_code || course.course_number,
+      name: course.course_name || course.name,
+      description: course.description,
+      prerequisites: course.prerequisites,
+      credits: course.credits,
+      department: course.department || (deptUpper || null),
+      semesters: course.semesters || null,
+    }))
+  }
+
+  // Final fallback: return ALL courses (no school filter) and let AI filter by relevance
+  console.log(`[getAllCourses] No courses found for school: ${school}. Falling back to all courses.`)
+  let allCoursesQuery = supabase.from('course_directory').select('*')
+  if (deptUpper) {
+    allCoursesQuery = allCoursesQuery.ilike('course_code', `${deptUpper}%`)
+  }
+  const { data: allCoursesData, error: allCoursesError } = await allCoursesQuery.order('course_code').limit(500)
+  
+  if (!allCoursesError && allCoursesData && allCoursesData.length > 0) {
+    console.log(`[getAllCourses] Returning ${allCoursesData.length} courses (all schools) for AI to filter`)
+    return allCoursesData.map(course => ({
     id: course.id,
-    course_number: course.course_code || course.course_number, // Handle both column names
-    name: course.course_name || course.name, // Handle both column names
+      course_number: course.course_code || course.course_number,
+      name: course.course_name || course.name,
     description: course.description,
     prerequisites: course.prerequisites,
     credits: course.credits,
-    department: course.department || (department?.toUpperCase().trim() || null),
-    semesters: course.semesters || null, // May not exist in course_directory
+      department: course.department || (deptUpper || null),
+      semesters: course.semesters || null,
   }))
+  }
+
+  console.log(`[getAllCourses] No courses found in database at all`)
+  return []
 }
 
 // Use Gemini to match query with courses

@@ -45,7 +45,7 @@ router.post('/save', authenticateUser, async (req: AuthenticatedRequest, res: Re
         company,
         seniority: seniority || 'mid',
         major: major || null,
-        nodes
+        nodes: nodes || []
       })
       .select()
       .single()
@@ -63,7 +63,7 @@ router.post('/save', authenticateUser, async (req: AuthenticatedRequest, res: Re
       company: data.company,
       seniority: data.seniority,
       major: data.major,
-      nodes: data.nodes,
+      nodes: data.nodes || [],
       createdAt: data.created_at,
       updatedAt: data.updated_at
     }

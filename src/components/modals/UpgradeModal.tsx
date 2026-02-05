@@ -497,64 +497,64 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
           ]}
         >
           <View style={styles.content}>
-            <View style={styles.header}>
-              <Text style={styles.title}>Upgrade Plan</Text>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <CloseIcon />
-              </Pressable>
-            </View>
-
+          <View style={styles.header}>
+            <Text style={styles.title}>Upgrade Plan</Text>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <CloseIcon />
+            </Pressable>
+          </View>
+          
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
             >
-              <View style={styles.plansContainer}>
-                <View style={[styles.planCard, styles.freePlan]}>
-                  <View style={styles.planHeader}>
-                    <Text style={styles.planName}>Free</Text>
-                    <View style={styles.planPriceContainer}>
-                      <Text style={styles.planPrice}>$0</Text>
-                      <Text style={styles.planPeriod}>/month</Text>
-                    </View>
-                  </View>
-                  <View style={styles.benefitsList}>
-                    <Text style={styles.benefitItem}>10 items per category</Text>
-                    <Text style={styles.benefitItem}>Limited AI usage</Text>
-                    <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.planButton, styles.currentPlanButton]}
-                    onPress={isPro ? handleUnsubscribe : undefined}
-                    disabled={!isPro || isUnsubscribing}
-                  >
-                    <Text style={styles.currentPlanButtonText}>
-                      {isPro ? (isUnsubscribing ? 'Canceling...' : 'Unsubscribe') : 'Current Plan'}
-                    </Text>
-                  </Pressable>
+          <View style={styles.plansContainer}>
+            <View style={[styles.planCard, styles.freePlan]}>
+              <View style={styles.planHeader}>
+                <Text style={styles.planName}>Free</Text>
+                <View style={styles.planPriceContainer}>
+                  <Text style={styles.planPrice}>$0</Text>
+                  <Text style={styles.planPeriod}>/month</Text>
                 </View>
-
-                <View style={[styles.planCard, styles.proPlan]}>
-                  <View style={styles.planHeader}>
-                    <Text style={styles.planName}>Pro</Text>
-                    <View style={styles.planPriceContainer}>
-                      <Text style={styles.planPrice}>$9.99</Text>
-                      <Text style={styles.planPeriod}>/month</Text>
-                    </View>
+              </View>
+              <View style={styles.benefitsList}>
+                    <Text style={styles.benefitItem}>10 items per category</Text>
+                <Text style={styles.benefitItem}>Limited AI usage</Text>
+                    <Text style={styles.benefitItem}>~10 hours YouTube transcription</Text>
+              </View>
+              <Pressable 
+                style={[styles.planButton, styles.currentPlanButton]}
+                onPress={isPro ? handleUnsubscribe : undefined}
+                disabled={!isPro || isUnsubscribing}
+              >
+                <Text style={styles.currentPlanButtonText}>
+                  {isPro ? (isUnsubscribing ? 'Canceling...' : 'Unsubscribe') : 'Current Plan'}
+                </Text>
+              </Pressable>
+            </View>
+            
+            <View style={[styles.planCard, styles.proPlan]}>
+              <View style={styles.planHeader}>
+                <Text style={styles.planName}>Pro</Text>
+                <View style={styles.planPriceContainer}>
+                  <Text style={styles.planPrice}>$9.99</Text>
+                  <Text style={styles.planPeriod}>/month</Text>
+                </View>
                     <Text style={styles.infoText}>Auto-renewing monthly subscription billed to your Apple ID.</Text>
                     <Text style={styles.infoText}>
                       Renews every month unless canceled at least 24 hours before the end of the period.
                     </Text>
-                  </View>
-                  <View style={styles.benefitsList}>
+              </View>
+              <View style={styles.benefitsList}>
                     <Text style={styles.benefitItem}>Unlimited items per category</Text>
-                    <Text style={styles.benefitItem}>10x AI usage</Text>
+                <Text style={styles.benefitItem}>10x AI usage</Text>
                     <Text style={styles.benefitItem}>~100 hours YouTube transcription</Text>
                     <Text style={styles.benefitItem}>Priority support/feature requests</Text>
-                  </View>
+              </View>
 
-                  {isPro ? (
-                    <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
-                      <Text style={styles.proPlanButtonText}>Current Plan</Text>
+              {isPro ? (
+                <Pressable style={[styles.planButton, styles.proPlanButton]} disabled>
+                  <Text style={styles.proPlanButtonText}>Current Plan</Text>
                     </Pressable>
                   ) : (
                     <View style={styles.buttonContainer}>
@@ -573,17 +573,17 @@ function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                   ? 'Processing...'
                                   : 'Subscribe via App Store'}
                           </Text>
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          style={[styles.planButton, styles.proPlanButton]}
-                          onPress={handleUpgrade}
-                          disabled={isLoading}
-                        >
+                </Pressable>
+              ) : (
+                <Pressable 
+                  style={[styles.planButton, styles.proPlanButton]}
+                  onPress={handleUpgrade}
+                  disabled={isLoading}
+                >
                           <Text style={styles.proPlanButtonText}>{isLoading ? 'Loading...' : 'Upgrade to Pro'}</Text>
-                        </Pressable>
-                      )}
-                    </View>
+                </Pressable>
+              )}
+            </View>
                   )}
                 </View>
               </View>

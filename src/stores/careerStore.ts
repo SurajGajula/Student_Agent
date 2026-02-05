@@ -9,6 +9,23 @@ export interface SkillNode {
   name: string
 }
 
+export interface Course {
+  id: string
+  course_number: string
+  name: string
+  description: string | null
+  prerequisites: string[] | null
+  credits: number | null
+  department: string | null
+  semesters: string[] | null
+}
+
+export interface CourseRecommendation {
+  course: Course
+  relevanceScore: number
+  reasoning: string
+}
+
 export interface CareerPath {
   id: string
   targetId: string
@@ -18,6 +35,7 @@ export interface CareerPath {
   seniority: string
   major: string | null
   nodes: SkillNode[]
+  courses?: CourseRecommendation[]
   createdAt?: string
   updatedAt?: string
 }

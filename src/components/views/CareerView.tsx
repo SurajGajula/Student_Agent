@@ -12,8 +12,12 @@ interface CareerViewProps {
   onNavigate?: (view: string, noteId?: string) => void
 }
 
+import SkillDetailView from './SkillDetailView'
+import type { SkillNode } from '../../stores/careerStore'
+
 function CareerView({ onNavigate }: CareerViewProps = {}) {
   const [currentPathId, setCurrentPathId] = useState<string | null>(null)
+  const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null)
   const { careerPaths, removeCareerPath, getCareerPathById, syncFromSupabase } = useCareerStore()
   const { isLoggedIn } = useAuthStore()
   const currentPath = currentPathId ? getCareerPathById(currentPathId) : null
@@ -62,7 +66,15 @@ function CareerView({ onNavigate }: CareerViewProps = {}) {
   }
 
   const handleBackClick = () => {
-    setCurrentPathId(null)
+    if (selectedSkill) {
+      setSelectedSkill(null)
+    } else {
+      setCurrentPathId(null)
+    }
+  }
+
+  const handleSkillClick = (skill: SkillNode) => {
+    setSelectedSkill(skill)
   }
 
   const handleDeletePath = async (pathId: string) => {
@@ -93,6 +105,18 @@ function CareerView({ onNavigate }: CareerViewProps = {}) {
   const mobilePaddingTop = Platform.OS === 'ios' 
     ? Math.max(insets.top + 12, 20) 
     : Math.max(54, 20)
+
+  // Render skill detail view
+  if (selectedSkill && currentPath) {
+    return (
+      <SkillDetailView
+        skill={selectedSkill}
+        careerPathId={currentPath.id}
+        onBack={handleBackClick}
+        onNavigateToNote={handleNavigateToNote}
+      />
+    )
+  }
 
   // Render career path detail view
   if (currentPathId && currentPath) {
@@ -128,7 +152,9 @@ function CareerView({ onNavigate }: CareerViewProps = {}) {
         </View>
         <View style={styles.graphContainer}>
           <CareerGraph 
-            nodes={currentPath.nodes} 
+            nodes={currentPath.nodes}
+            careerPathId={currentPath.id}
+            onSkillClick={handleSkillClick}
             onNavigateToNote={handleNavigateToNote}
           />
         </View>

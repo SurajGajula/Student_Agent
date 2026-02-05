@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking, Alert } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Linking, Alert, TextInput } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useUsageStore } from '../../stores/usageStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -45,7 +45,7 @@ interface SettingsViewProps {
 
 function SettingsView({ onNavigate }: SettingsViewProps) {
   const { planName, tokensUsed, monthlyLimit, remaining, isLoading, error, fetchUsage } = useUsageStore()
-  const { isLoggedIn } = useAuthStore()
+  const { isLoggedIn, email } = useAuthStore()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [cancelMessage, setCancelMessage] = useState<string | null>(null)
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null)
@@ -53,6 +53,9 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   const [restoringPurchases, setRestoringPurchases] = useState(false)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [schoolEmail, setSchoolEmail] = useState('')
+  const [profileMessage, setProfileMessage] = useState<string | null>(null)
+  const [savingProfile, setSavingProfile] = useState(false)
   const { signOut } = useAuthStore()
   const insets = useSafeAreaInsets()
   const windowWidth = Dimensions.get('window').width
@@ -142,6 +145,151 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
     }
   }
 
+  const validateSchoolEmailDomain = (value: string): { ok: boolean; message?: string } => {
+    const trimmed = value.trim()
+    const domain = trimmed.split('@')[1]?.toLowerCase()
+    if (!trimmed || !domain) return { ok: false, message: 'Enter a valid email address.' }
+
+    // Supported universities (from Goals) + their email domains
+    // Allow subdomains too (e.g. alumni.stanford.edu)
+    const allowedRootDomains = [
+      'stanford.edu',
+      'berkeley.edu',
+      'ucsc.edu',
+      'uwo.ca', // Western University (Canada)
+      'uwaterloo.ca',
+    ]
+
+    const isAllowed = allowedRootDomains.some(root => domain === root || domain.endsWith(`.${root}`))
+    if (!isAllowed) {
+      return { ok: false, message: 'School email must be from a supported university domain (Stanford, Berkeley, UC Santa Cruz, Western, Waterloo).' }
+    }
+    return { ok: true }
+  }
+
+  const inferSchoolNameFromEmail = (value: string): string => {
+    const trimmed = value.trim().toLowerCase()
+    const rawDomain = trimmed.split('@')[1] || ''
+    if (!rawDomain) return ''
+
+    // Normalize subdomains to their root domains for matching
+    const normalizeToRoot = (d: string): string => {
+      const roots = ['stanford.edu', 'berkeley.edu', 'ucsc.edu', 'uwo.ca', 'uwaterloo.ca']
+      const found = roots.find(root => d === root || d.endsWith(`.${root}`))
+      return found || d
+    }
+
+    const domain = normalizeToRoot(rawDomain)
+
+    // Common mappings for better UX (extend as you want)
+    const exactMap: Record<string, string> = {
+      'stanford.edu': 'Stanford University',
+      'berkeley.edu': 'University of California, Berkeley',
+      'uwaterloo.ca': 'University of Waterloo',
+      'uwo.ca': 'Western University',
+      'ucsc.edu': 'University of California, Santa Cruz',
+    }
+    if (exactMap[domain]) return exactMap[domain]
+
+    // Heuristic fallback (should rarely be hit with the supported list)
+    const parts = domain.split('.').filter(Boolean)
+    const base = parts.length >= 2 ? parts[parts.length - 2] : parts[0]
+    if (!base) return ''
+    const nice = base
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+    return `${nice} University`
+  }
+
+  const handleSaveProfile = async () => {
+    const emailTrimmed = schoolEmail.trim()
+    const inferredSchoolName = emailTrimmed ? inferSchoolNameFromEmail(emailTrimmed) : ''
+
+    // If an email is provided, validate domain + force school name derived from it
+    if (emailTrimmed) {
+      const validation = validateSchoolEmailDomain(emailTrimmed)
+      if (!validation.ok) {
+        setProfileMessage(validation.message || 'Invalid school email.')
+        return
+      }
+      if (inferredSchoolName) {
+        setSchoolName(inferredSchoolName)
+      }
+    }
+
+    setSavingProfile(true)
+    setProfileMessage(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      const API_BASE_URL = getApiBaseUrl()
+
+      // 1) Save school_name to the user table (derived from email when present)
+      const schoolNameToSave = (emailTrimmed ? inferredSchoolName : schoolName).trim()
+      const nameResp = await fetch(`${API_BASE_URL}/api/user/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ schoolName: schoolNameToSave }),
+      })
+
+      const nameData = await nameResp.json().catch(() => ({}))
+      if (!nameResp.ok) throw new Error(nameData.error || nameData.message || 'Failed to save school name')
+
+      if (nameData?.profile?.schoolName !== undefined) {
+        setSchoolName(nameData.profile.schoolName || '')
+      }
+
+      // 2) Save school_email to auth metadata (domain-verified only)
+      if (emailTrimmed) {
+        const { data, error } = await supabase.auth.updateUser({
+          data: {
+            school_email: emailTrimmed,
+            school_email_domain_verified: true,
+            school_email_saved_at: new Date().toISOString(),
+          },
+        })
+        if (error) throw error
+        const saved = (data.user?.user_metadata as any)?.school_email as string | undefined
+        if (saved) setSchoolEmail(saved)
+      }
+
+      setProfileMessage('Saved.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to save profile.'
+      setProfileMessage(msg)
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  const [schoolName, setSchoolName] = useState('')
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const API_BASE_URL = getApiBaseUrl()
+      const resp = await fetch(`${API_BASE_URL}/api/user/profile`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      if (!resp.ok) return
+      const data = await resp.json().catch(() => ({}))
+      if (typeof data.schoolName === 'string') {
+        setSchoolName(data.schoolName)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // NOTE: Saving is handled by handleSaveProfile() so school_name is always derived from school_email when provided.
+
   useEffect(() => {
     console.log('[SettingsView] Component mounted - syncing auth and resetting loading state')
     
@@ -165,6 +313,13 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
     }
     syncAuth()
   }, [])
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchProfile()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn])
 
   useEffect(() => {
     console.log('[SettingsView] useEffect triggered', {
@@ -516,6 +671,76 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
         ) : (
           <View style={styles.settingsContent}>
             <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Profile</Text>
+
+              <View style={styles.profileField}>
+                <Text style={styles.profileLabel}>Account email</Text>
+                <Text style={styles.profileValue}>{email || '—'}</Text>
+              </View>
+
+              <View style={styles.profileField}>
+                <Text style={styles.profileLabel}>School name</Text>
+                <TextInput
+                  value={schoolName}
+                  onChangeText={(t) => {
+                    setSchoolName(t)
+                    if (profileMessage) setProfileMessage(null)
+                  }}
+                  placeholder="Stanford University"
+                  placeholderTextColor="#999"
+                  style={styles.profileInput}
+                  editable={!savingProfile}
+                />
+              </View>
+
+              <View style={styles.profileField}>
+                <Text style={styles.profileLabel}>School email</Text>
+                <TextInput
+                  value={schoolEmail}
+                  onChangeText={(t) => {
+                    setSchoolEmail(t)
+                    if (profileMessage) setProfileMessage(null)
+                    // Auto-fill school name from email (only if user hasn't typed a custom one)
+                    const inferred = inferSchoolNameFromEmail(t)
+                    if (inferred && (!schoolName || schoolName.trim().length === 0)) {
+                      setSchoolName(inferred)
+                    }
+                  }}
+                  placeholder="name@school.edu"
+                  placeholderTextColor="#999"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={styles.profileInput}
+                  editable={!savingProfile}
+                />
+                <Text style={styles.profileHint}>
+                  Saved to your profile. This currently verifies by domain only (not ownership).
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={handleSaveProfile}
+                disabled={savingProfile}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  savingProfile && styles.primaryButtonDisabled,
+                  pressed && !savingProfile && styles.primaryButtonPressed,
+                ]}
+              >
+                <Text style={[
+                  styles.primaryButtonText,
+                  savingProfile && styles.primaryButtonTextDisabled,
+                ]}>
+                  {savingProfile ? 'Saving...' : 'Save'}
+                </Text>
+              </Pressable>
+
+              {!!profileMessage && (
+                <Text style={styles.profileMessage}>{profileMessage}</Text>
+              )}
+            </View>
+
+            <View style={styles.section}>
               <Text style={styles.sectionTitle}>Usage</Text>
               
               <View style={styles.usageInfo}>
@@ -771,6 +996,64 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     letterSpacing: -0.3,
     color: '#0f0f0f',
+  },
+  profileField: {
+    gap: 8,
+  },
+  profileLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '300',
+  },
+  profileValue: {
+    fontSize: 16,
+    color: '#0f0f0f',
+    fontWeight: '300',
+  },
+  profileInput: {
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#0f0f0f',
+  },
+  profileHint: {
+    fontSize: 13,
+    color: '#777',
+    fontWeight: '300',
+    maxWidth: 520,
+    lineHeight: 18,
+  },
+  profileMessage: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '300',
+  },
+  primaryButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 6,
+  },
+  primaryButtonPressed: {
+    opacity: 0.85,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: '#bdbdbd',
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  primaryButtonTextDisabled: {
+    color: '#f5f5f5',
   },
   usageInfo: {
     gap: 16,
