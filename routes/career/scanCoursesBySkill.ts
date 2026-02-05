@@ -4,7 +4,7 @@ import '../../load-env.js'
 import express, { Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth.js'
-import { findCoursesForSkill, SkillNode } from './service.js'
+import { findCoursesForSkill, SkillNode, CourseRecommendation } from './service.js'
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
