@@ -529,25 +529,25 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
         try {
           // Create note with content so auto-tagging can happen
           await addNote(noteTitle, undefined, extractedText)
-        
-        const currentState = useNotesStore.getState()
-        const allNotes = currentState.notes
-        
-        const newNote = allNotes
+          
+          const currentState = useNotesStore.getState()
+          const allNotes = currentState.notes
+          
+          const newNote = allNotes
           .filter(n => n.name === noteTitle)
             .sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
               return dateB - dateA
             })[0]
-        
-        if (newNote) {
-          setCurrentNoteId(newNote.id)
-          setSuccessMessage('Notes uploaded successfully')
-          setTimeout(() => setSuccessMessage(null), 3000)
-        } else {
-          setErrorMessage('Failed to create note. Please try again.')
-          setTimeout(() => setErrorMessage(null), 3000)
+          
+          if (newNote) {
+            setCurrentNoteId(newNote.id)
+            setSuccessMessage('Notes uploaded successfully')
+            setTimeout(() => setSuccessMessage(null), 3000)
+          } else {
+            setErrorMessage('Failed to create note. Please try again.')
+            setTimeout(() => setErrorMessage(null), 3000)
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to create note'
@@ -933,9 +933,6 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
           {...(Platform.OS === 'web' && {
             onDragOver: (e: any) => {
           e.preventDefault()
-          if (draggedItemId) {
-                setDragOverFolderId(null)
-              }
             },
           })}
         >
@@ -962,12 +959,12 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
                     style={styles.cardDeleteButton}
                     onPress={async (e) => {
                     e.stopPropagation()
-                      try {
-                        await removeNote(note.id)
-                      } catch (error) {
-                        console.error('Failed to remove note:', error)
-                      }
-                    }}
+                    try {
+                      await removeNote(note.id)
+                    } catch (error) {
+                      console.error('Failed to remove note:', error)
+                    }
+                  }}
                   >
                     <DeleteIcon />
                   </Pressable>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getApiBaseUrl } from '../../lib/platform'
 
 interface Capability {
@@ -14,6 +15,16 @@ function ChatHelpView() {
   const [capabilities, setCapabilities] = useState<Capability[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width)
+  const insets = useSafeAreaInsets()
+  const isMobile = windowWidth <= 768
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setWindowWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -52,10 +63,12 @@ function ChatHelpView() {
     )
   }
 
+  const mobileTopPadding = isMobile ? Math.max(insets.top + 60, 80) : 16
+
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[styles.container, isMobile && { paddingTop: mobileTopPadding, paddingBottom: 100 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >

@@ -29,7 +29,7 @@ const createFormData = async (imageSource: File | Blob | string): Promise<FormDa
  * @param youtubeUrl - The YouTube video URL
  * @returns Promise resolving to extracted text
  */
-async function extractNotesFromYouTube(youtubeUrl: string): Promise<string> {
+async function extractNotesFromYouTube(youtubeUrl: string): Promise<{ text: string; videoTitle?: string }> {
   const API_BASE_URL = getApiBaseUrl()
 
   // Get auth token
@@ -135,9 +135,9 @@ async function extractNotesWithBackendAPI(imageSource: File | Blob | string): Pr
   // Add timeout to prevent hanging (increased for Gemini API processing time)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180 second (3 minute) timeout
+  const API_BASE_URL = getApiBaseUrl()
 
   try {
-    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/api/parse-notes`, {
       method: 'POST',
       headers: {
@@ -237,13 +237,13 @@ export async function parseNotesFromYouTube(youtubeUrl: string): Promise<{ text:
   }
   
   try {
-    const text = await extractNotesFromYouTube(youtubeUrl)
+    const result = await extractNotesFromYouTube(youtubeUrl)
     
-    if (text.length === 0) {
+    if (result.text.length === 0) {
       console.warn('No text found in YouTube video')
     }
     
-    return text
+    return result
   } catch (error) {
     console.error('Error parsing YouTube video:', error)
     

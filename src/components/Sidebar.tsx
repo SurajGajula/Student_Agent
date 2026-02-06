@@ -406,14 +406,14 @@ const styles = StyleSheet.create({
     minWidth: 0, // Allow shrinking
   },
   usernameScrollContainer: {
-    ...(Platform.OS === 'web' && {
+    ...(Platform.OS === 'web' ? {
       overflowX: 'auto' as any,
       overflowY: 'hidden' as any,
       scrollbarWidth: 'none' as any,
       msOverflowStyle: 'none' as any,
       WebkitOverflowScrolling: 'touch' as any,
-    }),
-  },
+    } : {}),
+  } as any,
   sidebarUsername: {
     color: '#0f0f0f',
     fontSize: 15,

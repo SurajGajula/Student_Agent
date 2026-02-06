@@ -24,8 +24,12 @@ export default function CareerGraph({ nodes, careerPathId, onSkillClick, onNavig
   }, [])
 
   // Calculate number of columns based on screen width
-  const numColumns = windowWidth > 1200 ? 6 : windowWidth > 768 ? 4 : windowWidth > 480 ? 3 : 2
-  const cardWidth = (windowWidth - 40 - (numColumns - 1) * 12) / numColumns // 40px padding, 12px gap
+  const isMobile = windowWidth <= 768
+  const numColumns = windowWidth > 1200 ? 6 : windowWidth > 768 ? 4 : 2 // 2 columns on mobile
+  // On mobile, use percentage-based width for reliable 2-column layout
+  const cardWidth = isMobile 
+    ? '48%' as any // ~48% width for 2 columns with gap
+    : (windowWidth - 40 - (numColumns - 1) * 12) / numColumns // 40px padding, 12px gap
 
   const handleSkillClick = (skill: SkillNode) => {
     if (onSkillClick) {
@@ -45,7 +49,7 @@ export default function CareerGraph({ nodes, careerPathId, onSkillClick, onNavig
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isMobile && { paddingBottom: 120 }]}
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.grid}>
@@ -81,6 +85,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
   },
   skillCard: {
     backgroundColor: '#ffffff',

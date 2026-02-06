@@ -2,7 +2,7 @@
   "expo": {
     "name": "Student Agent",
     "slug": "student-agent",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "sdkVersion": "51.0.0",
     "platforms": [
       "ios",
@@ -11,10 +11,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sfstudio.studentagent.app"
+      "bundleIdentifier": "com.sfstudio.studentagent.app",
+      "buildNumber": "2"
     },
     "android": {
-      "package": "com.sfstudio.studentagent.app"
+      "package": "com.sfstudio.studentagent.app",
+      "versionCode": 2
     }
   }
 }

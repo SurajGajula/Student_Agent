@@ -243,7 +243,7 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
 
     try {
       // Route intent using Gemini AI
-      let intentResult: { intent: 'test' | 'flashcard' | 'course_search' | 'none'; school?: string; department?: string }
+      let intentResult: { intent: 'test' | 'flashcard' | 'course_search' | 'career_path' | 'none'; school?: string; department?: string; role?: string; company?: string; seniority?: string; major?: string; reasoning?: string }
       
       if (isLoggedIn) {
         try {
@@ -521,7 +521,7 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
               goalName,
               message,
               school,
-              department,
+              department || null,
               data.results
             )
             setStatusMessage({ 

@@ -255,6 +255,9 @@ async function fetchRuntimeConfig(force: boolean = false): Promise<AppConfig> {
             ...config,
             apiUrl: config.apiUrl || apiUrl
           }
+          if (!runtimeConfig) {
+            throw new Error('Failed to initialize runtime config')
+          }
           return runtimeConfig
         } catch (fetchError) {
           clearTimeout(timeoutId)

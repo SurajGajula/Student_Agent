@@ -371,11 +371,11 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
   }
 
   const handleDeleteTest = async (testId: string) => {
-    removeTest(testId)
-    if (currentTestId === testId) {
-      setCurrentTestId(null)
+      removeTest(testId)
+      if (currentTestId === testId) {
+        setCurrentTestId(null)
+      }
     }
-  }
 
 
   // Update detail mode when entering/exiting test detail
@@ -451,7 +451,7 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
     // Render results screen
     if (showResults) {
       const score = calculateTestScore()
-      return (
+    return (
         <View style={styles.container}>
           {isMobile && <MobileBackButton onPress={handleBackClick} />}
           <View style={[
@@ -555,14 +555,14 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
           
           {currentTest.questions[currentQuestionIndex] && (() => {
             const question = currentTest.questions[currentQuestionIndex]
-            const userResponse = userResponses[question.id] || ''
+              const userResponse = userResponses[question.id] || ''
             const isGraded = gradedQuestions[question.id] || false
-            const isCorrect = question.correctAnswer && 
-              (question.type === 'multiple-choice' 
-                ? userResponse === question.correctAnswer
-                : userResponse.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
-            
-            return (
+              const isCorrect = question.correctAnswer && 
+                (question.type === 'multiple-choice' 
+                  ? userResponse === question.correctAnswer
+                  : userResponse.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
+              
+              return (
               <View 
                 style={styles.questionCard}
                 {...(panResponder?.panHandlers || {})}
@@ -574,17 +574,17 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                   </Text>
                 </View>
                 <Text style={styles.questionText}>{question.question}</Text>
-                
+                  
                 {question.type === 'multiple-choice' && question.options && (
                   <View style={styles.optionsContainer}>
-                    {question.options.map((option, optIndex) => {
-                      const isSelected = userResponse === option
+                      {question.options.map((option, optIndex) => {
+                        const isSelected = userResponse === option
                       const isCorrectOption = isGraded && question.correctAnswer === option
                       const isWrongSelection = isGraded && isSelected && question.correctAnswer !== option
-                      
-                      return (
+                        
+                        return (
                         <Pressable
-                          key={optIndex}
+                            key={optIndex} 
                           style={[
                             styles.option,
                             isSelected && styles.optionSelected,
@@ -611,15 +611,15 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                     })}
                   </View>
                 )}
-                
-                {question.type === 'short-answer' && (
-                  <>
+                  
+                  {question.type === 'short-answer' && (
+                    <>
                     {!isGraded ? (
                       <View style={styles.inputContainer}>
                         <TextInput
                           style={styles.shortAnswerInput}
-                          placeholder="Type your answer here..."
-                          value={userResponse}
+                            placeholder="Type your answer here..."
+                            value={userResponse}
                           onChangeText={(text) => handleResponseChange(question.id, text, 'short-answer')}
                           multiline
                           numberOfLines={3}
@@ -639,10 +639,10 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                           ? [styles.answerSection, isCorrect ? styles.answerSectionCorrect : styles.answerSectionIncorrect]
                           : styles.answerSection}>
                           <Text style={styles.answerSectionTitle}>
-                            Your Answer:
-                            {userResponse && (
+                              Your Answer:
+                              {userResponse && (
                               <Text style={isCorrect ? styles.correctStatus : styles.incorrectStatus}>
-                                {isCorrect ? ' ✓ Correct' : ' ✗ Incorrect'}
+                                  {isCorrect ? ' ✓ Correct' : ' ✗ Incorrect'}
                               </Text>
                             )}
                           </Text>
@@ -653,8 +653,8 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                           <Text style={styles.answerText}>{question.correctAnswer}</Text>
                         </View>
                       </View>
-                    )}
-                  </>
+                      )}
+                    </>
                 )}
               </View>
             )
@@ -749,7 +749,7 @@ function TestsView({ onOpenLoginModal }: TestsViewProps = {}) {
                 </View>
                 <Text style={styles.testCardTitle} numberOfLines={2} ellipsizeMode="tail">{test.name}</Text>
                 <Text style={styles.testCardMeta} numberOfLines={1} ellipsizeMode="tail">
-                  {test.questions.length} questions • From: {test.noteName}
+                {test.questions.length} questions • From: {test.noteName}
                 </Text>
               </Pressable>
             )
@@ -994,7 +994,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#d0d0d0',
     borderColor: '#d0d0d0',
     ...(Platform.OS === 'web' && {
-      cursor: 'not-allowed',
+      cursor: 'not-allowed' as any,
     }),
   },
   submitButtonText: {
@@ -1142,7 +1142,7 @@ const styles = StyleSheet.create({
   generateTestButtonDisabled: {
     opacity: 0.5,
     ...(Platform.OS === 'web' && {
-      cursor: 'not-allowed',
+      cursor: 'not-allowed' as any,
     }),
   },
   generateTestButtonText: {

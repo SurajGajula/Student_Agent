@@ -360,7 +360,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
 
       // Listen for auth state changes - this handles cross-tab synchronization
-      const subscription = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         // Update session and mark auth as ready
         get().setSession(session)
         
@@ -375,7 +375,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       })
       
       // Store the subscription so we can unsubscribe later
-      set({ _authStateChangeSubscription: subscription })
+      set({ _authStateChangeSubscription: { unsubscribe: () => subscription.unsubscribe() } })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize auth'
       set({ isLoading: false, error: errorMessage })

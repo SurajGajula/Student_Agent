@@ -48,9 +48,9 @@ async function extractClassesWithBackendAPI(imageSource: File | Blob | string): 
   // Add timeout to prevent hanging (increased for Gemini API processing time)
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180 second (3 minute) timeout
+  const API_BASE_URL = getApiBaseUrl()
 
   try {
-    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/api/parse-schedule`, {
       method: 'POST',
       headers: {
@@ -138,6 +138,7 @@ async function checkBackendHealth(): Promise<boolean> {
  * @returns Promise resolving to array of parsed classes
  */
 export async function parseScheduleImage(imageSource: File | Blob | string): Promise<ParsedClass[]> {
+  const API_BASE_URL = getApiBaseUrl()
   
   // Check backend health first
   const isHealthy = await checkBackendHealth()

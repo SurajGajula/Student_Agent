@@ -177,14 +177,14 @@ function SkillDetailView({ skill, careerPathId, onBack, onNavigateToNote }: Skil
         {activeTab === 'notes' && (
           <>
             {!scannedNotes || scannedNotes.isLoading ? (
-              <View style={styles.emptyState}>
+              <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                 <ActivityIndicator size="large" color="#0f0f0f" />
                 <Text style={styles.emptyStateText}>Loading notes...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.list}>
+              <ScrollView style={styles.list} contentContainerStyle={isMobile && styles.listContentMobile}>
                 {scannedNotes.notes.length === 0 ? (
-                  <View style={styles.emptyState}>
+                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                     <Text style={styles.emptyStateText}>No tagged notes found for this skill</Text>
                     <Pressable
                       style={styles.scanButton}
@@ -229,14 +229,14 @@ function SkillDetailView({ skill, careerPathId, onBack, onNavigateToNote }: Skil
         {activeTab === 'courses' && (
           <>
             {!scannedCourses || scannedCourses.isLoading ? (
-              <View style={styles.emptyState}>
+              <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                 <ActivityIndicator size="large" color="#0f0f0f" />
                 <Text style={styles.emptyStateText}>Loading courses...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.list}>
+              <ScrollView style={styles.list} contentContainerStyle={isMobile && styles.listContentMobile}>
                 {scannedCourses.courses.length === 0 ? (
-                  <View style={styles.emptyState}>
+                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                     <Text style={styles.emptyStateText}>No courses found for this skill</Text>
                     <Pressable
                       style={styles.scanButton}
@@ -347,7 +347,9 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     padding: 20,
-    paddingBottom: 100, // Account for ChatBar
+  },
+  listContentMobile: {
+    paddingBottom: 120, // Account for ChatBar
   },
   count: {
     fontSize: 14,
@@ -398,7 +400,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-    paddingBottom: 100, // Account for ChatBar
+  },
+  emptyStateMobile: {
+    paddingBottom: 120, // Account for ChatBar
   },
   emptyStateText: {
     fontSize: 14,

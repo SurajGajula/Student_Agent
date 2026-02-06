@@ -1,2 +1,2 @@
 // Native platform image source
-export default require('../../assets/Logo.png')
+export default require('../../../assets/Logo.png')

@@ -10,17 +10,6 @@ const fs = require('fs');
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Force output to stderr (which Amplify shows) to verify this file is being executed
-// Use multiple methods to ensure output is visible
-process.stderr.write('[app.config.cjs] ===== FILE IS BEING EXECUTED =====\n');
-process.stdout.write('[app.config.cjs] ===== FILE IS BEING EXECUTED (stdout) =====\n');
-console.log('[app.config.cjs] ===== FILE IS BEING EXECUTED (console.log) =====');
-console.error('[app.config.cjs] ===== FILE IS BEING EXECUTED (console.error) =====');
-
-// Log all SUPABASE-related env vars
-const supabaseEnvVars = Object.keys(process.env).filter(k => k.includes('SUPABASE') || k.includes('STRIPE') || k.includes('EXPO_PUBLIC'));
-process.stderr.write('[app.config.cjs] process.env keys with SUPABASE/STRIPE/EXPO_PUBLIC: ' + supabaseEnvVars.join(', ') + '\n');
-console.log('[app.config.cjs] process.env keys:', supabaseEnvVars.join(', '));
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY;
 // Default to production URL for mobile apps (iOS/Android builds), localhost only for development
@@ -28,20 +17,11 @@ const isProduction = process.env.NODE_ENV === 'production' || !process.env.EXPO_
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || process.env.VITE_API_URL || 
   (isProduction ? 'https://studentagent.site' : 'http://localhost:3001');
 
-// Debug logging during build (always log in app.config.cjs since it only runs at build time)
-console.error('[app.config.cjs] ===== ENVIRONMENT VARIABLES CHECK =====');
-console.error('[app.config.cjs] EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓ (' + (process.env.EXPO_PUBLIC_SUPABASE_URL || '').substring(0, 30) + '...)' : '✗');
-console.error('[app.config.cjs] SUPABASE_URL:', process.env.SUPABASE_URL ? '✓ (' + (process.env.SUPABASE_URL || '').substring(0, 30) + '...)' : '✗');
-console.error('[app.config.cjs] EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓ (length: ' + (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').length + ')' : '✗');
-console.error('[app.config.cjs] SUPABASE_PUBLISHABLE_KEY:', process.env.SUPABASE_PUBLISHABLE_KEY ? '✓ (length: ' + (process.env.SUPABASE_PUBLISHABLE_KEY || '').length + ')' : '✗');
-console.error('[app.config.cjs] Resolved supabaseUrl:', supabaseUrl ? '✓ (' + supabaseUrl.substring(0, 30) + '...)' : '✗ EMPTY');
-console.error('[app.config.cjs] Resolved supabaseAnonKey:', supabaseAnonKey ? '✓ (length: ' + supabaseAnonKey.length + ')' : '✗ EMPTY');
-console.error('[app.config.cjs] ======================================');
 
 const expoConfig = {
   name: "Student Agent",
   slug: "student-agent",
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   userInterfaceStyle: "light",
   splash: {
@@ -73,10 +53,12 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.sfstudio.studentagent.app",
+      buildNumber: "2",
       orientation: "portrait"
     },
     android: {
       package: "com.sfstudio.studentagent.app",
+      versionCode: 2,
       orientation: "portrait",
       ...(fs.existsSync('./assets/adaptive-icon.png') && {
         adaptiveIcon: {

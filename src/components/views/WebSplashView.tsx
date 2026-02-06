@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image, Pressable, Dimensions } from 'react-native'
+import { View, Text, StyleSheet, Image, Pressable, Dimensions, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import LoginModal from '../modals/LoginModal'
 import { useState } from 'react'
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0f0f0',
-    minHeight: '100vh',
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as any } : {}),
   },
   header: {
     width: '100%',

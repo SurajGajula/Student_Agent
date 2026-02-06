@@ -19,7 +19,7 @@ interface NotesStore {
   isLoading: boolean
   error: string | null
   syncFromSupabase: () => Promise<void>
-  addNote: (name: string, folderId?: string) => Promise<void>
+  addNote: (name: string, folderId?: string, content?: string) => Promise<void>
   removeNote: (id: string) => Promise<void>
   updateNoteContentLocal: (id: string, content: string) => void
   updateNoteContent: (id: string, content: string) => Promise<void>
