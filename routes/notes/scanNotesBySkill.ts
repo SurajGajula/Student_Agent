@@ -106,58 +106,129 @@ router.post('/:skillId', authenticateUser, async (req: AuthenticatedRequest, res
       return res.status(500).json({ error: 'Failed to fetch notes', message: fetchError.message })
     }
 
+    // Get skill name for keyword matching
+    const skillName = req.body.skillName || ''
+    
+    // First, get the skill name from skill_nodes if not provided
+    let actualSkillName = skillName
+    if (!actualSkillName) {
+      const { data: skillNodeData } = await supabase
+        .from('skill_nodes')
+        .select('name')
+        .eq('skill_id', skillId)
+        .maybeSingle()
+      
+      if (skillNodeData?.name) {
+        actualSkillName = skillNodeData.name
+      }
+    }
+
     // Filter notes that already have this skill
     const notesWithSkill: string[] = []
+    const alreadyTaggedIds = new Set<string>()
     
     for (const note of allUserNotes || []) {
       const skillIds = (note.skill_ids || []) as string[]
       if (Array.isArray(skillIds) && skillIds.includes(skillId)) {
         notesWithSkill.push(note.id)
+        alreadyTaggedIds.add(note.id)
       }
     }
     
     console.log(`[ScanNotes] Found ${notesWithSkill.length} notes already tagged with skill ${skillId}`)
 
-    // If fullScan is requested, do auto-tagging
+    // Also do keyword-based matching to find notes that should have this skill
+    // This helps find notes even if they haven't been auto-tagged yet
     const notesToTag: Array<{ id: string, name: string, content: string }> = []
-    if (fullScan) {
-      const alreadyTaggedIds = new Set(notesWithSkill)
-      
-      // Check notes that don't have the skill yet
-      for (const note of allUserNotes || []) {
-        // Skip if already tagged
-        if (alreadyTaggedIds.has(note.id)) {
-          continue
-        }
+    const skillNameLower = actualSkillName ? actualSkillName.toLowerCase() : ''
+    const skillKeywords = skillNameLower ? skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2) : []
+    
+    // Check notes that don't have the skill yet
+    for (const note of allUserNotes || []) {
+      // Skip if already tagged
+      if (alreadyTaggedIds.has(note.id)) {
+        continue
+      }
 
-        if (note.content && note.content.trim().length > 100) {
-          // Note doesn't have skill but has content - check if it should be tagged
-          const contentLower = note.content.toLowerCase()
-          const skillName = req.body.skillName || ''
-          
-          // Quick keyword match - if skill name appears in content, it's likely relevant
-          if (skillName && contentLower.includes(skillName.toLowerCase())) {
-            notesToTag.push({
-              id: note.id,
-              name: note.name,
-              content: note.content
-            })
+      if (note.content && note.content.trim().length > 50) {
+        const contentLower = note.content.toLowerCase()
+        const noteNameLower = (note.name || '').toLowerCase()
+        const combinedText = `${noteNameLower} ${contentLower}`
+        
+        // Check if skill name or keywords appear in content
+        let shouldTag = false
+        
+        if (skillNameLower) {
+          // Direct match: skill name appears in content
+          if (combinedText.includes(skillNameLower)) {
+            shouldTag = true
           }
+          // Keyword match: significant keywords from skill name appear
+          else if (skillKeywords.length > 0) {
+            const significantKeywords = skillKeywords.filter(k => k.length > 3)
+            if (significantKeywords.length > 0 && significantKeywords.some(keyword => combinedText.includes(keyword))) {
+              shouldTag = true
+            }
+          }
+        }
+        
+        if (shouldTag) {
+          notesToTag.push({
+            id: note.id,
+            name: note.name,
+            content: note.content
+          })
         }
       }
     }
+    
+    console.log(`[ScanNotes] Found ${notesToTag.length} notes with matching keywords for skill "${actualSkillName}"`)
+
+    // If fullScan is requested, do full auto-tagging with AI
+    // Otherwise, just use keyword matches for immediate results
 
     // Auto-tag notes that should have this skill
     if (notesToTag.length > 0) {
-      console.log(`[ScanNotes] Auto-tagging ${notesToTag.length} notes with skill ${skillId}`)
-      
-      for (const note of notesToTag) {
-        try {
-          // Use autoTagSkills to check if this note should have this skill
-          const matchedSkills = await autoTagSkills(req.userId, note.content, note.name)
-          
-          if (matchedSkills.includes(skillId)) {
-            // Add skill to note
+      if (fullScan) {
+        // Full scan: Use AI to verify and tag
+        console.log(`[ScanNotes] Full auto-tagging ${notesToTag.length} notes with skill ${skillId} using AI`)
+        
+        for (const note of notesToTag) {
+          try {
+            // Use autoTagSkills to check if this note should have this skill
+            const matchedSkills = await autoTagSkills(req.userId, note.content, note.name)
+            
+            if (matchedSkills.includes(skillId)) {
+              // Add skill to note
+              const currentSkillIds = (allUserNotes?.find(n => n.id === note.id)?.skill_ids || []) as string[]
+              if (!currentSkillIds.includes(skillId)) {
+                const updatedSkillIds = [...currentSkillIds, skillId]
+                
+                const { error: updateError } = await supabase
+                  .from('notes')
+                  .update({ skill_ids: updatedSkillIds })
+                  .eq('id', note.id)
+                  .eq('user_id', req.userId)
+                
+                if (updateError) {
+                  console.error(`[ScanNotes] Error updating note ${note.id}:`, updateError)
+                } else {
+                  notesWithSkill.push(note.id)
+                  console.log(`[ScanNotes] Auto-tagged note "${note.name}" with skill ${skillId}`)
+                }
+              }
+            }
+          } catch (tagError) {
+            console.error(`[ScanNotes] Error auto-tagging note ${note.id}:`, tagError)
+            // Continue with other notes
+          }
+        }
+      } else {
+        // Quick scan: Just tag based on keyword match (faster, no AI call)
+        console.log(`[ScanNotes] Quick-tagging ${notesToTag.length} notes with skill ${skillId} based on keywords`)
+        
+        for (const note of notesToTag) {
+          try {
             const currentSkillIds = (allUserNotes?.find(n => n.id === note.id)?.skill_ids || []) as string[]
             if (!currentSkillIds.includes(skillId)) {
               const updatedSkillIds = [...currentSkillIds, skillId]
@@ -172,13 +243,13 @@ router.post('/:skillId', authenticateUser, async (req: AuthenticatedRequest, res
                 console.error(`[ScanNotes] Error updating note ${note.id}:`, updateError)
               } else {
                 notesWithSkill.push(note.id)
-                console.log(`[ScanNotes] Auto-tagged note "${note.name}" with skill ${skillId}`)
+                console.log(`[ScanNotes] Quick-tagged note "${note.name}" with skill ${skillId} (keyword match)`)
               }
             }
+          } catch (tagError) {
+            console.error(`[ScanNotes] Error tagging note ${note.id}:`, tagError)
+            // Continue with other notes
           }
-        } catch (tagError) {
-          console.error(`[ScanNotes] Error auto-tagging note ${note.id}:`, tagError)
-          // Continue with other notes
         }
       }
     }

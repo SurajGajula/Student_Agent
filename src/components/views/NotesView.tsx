@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, Keyboard } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, Dimensions, Platform, Keyboard, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AddNoteModal from '../modals/AddNoteModal'
 import UploadNotesModal from '../modals/UploadNotesModal'
@@ -18,20 +18,32 @@ interface NotesViewProps {
   onOpenUpgradeModal?: () => void
 }
 
-const SpinnerIcon = () => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <Circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-    <Path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round"/>
-  </Svg>
-)
+const SpinnerIcon = ({ spinAnim }: { spinAnim: Animated.Value }) => {
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  })
+
+  return (
+    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+      <Svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <Circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+        <Path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round"/>
+      </Svg>
+    </Animated.View>
+  )
+}
 
 function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isAddingNote, setIsAddingNote] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const uploadSpinAnim = useRef(new Animated.Value(0)).current
+  const addNoteSpinAnim = useRef(new Animated.Value(0)).current
   const { notes, addNote, updateNoteContentLocal, updateNoteContent, removeNote, moveNoteToFolder } = useNotesStore()
   const { isLoggedIn } = useAuthStore()
   const { planName } = useUsageStore()
@@ -234,6 +246,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
   }
 
   const handleSubmitNote = async (noteName: string) => {
+    setIsAddingNote(true)
     try {
       await addNote(noteName, undefined)
       setIsNoteModalOpen(false)
@@ -241,8 +254,40 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
       setErrorMessage(errorMessage)
       setTimeout(() => setErrorMessage(null), 5000)
+    } finally {
+      setIsAddingNote(false)
     }
   }
+
+  // Animate spinner when processing upload
+  useEffect(() => {
+    if (isProcessing) {
+      Animated.loop(
+        Animated.timing(uploadSpinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== 'web',
+        })
+      ).start()
+    } else {
+      uploadSpinAnim.setValue(0)
+    }
+  }, [isProcessing, uploadSpinAnim])
+
+  // Animate spinner when adding note
+  useEffect(() => {
+    if (isAddingNote) {
+      Animated.loop(
+        Animated.timing(addNoteSpinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== 'web',
+        })
+      ).start()
+    } else {
+      addNoteSpinAnim.setValue(0)
+    }
+  }, [isAddingNote, addNoteSpinAnim])
 
   const handleBackClick = () => {
     if (currentNoteId) {
@@ -905,7 +950,7 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             {isProcessing ? (
               <>
                 <View style={isMobile && styles.iconWrapperMobile}>
-                <SpinnerIcon />
+                <SpinnerIcon spinAnim={uploadSpinAnim} />
                 </View>
                 <Text style={[styles.uploadButtonText, isMobile && styles.buttonTextMobile]}>Processing...</Text>
               </>
@@ -918,11 +963,17 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
               </>
             )}
           </Pressable>
-          <Pressable style={[styles.addNoteButton, isMobile && styles.buttonMobile]} onPress={handleAddNote}>
+          <Pressable 
+            style={[styles.addNoteButton, isMobile && styles.buttonMobile]} 
+            onPress={handleAddNote}
+            disabled={isAddingNote}
+          >
             <View style={isMobile && styles.iconWrapperMobile}>
-            <AddIcon />
+              {isAddingNote ? <SpinnerIcon spinAnim={addNoteSpinAnim} /> : <AddIcon />}
             </View>
-            <Text style={[styles.addNoteButtonText, isMobile && styles.buttonTextMobile]}>Add Notes</Text>
+            <Text style={[styles.addNoteButtonText, isMobile && styles.buttonTextMobile]}>
+              {isAddingNote ? 'Adding...' : 'Add Notes'}
+            </Text>
           </Pressable>
         </View>
       </View>
