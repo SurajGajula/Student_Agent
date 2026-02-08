@@ -141,7 +141,7 @@ router.post('/:skillId', authenticateUser, async (req: AuthenticatedRequest, res
     // This helps find notes even if they haven't been auto-tagged yet
     const notesToTag: Array<{ id: string, name: string, content: string }> = []
     const skillNameLower = actualSkillName ? actualSkillName.toLowerCase() : ''
-    const skillKeywords = skillNameLower ? skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2) : []
+    const skillKeywords = skillNameLower ? skillNameLower.split(/[\s\-_/]+/).filter((k: string) => k.length > 2) : []
     
     // Check notes that don't have the skill yet
     for (const note of allUserNotes || []) {
@@ -165,8 +165,8 @@ router.post('/:skillId', authenticateUser, async (req: AuthenticatedRequest, res
           }
           // Keyword match: significant keywords from skill name appear
           else if (skillKeywords.length > 0) {
-            const significantKeywords = skillKeywords.filter(k => k.length > 3)
-            if (significantKeywords.length > 0 && significantKeywords.some(keyword => combinedText.includes(keyword))) {
+            const significantKeywords = skillKeywords.filter((k: string) => k.length > 3)
+            if (significantKeywords.length > 0 && significantKeywords.some((keyword: string) => combinedText.includes(keyword))) {
               shouldTag = true
             }
           }
