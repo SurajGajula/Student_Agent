@@ -49,7 +49,10 @@ export default function CareerGraph({ nodes, careerPathId, onSkillClick, onNavig
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, isMobile && { paddingBottom: 120 }]}
+        contentContainerStyle={[
+          styles.scrollContent, 
+          (isMobile || Platform.OS === 'web') && { paddingBottom: 120 }
+        ]}
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.grid}>

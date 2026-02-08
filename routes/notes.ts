@@ -186,8 +186,16 @@ router.post('/parse-notes', authenticateUser, upload.single('image'), async (req
         prompt = `Listen to this audio from a YouTube video and generate comprehensive lecture notes.
 Write the notes as if you are directly explaining the content and concepts yourself, using the audio as a reference.
 
-IMPORTANT: At the very beginning of your response, on the first line, provide ONLY the video title in this exact format:
-VIDEO_TITLE: ${videoTitleFromInfo}
+Original Video Title: ${videoTitleFromInfo || 'Unknown'}
+
+IMPORTANT: At the very beginning of your response, on the first line, provide ONLY a concise, descriptive title for this video in this exact format:
+VIDEO_TITLE: [Your generated title here]
+
+Generate a title that:
+- Accurately reflects the main topic/content of the video
+- Is concise and descriptive (avoid generic titles like "Lecture" or "Video")
+- Excludes unnecessary metadata (course codes, dates, grading info, logistics)
+- Focuses on the actual subject matter being taught
 
 Then on the next line, start the notes content.
 
@@ -197,7 +205,12 @@ Requirements for the notes:
 - Include key points and explanations
 - Include important formulas or equations (preserve as written)
 - Include examples and use cases
-- Include any course codes, dates, or references
+- Include any course codes, dates, or references that are relevant to the content
+- EXCLUDE unnecessary administrative information such as:
+  * Grading policies, assignment due dates, exam schedules
+  * Course logistics (office hours, TA information, etc.)
+  * Administrative announcements unrelated to the content
+  * Repetitive course introductions or syllabus information
 - Use plain text only - NO markdown formatting (no **, ###, ##, *, etc.)
 - Format with clear sections using plain text headers (just capitalized text, no markdown)
 - Use bullet points with plain text dashes (-) only
@@ -280,13 +293,19 @@ Requirements for the notes:
               // Use transcript text instead of audio
               prompt = `Generate comprehensive lecture notes from this YouTube video transcript.
 
-Video Title: ${videoTitleFromInfo || 'Unknown'}
+Original Video Title: ${videoTitleFromInfo || 'Unknown'}
 
 Transcript:
 ${transcriptText.substring(0, 100000)}${transcriptText.length > 100000 ? '...' : ''}
 
-IMPORTANT: At the very beginning of your response, on the first line, provide ONLY the video title in this exact format:
-VIDEO_TITLE: ${videoTitleFromInfo || 'Unknown'}
+IMPORTANT: At the very beginning of your response, on the first line, provide ONLY a concise, descriptive title for this video in this exact format:
+VIDEO_TITLE: [Your generated title here]
+
+Generate a title that:
+- Accurately reflects the main topic/content of the video
+- Is concise and descriptive (avoid generic titles like "Lecture" or "Video")
+- Excludes unnecessary metadata (course codes, dates, grading info, logistics)
+- Focuses on the actual subject matter being taught
 
 Then on the next line, start the notes content.
 
@@ -296,7 +315,12 @@ Requirements for the notes:
 - Include key points and explanations
 - Include important formulas or equations (preserve as written)
 - Include examples and use cases
-- Include any course codes, dates, or references
+- Include any course codes, dates, or references that are relevant to the content
+- EXCLUDE unnecessary administrative information such as:
+  * Grading policies, assignment due dates, exam schedules
+  * Course logistics (office hours, TA information, etc.)
+  * Administrative announcements unrelated to the content
+  * Repetitive course introductions or syllabus information
 - Use plain text only - NO markdown formatting (no **, ###, ##, *, etc.)
 - Format with clear sections using plain text headers (just capitalized text, no markdown)
 - Use bullet points with plain text dashes (-) only

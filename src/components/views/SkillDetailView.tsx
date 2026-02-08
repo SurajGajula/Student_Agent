@@ -177,14 +177,14 @@ function SkillDetailView({ skill, careerPathId, onBack, onNavigateToNote }: Skil
         {activeTab === 'notes' && (
           <>
             {!scannedNotes || scannedNotes.isLoading ? (
-              <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+              <View style={[styles.emptyState, (isMobile || Platform.OS === 'web') && styles.emptyStateMobile]}>
                 <ActivityIndicator size="large" color="#0f0f0f" />
                 <Text style={styles.emptyStateText}>Loading notes...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.list} contentContainerStyle={isMobile && styles.listContentMobile}>
+              <ScrollView style={styles.list} contentContainerStyle={(isMobile || Platform.OS === 'web') && styles.listContentMobile}>
                 {scannedNotes.notes.length === 0 ? (
-                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                  <View style={[styles.emptyState, (isMobile || Platform.OS === 'web') && styles.emptyStateMobile]}>
                     <Text style={styles.emptyStateText}>No tagged notes found for this skill</Text>
                     <Pressable
                       style={styles.scanButton}
@@ -229,14 +229,14 @@ function SkillDetailView({ skill, careerPathId, onBack, onNavigateToNote }: Skil
         {activeTab === 'courses' && (
           <>
             {!scannedCourses || scannedCourses.isLoading ? (
-              <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+              <View style={[styles.emptyState, (isMobile || Platform.OS === 'web') && styles.emptyStateMobile]}>
                 <ActivityIndicator size="large" color="#0f0f0f" />
                 <Text style={styles.emptyStateText}>Loading courses...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.list} contentContainerStyle={isMobile && styles.listContentMobile}>
+              <ScrollView style={styles.list} contentContainerStyle={(isMobile || Platform.OS === 'web') && styles.listContentMobile}>
                 {scannedCourses.courses.length === 0 ? (
-                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                  <View style={[styles.emptyState, (isMobile || Platform.OS === 'web') && styles.emptyStateMobile]}>
                     <Text style={styles.emptyStateText}>No courses found for this skill</Text>
                     <Pressable
                       style={styles.scanButton}
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   listContentMobile: {
-    paddingBottom: 120, // Account for ChatBar
+    paddingBottom: 120, // Account for ChatBar on mobile and web
   },
   count: {
     fontSize: 14,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyStateMobile: {
-    paddingBottom: 120, // Account for ChatBar
+    paddingBottom: 120, // Account for ChatBar on mobile and web
   },
   emptyStateText: {
     fontSize: 14,

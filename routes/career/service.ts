@@ -475,24 +475,41 @@ function getSchoolVariations(school: string): string[] {
   const lowerSchool = school.toLowerCase()
   
   // Handle "University of California, X" -> "UC X", "UCX"
-  const ucMatch = lowerSchool.match(/university of california[,\s]+(\w+)/)
+  // Match multi-word campus names (e.g., "Santa Cruz", "Los Angeles")
+  const ucMatch = lowerSchool.match(/university of california[,\s]+(.+?)(?:\s*$|,)/)
   if (ucMatch) {
-    const campus = ucMatch[1]
-    variations.push(`UC ${campus.charAt(0).toUpperCase() + campus.slice(1)}`)
-    variations.push(`UC${campus.charAt(0).toUpperCase()}${campus.slice(1)}`)
-    // Common abbreviations
+    const campus = ucMatch[1].trim()
+    const campusTitleCase = campus.split(/\s+/).map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    
+    // Add "UC Campus Name" format
+    variations.push(`UC ${campusTitleCase}`)
+    variations.push(`UC${campusTitleCase.replace(/\s+/g, '')}`)
+    
+    // Common abbreviations (check for specific campus names)
     const abbrevMap: Record<string, string> = {
-      'santa': 'UCSC',
+      'santa cruz': 'UCSC',
+      'santa': 'UCSC', // Fallback if only "Santa" is captured
       'berkeley': 'UCB',
-      'los': 'UCLA',
-      'san': 'UCSD',
+      'los angeles': 'UCLA',
+      'los': 'UCLA', // Fallback
+      'san diego': 'UCSD',
+      'san': 'UCSD', // Fallback (but this is ambiguous)
       'davis': 'UCD',
       'irvine': 'UCI',
       'riverside': 'UCR',
       'merced': 'UCM',
     }
+    
+    // Check full campus name first, then first word
     if (abbrevMap[campus]) {
       variations.push(abbrevMap[campus])
+    } else {
+      const firstWord = campus.split(/\s+/)[0]
+      if (abbrevMap[firstWord]) {
+        variations.push(abbrevMap[firstWord])
+      }
     }
   }
   
@@ -503,6 +520,12 @@ function getSchoolVariations(school: string): string[] {
   if (lowerSchool.includes('stanford')) {
     variations.push('Stanford')
     variations.push('Stanford University')
+  }
+  
+  // Special handling for UC Santa Cruz - ensure UCSC is included
+  if (lowerSchool.includes('santa cruz') || lowerSchool.includes('ucsc')) {
+    variations.push('UCSC')
+    variations.push('UC Santa Cruz')
   }
   
   return [...new Set(variations)] // Remove duplicates
@@ -568,17 +591,43 @@ async function getAllCourses(school?: string, department?: string): Promise<Cour
   
   // Try case-insensitive partial match as last resort
   console.log(`[getAllCourses] No exact match found. Trying partial match for: ${school}`)
-    let fallbackQuery = supabase.from('course_directory').select('*')
-    
-  // Try matching any word from the school name
-  const schoolWords = school.trim().split(/[\s,]+/).filter(w => w.length > 3)
-  if (schoolWords.length > 0) {
-    // Try matching the most specific word (usually the campus name)
-    const searchWord = schoolWords[schoolWords.length - 1]
-    fallbackQuery = fallbackQuery.ilike('school', `%${searchWord}%`)
-  } else {
-    fallbackQuery = fallbackQuery.ilike('school', `%${school.trim()}%`)
+  let fallbackQuery = supabase.from('course_directory').select('*')
+  
+  // For UC schools, try to match the campus name specifically
+  const lowerSchool = school.toLowerCase()
+  if (lowerSchool.includes('university of california')) {
+    // Extract campus name (e.g., "Santa Cruz" from "University of California, Santa Cruz")
+    const campusMatch = lowerSchool.match(/university of california[,\s]+(.+?)(?:\s*$|,)/)
+    if (campusMatch) {
+      const campusName = campusMatch[1].trim()
+      // Try matching the full campus name first (e.g., "Santa Cruz")
+      if (campusName.includes(' ')) {
+        // Multi-word campus name - match both words
+        const campusWords = campusName.split(/\s+/).filter(w => w.length > 2)
+        if (campusWords.length >= 2) {
+          // Match both words (e.g., "Santa" AND "Cruz")
+          fallbackQuery = fallbackQuery.ilike('school', `%${campusWords[0]}%${campusWords[1]}%`)
+        } else {
+          fallbackQuery = fallbackQuery.ilike('school', `%${campusName}%`)
+        }
+      } else {
+        fallbackQuery = fallbackQuery.ilike('school', `%${campusName}%`)
+      }
+    } else {
+      // Fallback to generic UC match
+      fallbackQuery = fallbackQuery.ilike('school', `%california%`)
     }
+  } else {
+    // For non-UC schools, try matching any word from the school name
+    const schoolWords = school.trim().split(/[\s,]+/).filter(w => w.length > 3)
+    if (schoolWords.length > 0) {
+      // Try matching the most specific word (usually the campus name)
+      const searchWord = schoolWords[schoolWords.length - 1]
+      fallbackQuery = fallbackQuery.ilike('school', `%${searchWord}%`)
+    } else {
+      fallbackQuery = fallbackQuery.ilike('school', `%${school.trim()}%`)
+    }
+  }
     
     if (deptUpper) {
       fallbackQuery = fallbackQuery.ilike('course_code', `${deptUpper}%`)
@@ -877,9 +926,11 @@ Find courses that would help someone learn or improve the skill: "${skillName}"
 IMPORTANT RULES:
 1. You MUST ONLY use courses from the list provided below
 2. Do NOT invent or reference any courses not in the list
-3. Only recommend courses that are DIRECTLY relevant to learning "${skillName}"
-4. Consider course descriptions, names, and typical curriculum when determining relevance
-5. If a course teaches fundamentals needed for the skill, include it
+3. PRIORITIZE courses where "${skillName}" or related terms appear in the course NAME or DESCRIPTION
+4. Consider synonyms, abbreviations, and related terms (e.g., "ML" matches "Machine Learning", "AI" matches "Artificial Intelligence")
+5. If a course title/description contains the skill name or closely related terms, give it a HIGH relevance score (80-100)
+6. Also include courses that teach fundamentals needed for the skill, but give them lower scores (50-79)
+7. Be inclusive - if a course mentions the skill in any form, include it
 
 Skill to find courses for: "${skillName}"
 
@@ -888,7 +939,7 @@ ${coursesContext}
 
 Respond with a JSON array of objects, where each object has:
 - index: The number from the list above (1-based, must be between 1 and ${allCourses.length})
-- relevanceScore: A number from 0-100 indicating how relevant the course is to learning "${skillName}"
+- relevanceScore: A number from 0-100 indicating how relevant the course is to learning "${skillName}" (prioritize courses with skill name in title/description)
 - reasoning: A brief explanation of how this course helps learn "${skillName}" (under 200 characters)
 
 Return ONLY a valid JSON array, no other text. Order by relevanceScore descending. Limit to top ${limit} most relevant courses.
@@ -896,7 +947,7 @@ If no courses are relevant, return an empty array: []
 
 Example format:
 [
-  {"index": 5, "relevanceScore": 95, "reasoning": "Directly teaches ${skillName} fundamentals"},
+  {"index": 5, "relevanceScore": 95, "reasoning": "Course name/description directly mentions ${skillName}"},
   {"index": 12, "relevanceScore": 85, "reasoning": "Covers prerequisites needed for ${skillName}"}
 ]`
 
@@ -928,92 +979,187 @@ Example format:
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       console.error('[FindCoursesForSkill] Vertex AI API error:', errorData)
-      return []
-    }
-
-    const data = await response.json()
-    
-    // Extract text from response
-    let textResponse = ''
-    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-      const content = data.candidates[0].content
-      if (content.parts && Array.isArray(content.parts)) {
-        textResponse = content.parts
-          .map((part: any) => part.text || '')
-          .join('')
-      } else {
-        console.warn('[FindCoursesForSkill] Unexpected response format: missing parts')
-        return []
-      }
+      console.log('[FindCoursesForSkill] Falling back to keyword-based matching due to API error')
+      // Don't return empty - fall through to keyword-based fallback
     } else {
-      console.warn('[FindCoursesForSkill] Unexpected response format from Vertex AI')
-      return []
-    }
-
-    if (!textResponse) {
-      console.warn('[FindCoursesForSkill] No response from Gemini API')
-      return []
-    }
-
-    // Parse JSON response
-    try {
-      let cleanedResponse = textResponse.trim()
-      if (cleanedResponse.startsWith('```json')) {
-        cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/\s*```$/g, '').trim()
-      } else if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/g, '').trim()
+      // Only process response if API call succeeded
+      const data = await response.json()
+      
+      // Extract text from response
+      let textResponse = ''
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        const content = data.candidates[0].content
+        if (content.parts && Array.isArray(content.parts)) {
+          textResponse = content.parts
+            .map((part: any) => part.text || '')
+            .join('')
+        } else {
+          console.warn('[FindCoursesForSkill] Unexpected response format: missing parts')
+          // Fall through to keyword fallback
+        }
+      } else {
+        console.warn('[FindCoursesForSkill] Unexpected response format from Vertex AI')
+        // Fall through to keyword fallback
       }
 
-      // Check if response looks truncated
-      if (!cleanedResponse.endsWith(']')) {
-        const lastCompleteBrace = cleanedResponse.lastIndexOf('}')
-        if (lastCompleteBrace > 0) {
-          cleanedResponse = cleanedResponse.substring(0, lastCompleteBrace + 1) + ']'
+      if (textResponse) {
+        // Parse JSON response
+        try {
+          let cleanedResponse = textResponse.trim()
+          if (cleanedResponse.startsWith('```json')) {
+            cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '').replace(/\s*```$/g, '').trim()
+          } else if (cleanedResponse.startsWith('```')) {
+            cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/g, '').trim()
+          }
+
+          // Check if response looks truncated
+          if (!cleanedResponse.endsWith(']')) {
+            const lastCompleteBrace = cleanedResponse.lastIndexOf('}')
+            if (lastCompleteBrace > 0) {
+              cleanedResponse = cleanedResponse.substring(0, lastCompleteBrace + 1) + ']'
+            }
+          }
+
+          const recommendations = JSON.parse(cleanedResponse) as Array<{
+            index: number
+            relevanceScore: number
+            reasoning: string
+          }>
+
+          if (!Array.isArray(recommendations)) {
+            throw new Error('Invalid response format: expected JSON array')
+          }
+
+          // Validate and filter recommendations
+          const validRecommendations = recommendations
+            .slice(0, limit)
+            .map(rec => {
+              if (!rec.index || rec.index < 1 || rec.index > allCourses.length) {
+                console.warn(`[FindCoursesForSkill] Invalid index ${rec.index}. Skipping.`)
+                return null
+              }
+              
+              const course = allCourses[rec.index - 1]
+              if (!course || !course.course_number || !course.name) {
+                return null
+              }
+              
+              const reasoning = (rec.reasoning || '').substring(0, 500)
+              
+              return {
+                course,
+                relevanceScore: Math.min(100, Math.max(0, rec.relevanceScore || 0)),
+                reasoning: reasoning || `Relevant to learning ${skillName}`
+              }
+            })
+            .filter((item): item is CourseRecommendation => item !== null)
+
+          console.log(`[FindCoursesForSkill] Found ${validRecommendations.length} courses via AI for skill: ${skillName}`)
+          
+          // If AI returned results, use them (unless it's 0, then try keyword fallback)
+          if (validRecommendations.length > 0) {
+            return validRecommendations
+          }
+          // If AI returned 0, fall through to keyword fallback
+        } catch (error) {
+          console.error('[FindCoursesForSkill] Error parsing response:', error)
+          // Fall through to keyword fallback
         }
       }
-
-      const recommendations = JSON.parse(cleanedResponse) as Array<{
-        index: number
-        relevanceScore: number
-        reasoning: string
-      }>
-
-      if (!Array.isArray(recommendations)) {
-        throw new Error('Invalid response format: expected JSON array')
-      }
-
-      // Validate and filter recommendations
-      const validRecommendations = recommendations
-        .slice(0, limit)
-        .map(rec => {
-          if (!rec.index || rec.index < 1 || rec.index > allCourses.length) {
-            console.warn(`[FindCoursesForSkill] Invalid index ${rec.index}. Skipping.`)
-            return null
-          }
-          
-          const course = allCourses[rec.index - 1]
-          if (!course || !course.course_number || !course.name) {
-            return null
-          }
-          
-          const reasoning = (rec.reasoning || '').substring(0, 500)
-          
+    }
+    
+    // Keyword-based fallback: runs if API call failed OR AI returned 0 courses
+    console.log(`[FindCoursesForSkill] Using keyword-based fallback for: ${skillName}`)
+    
+    const skillNameLower = skillName.toLowerCase()
+    const skillKeywords = skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2) // Split on spaces, dashes, underscores, slashes
+    
+    const keywordMatches = allCourses
+      .map((course, index) => {
+        const courseName = (course.name || '').toLowerCase()
+        const courseDesc = (course.description || '').toLowerCase()
+        const courseNumber = (course.course_number || '').toLowerCase()
+        
+        // Check if any keyword appears in course name, description, or number
+        const nameMatch = skillKeywords.some(keyword => 
+          courseName.includes(keyword) || keyword.includes(courseName.split(' ')[0])
+        )
+        const descMatch = skillKeywords.some(keyword => 
+          courseDesc.includes(keyword)
+        )
+        const numberMatch = skillKeywords.some(keyword => 
+          courseNumber.includes(keyword)
+        )
+        
+        // Also check if skill name (or parts of it) appears directly
+        const directNameMatch = courseName.includes(skillNameLower) || skillNameLower.includes(courseName.split(' ')[0])
+        const directDescMatch = courseDesc.includes(skillNameLower)
+        
+        if (nameMatch || descMatch || numberMatch || directNameMatch || directDescMatch) {
           return {
             course,
-            relevanceScore: Math.min(100, Math.max(0, rec.relevanceScore || 0)),
-            reasoning: reasoning || `Relevant to learning ${skillName}`
+            relevanceScore: directNameMatch || directDescMatch ? 90 : (nameMatch ? 80 : 70),
+            reasoning: directNameMatch || directDescMatch 
+              ? `Course name/description contains "${skillName}"`
+              : nameMatch 
+                ? `Course name contains related keywords`
+                : `Course description mentions related terms`
           }
-        })
-        .filter((item): item is CourseRecommendation => item !== null)
-
-      console.log(`[FindCoursesForSkill] Found ${validRecommendations.length} courses for skill: ${skillName}`)
-      return validRecommendations
-    } catch (error) {
-      console.error('[FindCoursesForSkill] Error parsing response:', error)
-      return []
+        }
+        return null
+      })
+      .filter((item): item is CourseRecommendation => item !== null)
+      .slice(0, limit)
+    
+    if (keywordMatches.length > 0) {
+      console.log(`[FindCoursesForSkill] Keyword fallback found ${keywordMatches.length} courses`)
+      return keywordMatches
     }
+    
+    console.log(`[FindCoursesForSkill] No courses found via keyword matching for: ${skillName}`)
+    return []
   } catch (error) {
     console.error('[FindCoursesForSkill] Error:', error)
+    // Try keyword fallback even on error
+    console.log(`[FindCoursesForSkill] Attempting keyword fallback after error for: ${skillName}`)
+    
+    const skillNameLower = skillName.toLowerCase()
+    const skillKeywords = skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2)
+    
+    const keywordMatches = allCourses
+      .map((course) => {
+        const courseName = (course.name || '').toLowerCase()
+        const courseDesc = (course.description || '').toLowerCase()
+        const courseNumber = (course.course_number || '').toLowerCase()
+        
+        const nameMatch = skillKeywords.some(keyword => 
+          courseName.includes(keyword) || keyword.includes(courseName.split(' ')[0])
+        )
+        const descMatch = skillKeywords.some(keyword => 
+          courseDesc.includes(keyword)
+        )
+        const directNameMatch = courseName.includes(skillNameLower) || skillNameLower.includes(courseName.split(' ')[0])
+        const directDescMatch = courseDesc.includes(skillNameLower)
+        
+        if (nameMatch || descMatch || directNameMatch || directDescMatch) {
+          return {
+            course,
+            relevanceScore: directNameMatch || directDescMatch ? 90 : (nameMatch ? 80 : 70),
+            reasoning: directNameMatch || directDescMatch 
+              ? `Course name/description contains "${skillName}"`
+              : `Course name contains related keywords`
+          }
+        }
+        return null
+      })
+      .filter((item): item is CourseRecommendation => item !== null)
+      .slice(0, limit)
+    
+    if (keywordMatches.length > 0) {
+      console.log(`[FindCoursesForSkill] Keyword fallback found ${keywordMatches.length} courses after error`)
+      return keywordMatches
+    }
+    
     return []
   }
 }

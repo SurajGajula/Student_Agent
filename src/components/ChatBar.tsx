@@ -77,22 +77,58 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
   )
 
   // Parse mentions from message - now looks for @noteName format and looks up IDs
+  // Note names can have spaces, so we need to match until an action word or end of string
   const parseMentions = (text: string): Mention[] => {
-    const mentionRegex = /@(\S+)/g
     const parsed: Mention[] = []
-    let match
-
-    while ((match = mentionRegex.exec(text)) !== null) {
-      const noteName = match[1]
-      // Look up the note by name to get the ID
-      const note = notes.find(n => n.name === noteName)
+    
+    // Find all @ symbols in the message
+    const atIndices: number[] = []
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '@') {
+        atIndices.push(i)
+      }
+    }
+    
+    // Action words that typically follow mentions
+    const actionWords = ['into', 'to', 'for', 'from', 'as', 'with', 'turn', 'make', 'create', 'generate']
+    
+    for (const atIndex of atIndices) {
+      // Get text after @
+      const textAfterAt = text.substring(atIndex + 1)
       
-      if (note) {
+      // Try to find the longest matching note name
+      // Check each note to see if the text starts with its name
+      let bestMatch: { note: Note; nameLength: number } | null = null
+      
+      for (const note of notes) {
+        const noteName = note.name.trim()
+        if (!noteName) continue
+        
+        // Check if text after @ starts with this note name (case-insensitive)
+        const lowerTextAfter = textAfterAt.toLowerCase()
+        const lowerNoteName = noteName.toLowerCase()
+        
+        if (lowerTextAfter.startsWith(lowerNoteName)) {
+          // Check if it's followed by a space or action word or end of string
+          const afterNoteName = textAfterAt.substring(noteName.length)
+          const nextChar = afterNoteName[0]
+          const nextWord = afterNoteName.trim().split(/\s+/)[0]?.toLowerCase()
+          
+          // If followed by space, action word, or end, it's a valid match
+          if (!nextChar || nextChar === ' ' || (nextWord && actionWords.includes(nextWord))) {
+            if (!bestMatch || noteName.length > bestMatch.nameLength) {
+              bestMatch = { note, nameLength: noteName.length }
+            }
+          }
+        }
+      }
+      
+      if (bestMatch) {
         parsed.push({
-          noteId: note.id,
-          noteName: note.name,
-          startIndex: match.index,
-          endIndex: match.index + match[0].length
+          noteId: bestMatch.note.id,
+          noteName: bestMatch.note.name,
+          startIndex: atIndex,
+          endIndex: atIndex + 1 + bestMatch.note.name.length
         })
       }
     }
