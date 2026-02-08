@@ -263,7 +263,7 @@ If the message doesn't match any capability, do not call any function.`
         if (name === 'generate_test') {
           // Allow test generation even without explicit mentions if user is on notes page
           const isOnNotesPage = chatContext.page?.currentView === 'notes'
-          const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+          const hasNoteSelected = chatContext.database?.notes && chatContext.database.notes.length > 0
           
           if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
             intentResult = {
@@ -284,7 +284,7 @@ If the message doesn't match any capability, do not call any function.`
         } else if (name === 'generate_flashcard') {
           // Allow flashcard generation even without explicit mentions if user is on notes page
           const isOnNotesPage = chatContext.page?.currentView === 'notes'
-          const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+          const hasNoteSelected = chatContext.database?.notes && chatContext.database.notes.length > 0
           
           if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
             intentResult = {
@@ -367,7 +367,7 @@ If the message doesn't match any capability, do not call any function.`
     // Ensure test/flashcard intents have some note context (mentions or page context)
     if (intentResult.intent === 'test' || intentResult.intent === 'flashcard') {
       const isOnNotesPage = chatContext.page?.currentView === 'notes'
-      const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+      const hasNoteSelected = chatContext.database?.notes && chatContext.database.notes.length > 0
       
       if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
         console.warn('Test/flashcard intent detected but no note context available, changing to none')
