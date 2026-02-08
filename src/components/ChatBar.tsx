@@ -76,19 +76,25 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
     note.name.toLowerCase().includes(autocompleteQuery.toLowerCase())
   )
 
-  // Parse mentions from message
+  // Parse mentions from message - now looks for @noteName format and looks up IDs
   const parseMentions = (text: string): Mention[] => {
-    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
+    const mentionRegex = /@(\S+)/g
     const parsed: Mention[] = []
     let match
 
     while ((match = mentionRegex.exec(text)) !== null) {
-      parsed.push({
-        noteId: match[2],
-        noteName: match[1],
-        startIndex: match.index,
-        endIndex: match.index + match[0].length
-      })
+      const noteName = match[1]
+      // Look up the note by name to get the ID
+      const note = notes.find(n => n.name === noteName)
+      
+      if (note) {
+        parsed.push({
+          noteId: note.id,
+          noteName: note.name,
+          startIndex: match.index,
+          endIndex: match.index + match[0].length
+        })
+      }
     }
 
     return parsed
@@ -139,12 +145,11 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
     const lastAtIndex = text.lastIndexOf('@')
     
     if (lastAtIndex !== -1) {
-      // Check if there's a space or mention end between @ and end
+      // Check if there's a space after @
       const textAfterAt = text.substring(lastAtIndex + 1)
       const hasSpace = textAfterAt.includes(' ')
-      const hasMentionEnd = textAfterAt.includes('](')
       
-      if (!hasSpace && !hasMentionEnd) {
+      if (!hasSpace) {
         const query = textAfterAt
         setAutocompleteQuery(query)
         setShowAutocomplete(true)
@@ -161,7 +166,10 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
     
     if (lastAtIndex !== -1) {
       const beforeAt = message.substring(0, lastAtIndex)
-      const mentionText = `@[${note.name}](${note.id}) `
+      // Use note name if valid, otherwise use a fallback
+      // Just show the name, not the ID - we'll look it up when sending to API
+      const noteName = (note.name && note.name !== 'undefined' && note.name.trim()) ? note.name : 'Note'
+      const mentionText = `@${noteName} `
       const newMessage = beforeAt + mentionText
       
       setMessage(newMessage)
@@ -276,22 +284,37 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
 
       // Handle test generation
       if (intentResult.intent === 'test') {
-        if (!mentions || mentions.length === 0) {
+        // Try to find note from mentions first, then from URL/context if on notes page
+        let targetNote: Note | undefined
+        
+        if (mentions && mentions.length > 0) {
+          targetNote = notes.find(n => n.id === mentions[0].noteId)
+        } else if (currentView === 'notes') {
+          // If on notes page, try to get selected note from URL hash (web) or use first note
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const hash = window.location.hash
+            if (hash && hash.startsWith('#note-')) {
+              const noteId = hash.replace('#note-', '')
+              targetNote = notes.find(n => n.id === noteId)
+            }
+          }
+          // If still no note found, use the most recently updated note
+          if (!targetNote && notes.length > 0) {
+            targetNote = notes[0] // Notes are already sorted by updated_at desc in the store
+          }
+        }
+        
+        if (!targetNote) {
           setStatusMessage({ 
             type: 'error', 
-            text: 'Test generation requires a note mention. Use @ to mention a note first.' 
+            text: 'Test generation requires a note. Please mention a note with @[note name] or select a note on the notes page.' 
           })
           setMessage('')
           setIsLoading(false)
           return
         }
 
-        const mentionedNote = notes.find(n => n.id === mentions[0].noteId)
-        if (!mentionedNote) {
-          throw new Error('Note not found')
-        }
-
-        const noteContent = mentionedNote.content || ''
+        const noteContent = targetNote.content || ''
         if (!noteContent.trim()) {
           throw new Error('Note content is empty')
         }
@@ -311,8 +334,8 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
             'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
-            noteId: mentionedNote.id,
-            noteName: mentionedNote.name,
+            noteId: targetNote.id,
+            noteName: targetNote.name,
             noteContent: noteContent
           }),
         })

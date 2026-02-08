@@ -94,6 +94,11 @@ router.post('/route', authenticateUser, async (req: AuthenticatedRequest, res: R
 
     // Get all capabilities from registry (Vertex AI function calling format)
     const functionDeclarations = capabilityRegistry.getFunctionDeclarations()
+    
+    // Debug: Log function declarations to verify they're being sent
+    console.log('[Intent Router] Available function declarations:', functionDeclarations.map(f => f.name))
+    console.log('[Intent Router] User message:', message)
+    console.log('[Intent Router] Has mentions:', hasMentions, mentions)
 
     // Build prompt for intent classification with context
     const contextInfo = []
@@ -104,7 +109,8 @@ router.post('/route', authenticateUser, async (req: AuthenticatedRequest, res: R
       contextInfo.push(`Current page: ${chatContext.page.currentView}`)
     }
     if (hasMentions) {
-      contextInfo.push(`Note mentions: ${mentions.map((m: any) => m.noteName).join(', ')}`)
+      const mentionDetails = mentions.map((m: any) => `- Note: "${m.noteName}" (ID: ${m.noteId})`).join('\n')
+      contextInfo.push(`Note mentions in message:\n${mentionDetails}`)
     }
 
     const prompt = `You are an intent classifier for a student study assistant application. Analyze the user's message and determine which function to call.
@@ -112,7 +118,36 @@ router.post('/route', authenticateUser, async (req: AuthenticatedRequest, res: R
 ${contextInfo.length > 0 ? `Context:\n${contextInfo.join('\n')}\n` : ''}
 User's message: "${message}"
 
-Analyze the user's message and call the appropriate function. If the message doesn't match any capability, do not call any function.`
+CRITICAL INSTRUCTIONS:
+1. You MUST call a function if the message matches any capability. Do NOT return text-only responses. Do NOT explain why you cannot do something - just call the appropriate function.
+2. If the user mentions creating a test, quiz, exam, or questions from a note, you MUST call the generate_test function.
+3. If the user mentions creating flashcards, study cards, or memorization cards from a note, you MUST call the generate_flashcard function.
+4. Note mentions appear in the format @[note name](noteId) in the message. The note details are provided in the Context section above.
+5. Even if the note name appears as "undefined" in the mention, you should still call the function - the system will handle fetching the note content using the noteId.
+
+For test generation (generate_test function):
+- ALWAYS call generate_test if the message contains: "test", "quiz", "exam", or "questions" AND action words like "turn", "make", "create", "generate"
+- Examples that MUST trigger generate_test:
+  * "turn @[note] into a test" → CALL generate_test
+  * "make a quiz from @[note]" → CALL generate_test
+  * "turn note into test" → CALL generate_test
+  * "create test questions" → CALL generate_test
+  * "generate quiz from note" → CALL generate_test
+- If a note is mentioned (see Context section), use the noteId and noteName from the mention details
+- If no note is mentioned but the user is on the notes page, still call the function (the system will use context)
+
+For flashcard generation (generate_flashcard function):
+- ALWAYS call generate_flashcard if the message contains: "flashcard", "flash card", "study cards", "memorization", "review cards" AND action words like "turn", "make", "create", "generate"
+- Examples that MUST trigger generate_flashcard:
+  * "turn @[note] into flashcards" → CALL generate_flashcard
+  * "make flashcards from @[note]" → CALL generate_flashcard
+  * "create study cards for @[note]" → CALL generate_flashcard
+  * "turn note into flashcards" → CALL generate_flashcard
+  * "generate flash cards" → CALL generate_flashcard
+- If a note is mentioned (see Context section), use the noteId and noteName from the mention details
+- If no note is mentioned but the user is on the notes page, still call the function (the system will use context)
+
+If the message doesn't match any capability, do not call any function.`
 
     const accessToken = await getAccessToken()
     const location = 'us-central1'
@@ -168,10 +203,53 @@ Analyze the user's message and call the appropriate function. If the message doe
 
     const data = (await response.json()) as VertexAIResponse
     
-    // Parse function call response
-    let intentResult: IntentResponse
+    // Debug: Log the full response to see what Gemini returned
+    console.log('[Intent Router] Vertex AI response structure:', {
+      hasCandidates: !!data.candidates,
+      candidateCount: data.candidates?.length || 0,
+      firstCandidateContent: data.candidates?.[0]?.content,
+      firstCandidateParts: data.candidates?.[0]?.content?.parts,
+      finishReason: data.candidates?.[0]?.finishReason
+    })
     
-    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+    // Parse function call response
+    let intentResult: IntentResponse | undefined = undefined
+    
+    // Handle MALFORMED_FUNCTION_CALL - Gemini tried to call but format was wrong
+    // Fallback: infer intent from message content
+    if (data.candidates && data.candidates[0]) {
+      const finishReason = data.candidates[0].finishReason
+      if (finishReason === 'MALFORMED_FUNCTION_CALL') {
+        console.warn('[Intent Router] Malformed function call detected, inferring intent from message')
+        const lowerMessage = message.toLowerCase()
+        const hasFlashcardKeywords = lowerMessage.includes('flashcard') || lowerMessage.includes('flash card') || lowerMessage.includes('study card') || lowerMessage.includes('memorization')
+        const hasTestKeywords = lowerMessage.includes('test') || lowerMessage.includes('quiz') || lowerMessage.includes('exam') || lowerMessage.includes('question')
+        const hasActionWords = lowerMessage.includes('turn') || lowerMessage.includes('make') || lowerMessage.includes('create') || lowerMessage.includes('generate')
+        
+        if (hasFlashcardKeywords && hasActionWords && hasMentions) {
+          intentResult = {
+            intent: 'flashcard',
+            confidence: 0.8,
+            reasoning: 'Flashcard generation detected from message (malformed function call recovered)'
+          }
+        } else if (hasTestKeywords && hasActionWords && hasMentions) {
+          intentResult = {
+            intent: 'test',
+            confidence: 0.8,
+            reasoning: 'Test generation detected from message (malformed function call recovered)'
+          }
+        } else {
+          intentResult = {
+            intent: 'none',
+            confidence: 0.5,
+            reasoning: 'Malformed function call and unable to infer intent from message'
+          }
+        }
+      }
+    }
+    
+    // Only process content if we haven't already set intentResult from malformed function call fallback
+    if (!intentResult && data.candidates && data.candidates[0] && data.candidates[0].content) {
       const content = data.candidates[0].content
       const parts = content.parts || []
       
@@ -183,44 +261,46 @@ Analyze the user's message and call the appropriate function. If the message doe
         
         // Map function name to intent
         if (name === 'generate_test') {
-          // Validate that mentions are present
-          if (!hasMentions) {
+          // Allow test generation even without explicit mentions if user is on notes page
+          const isOnNotesPage = chatContext.page?.currentView === 'notes'
+          const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+          
+          if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
             intentResult = {
               intent: 'none',
               confidence: 0,
-              reasoning: 'Test generation requires note mentions'
+              reasoning: 'Test generation requires a note. Please mention a note with @[note name] or select a note on the notes page.'
             }
           } else {
-            // Validate mentions array exists and has items
-            const mentionArray = Array.isArray(mentions) ? mentions : []
-            if (mentionArray.length === 0) {
-              intentResult = {
-                intent: 'none',
-                confidence: 0,
-                reasoning: 'Test generation requires note mentions'
-              }
-            } else {
-              intentResult = {
-                intent: 'test',
-                confidence: 0.9,
-                reasoning: 'User wants to generate a test from notes'
-              }
-              // Frontend will use mentions as before for backward compatibility
+            intentResult = {
+              intent: 'test',
+              confidence: 0.9,
+              reasoning: hasMentions 
+                ? 'User wants to generate a test from mentioned note(s)'
+                : 'User wants to generate a test from current note context'
             }
+            // Frontend will use mentions if available, otherwise use selected note
           }
         } else if (name === 'generate_flashcard') {
-          if (!hasMentions) {
+          // Allow flashcard generation even without explicit mentions if user is on notes page
+          const isOnNotesPage = chatContext.page?.currentView === 'notes'
+          const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+          
+          if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
             intentResult = {
               intent: 'none',
               confidence: 0,
-              reasoning: 'Flashcard generation requires note mentions'
+              reasoning: 'Flashcard generation requires a note. Please mention a note with @[note name] or select a note on the notes page.'
             }
           } else {
             intentResult = {
               intent: 'flashcard',
               confidence: 0.9,
-              reasoning: 'User wants to generate flashcards from notes'
+              reasoning: hasMentions 
+                ? 'User wants to generate flashcards from mentioned note(s)'
+                : 'User wants to generate flashcards from current note context'
             }
+            // Frontend will use mentions if available, otherwise use selected note
           }
         } else if (name === 'search_courses') {
           intentResult = {
@@ -284,10 +364,16 @@ Analyze the user's message and call the appropriate function. If the message doe
       intentResult.intent = 'none'
     }
 
-    // Ensure test/flashcard intents require mentions
-    if ((intentResult.intent === 'test' || intentResult.intent === 'flashcard') && !hasMentions) {
-      console.warn('Test/flashcard intent detected but no mentions present, changing to none')
-      intentResult.intent = 'none'
+    // Ensure test/flashcard intents have some note context (mentions or page context)
+    if (intentResult.intent === 'test' || intentResult.intent === 'flashcard') {
+      const isOnNotesPage = chatContext.page?.currentView === 'notes'
+      const hasNoteSelected = chatContext.database?.recentNotes && chatContext.database.recentNotes.length > 0
+      
+      if (!hasMentions && !isOnNotesPage && !hasNoteSelected) {
+        console.warn('Test/flashcard intent detected but no note context available, changing to none')
+        intentResult.intent = 'none'
+        intentResult.reasoning = 'Please mention a note with @[note name] or select a note on the notes page.'
+      }
     }
 
     // Extract and record token usage

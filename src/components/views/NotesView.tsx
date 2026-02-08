@@ -442,8 +442,13 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
         setErrorMessage('No content found in the YouTube video. Please ensure the video has captions or spoken content.')
         setTimeout(() => setErrorMessage(null), 5000)
       } else {
-        // Use video title if available, otherwise fallback to default
-        let noteTitle = videoTitle || 'YouTube Video Notes'
+        // Always use video title if provided (even if it's "Unknown"), only fallback if truly missing
+        let noteTitle: string
+        if (videoTitle && typeof videoTitle === 'string' && videoTitle.trim() && videoTitle !== 'undefined') {
+          noteTitle = videoTitle.trim()
+        } else {
+          noteTitle = 'YouTube Video Notes'
+        }
         
         // Limit title length
         if (noteTitle.length > 100) {
@@ -522,8 +527,15 @@ function NotesView({ onOpenLoginModal, onOpenUpgradeModal }: NotesViewProps) {
             noteTitle = courseCodeMatch[0].trim()
           } else {
             const firstLine = lines[0].trim()
-            noteTitle = firstLine.length > 50 ? firstLine.substring(0, 47) + '...' : firstLine
+            if (firstLine && firstLine !== 'undefined' && firstLine.length > 0) {
+              noteTitle = firstLine.length > 50 ? firstLine.substring(0, 47) + '...' : firstLine
+            }
           }
+        }
+        
+        // Ensure we have a valid title
+        if (!noteTitle || noteTitle.trim() === '' || noteTitle === 'undefined') {
+          noteTitle = 'Untitled Note'
         }
 
         try {

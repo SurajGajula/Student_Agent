@@ -504,14 +504,15 @@ Do not add any commentary or explanations, just return the raw extracted text.`
     
     if (hasYoutubeUrl) {
       // Use title from video info if we extracted audio, otherwise try to extract from response
-      if (videoTitleFromInfo) {
-        videoTitle = videoTitleFromInfo
+      // Always use the video title if available, even if it's "Unknown" (it's still the actual title from YouTube)
+      if (videoTitleFromInfo && videoTitleFromInfo.trim() && videoTitleFromInfo !== 'undefined') {
+        videoTitle = videoTitleFromInfo.trim()
         // Remove VIDEO_TITLE line from response if present
         notesText = textResponse.replace(/^VIDEO_TITLE:\s*.+?(?:\n|$)/i, '').trim()
       } else {
         // Look for VIDEO_TITLE: prefix at the start of the response (for transcript-based processing)
         const titleMatch = textResponse.match(/^VIDEO_TITLE:\s*(.+?)(?:\n|$)/i)
-        if (titleMatch && titleMatch[1]) {
+        if (titleMatch && titleMatch[1] && titleMatch[1].trim() && titleMatch[1].trim() !== 'undefined') {
           videoTitle = titleMatch[1].trim()
           // Remove the title line from the notes text
           notesText = textResponse.replace(/^VIDEO_TITLE:\s*.+?(?:\n|$)/i, '').trim()

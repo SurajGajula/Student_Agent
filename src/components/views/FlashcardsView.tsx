@@ -17,11 +17,13 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [prevCardIndex, setPrevCardIndex] = useState<number | null>(null)
+  const [prevCardFlipped, setPrevCardFlipped] = useState(false)
   const { flashcardSets, removeFlashcardSet, getFlashcardSetById } = useFlashcardsStore()
   const { isLoggedIn } = useAuthStore()
   
   // Animation refs
   const flipAnim = useRef(new Animated.Value(0)).current
+  const prevFlipAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(0)).current
   const prevSlideAnim = useRef(new Animated.Value(0)).current
   
@@ -53,7 +55,9 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
       setIsFlipped(false)
       setIsTransitioning(false)
       setPrevCardIndex(null)
+      setPrevCardFlipped(false)
       flipAnim.setValue(0)
+      prevFlipAnim.setValue(0)
       slideAnim.setValue(0)
       prevSlideAnim.setValue(0)
     }
@@ -100,6 +104,10 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
       setIsTransitioning(true)
       setPrevCardIndex(currentCardIndex)
       
+      // Save current flip state for the previous card
+      setPrevCardFlipped(isFlipped)
+      prevFlipAnim.setValue(isFlipped ? 1 : 0)
+      
       // Update card index immediately so the incoming card's text is set
       const nextIndex = currentCardIndex + 1
       setCurrentCardIndex(nextIndex)
@@ -122,8 +130,10 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
       }).start(() => {
         setTimeout(() => {
           setPrevCardIndex(null)
+          setPrevCardFlipped(false)
           setIsTransitioning(false)
           prevSlideAnim.setValue(0)
+          prevFlipAnim.setValue(0)
           slideAnim.setValue(0)
         }, 100)
       })
@@ -134,6 +144,10 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     if (currentCardIndex > 0 && !isTransitioning) {
       setIsTransitioning(true)
       setPrevCardIndex(currentCardIndex)
+      
+      // Save current flip state for the previous card
+      setPrevCardFlipped(isFlipped)
+      prevFlipAnim.setValue(isFlipped ? 1 : 0)
       
       // Update card index immediately so the incoming card's text is set
       const prevIndex = currentCardIndex - 1
@@ -157,8 +171,10 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
       }).start(() => {
         setTimeout(() => {
           setPrevCardIndex(null)
+          setPrevCardFlipped(false)
           setIsTransitioning(false)
           prevSlideAnim.setValue(0)
+          prevFlipAnim.setValue(0)
           slideAnim.setValue(0)
         }, 100)
       })
@@ -234,6 +250,15 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     inputRange: [0, 1],
     outputRange: ['180deg', '360deg'],
   })
+  // Previous card flip animation interpolations
+  const prevFrontInterpolate = prevFlipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  })
+  const prevBackInterpolate = prevFlipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  })
 
   // Update detail mode when entering/exiting flashcard study
   useEffect(() => {
@@ -249,6 +274,16 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
     const backAnimatedStyle = {
       transform: [{ rotateY: backInterpolate }],
     }
+    const prevFrontAnimatedStyle = {
+      transform: [{ rotateY: prevFrontInterpolate }],
+    }
+    const prevBackAnimatedStyle = {
+      transform: [{ rotateY: prevBackInterpolate }],
+    }
+    
+    // Calculate card width and center position
+    const cardWidth = Math.min(600, windowWidth - 40) // 40px for padding
+    const cardCenterOffset = -cardWidth / 2
 
     return (
       <View style={styles.container}>
@@ -287,6 +322,9 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
                 style={[
                   styles.flashcard,
                   {
+                    width: cardWidth,
+                    left: '50%',
+                    marginLeft: cardCenterOffset,
                     transform: [{ translateX: prevSlideAnim }],
                     position: 'absolute',
                     ...(Platform.OS === 'web' && {
@@ -296,13 +334,13 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
                 ]}
               >
                 <View style={styles.flashcardInner}>
-                  <Animated.View style={[styles.flashcardSide, frontAnimatedStyle]}>
+                  <Animated.View style={[styles.flashcardSide, prevFrontAnimatedStyle]}>
                     <View style={styles.flashcardContent}>
                       <Text style={styles.flashcardText}>{prevCard.front}</Text>
                     </View>
                     <Text style={styles.flashcardHint}>Click to flip</Text>
                   </Animated.View>
-                  <Animated.View style={[styles.flashcardSide, styles.flashcardBack, backAnimatedStyle]}>
+                  <Animated.View style={[styles.flashcardSide, styles.flashcardBack, prevBackAnimatedStyle]}>
                     <View style={styles.flashcardContent}>
                       <Text style={styles.flashcardText}>{prevCard.back}</Text>
                     </View>
@@ -316,7 +354,11 @@ function FlashcardsView({ onOpenLoginModal }: FlashcardsViewProps = {}) {
               style={[
                 styles.flashcard,
                 {
+                  width: cardWidth,
+                  left: '50%',
+                  marginLeft: cardCenterOffset,
                   transform: [{ translateX: slideAnim }],
+                  position: 'absolute',
                   ...(Platform.OS === 'web' && {
                     zIndex: 2, // Higher z-index for current card
                   }),
@@ -524,9 +566,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 20,
     ...(Platform.OS === 'web' && {
-      overflow: 'hidden', // Clip cards that go outside bounds
+      overflowX: 'hidden', // Only clip horizontally (left/right edges)
+      overflowY: 'visible', // Allow vertical overflow if needed
+      zIndex: 0, // Ensure it's below the sidebar
     }),
   },
   progress: {
@@ -536,20 +580,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   cardSlideContainer: {
-    width: '100%',
-    maxWidth: 600,
+    width: '100%', // Full viewport width
     height: 400,
     position: 'relative',
     justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden', // Clip cards that go outside bounds
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-    }),
+    overflow: 'hidden', // Clip cards at left/right edges
+    zIndex: 1,
   },
   flashcard: {
-    width: '100%',
     height: '100%',
+    position: 'absolute',
     ...(Platform.OS === 'web' && {
       perspective: 1000,
     }),
