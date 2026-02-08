@@ -1120,44 +1120,56 @@ Example format:
     return []
   } catch (error) {
     console.error('[FindCoursesForSkill] Error:', error)
-    // Try keyword fallback even on error
+    // Try keyword fallback even on error - need to fetch courses first
     console.log(`[FindCoursesForSkill] Attempting keyword fallback after error for: ${skillName}`)
     
-    const skillNameLower = skillName.toLowerCase()
-    const skillKeywords = skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2)
-    
-    const keywordMatches = allCourses
-      .map((course) => {
-        const courseName = (course.name || '').toLowerCase()
-        const courseDesc = (course.description || '').toLowerCase()
-        const courseNumber = (course.course_number || '').toLowerCase()
-        
-        const nameMatch = skillKeywords.some(keyword => 
-          courseName.includes(keyword) || keyword.includes(courseName.split(' ')[0])
-        )
-        const descMatch = skillKeywords.some(keyword => 
-          courseDesc.includes(keyword)
-        )
-        const directNameMatch = courseName.includes(skillNameLower) || skillNameLower.includes(courseName.split(' ')[0])
-        const directDescMatch = courseDesc.includes(skillNameLower)
-        
-        if (nameMatch || descMatch || directNameMatch || directDescMatch) {
-          return {
-            course,
-            relevanceScore: directNameMatch || directDescMatch ? 90 : (nameMatch ? 80 : 70),
-            reasoning: directNameMatch || directDescMatch 
-              ? `Course name/description contains "${skillName}"`
-              : `Course name contains related keywords`
+    try {
+      // Fetch courses for keyword matching
+      const allCourses = await getAllCourses(school?.trim())
+      
+      if (allCourses.length === 0) {
+        console.log(`[FindCoursesForSkill] No courses found in database for keyword fallback`)
+        return []
+      }
+      
+      const skillNameLower = skillName.toLowerCase()
+      const skillKeywords = skillNameLower.split(/[\s\-_/]+/).filter(k => k.length > 2)
+      
+      const keywordMatches = allCourses
+        .map((course: Course) => {
+          const courseName = (course.name || '').toLowerCase()
+          const courseDesc = (course.description || '').toLowerCase()
+          const courseNumber = (course.course_number || '').toLowerCase()
+          
+          const nameMatch = skillKeywords.some(keyword => 
+            courseName.includes(keyword) || keyword.includes(courseName.split(' ')[0])
+          )
+          const descMatch = skillKeywords.some(keyword => 
+            courseDesc.includes(keyword)
+          )
+          const directNameMatch = courseName.includes(skillNameLower) || skillNameLower.includes(courseName.split(' ')[0])
+          const directDescMatch = courseDesc.includes(skillNameLower)
+          
+          if (nameMatch || descMatch || directNameMatch || directDescMatch) {
+            return {
+              course,
+              relevanceScore: directNameMatch || directDescMatch ? 90 : (nameMatch ? 80 : 70),
+              reasoning: directNameMatch || directDescMatch 
+                ? `Course name/description contains "${skillName}"`
+                : `Course name contains related keywords`
+            }
           }
-        }
-        return null
-      })
-      .filter((item): item is CourseRecommendation => item !== null)
-      .slice(0, limit)
-    
-    if (keywordMatches.length > 0) {
-      console.log(`[FindCoursesForSkill] Keyword fallback found ${keywordMatches.length} courses after error`)
-      return keywordMatches
+          return null
+        })
+        .filter((item: CourseRecommendation | null): item is CourseRecommendation => item !== null)
+        .slice(0, limit)
+      
+      if (keywordMatches.length > 0) {
+        console.log(`[FindCoursesForSkill] Keyword fallback found ${keywordMatches.length} courses after error`)
+        return keywordMatches
+      }
+    } catch (fallbackError) {
+      console.error('[FindCoursesForSkill] Error in keyword fallback:', fallbackError)
     }
     
     return []
