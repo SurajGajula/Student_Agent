@@ -65,18 +65,7 @@ router.delete('/delete', authenticateUser, async (req: AuthenticatedRequest, res
       return res.status(500).json({ error: 'Failed to delete user data', message: flashcardsError.message })
     }
 
-    // 4. Delete user's folders
-    const { error: foldersError } = await supabase
-      .from('folders')
-      .delete()
-      .eq('user_id', userId)
-
-    if (foldersError) {
-      console.error('Error deleting folders:', foldersError)
-      return res.status(500).json({ error: 'Failed to delete user data', message: foldersError.message })
-    }
-
-    // 6. Delete user's usage record (contains stripe_customer_id, plan_id, etc.)
+    // 4. Delete user's usage record (contains stripe_customer_id, plan_id, etc.)
     const { error: usageError } = await supabase
       .from('user_usage')
       .delete()
@@ -87,7 +76,7 @@ router.delete('/delete', authenticateUser, async (req: AuthenticatedRequest, res
       return res.status(500).json({ error: 'Failed to delete user data', message: usageError.message })
     }
 
-    // 7. Delete the auth user (this will cascade delete related auth data)
+    // 5. Delete the auth user (this will cascade delete related auth data)
     const { error: authError } = await supabase.auth.admin.deleteUser(userId)
 
     if (authError) {
