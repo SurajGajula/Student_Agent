@@ -225,7 +225,7 @@ ${index + 1}. ${course.course_number}: ${course.name}
   }).join('\n')
 
   const prompt = `You are a course recommendation assistant. 
-Given a user's query about their career goals or interests, recommend the most relevant courses from the EXACT list provided below.
+Given a user's query about their career interests or academic requirements, recommend the most relevant courses from the EXACT list provided below.
 
 IMPORTANT: You MUST ONLY use courses from the list provided. Do NOT invent, create, or reference any courses that are not in the list. Only use the index numbers that correspond to courses in the provided list.
 
@@ -242,7 +242,7 @@ Please respond with a JSON array of objects, where each object has:
 Return ONLY a valid JSON array, no other text. Order by relevanceScore descending. Limit to top ${limit} recommendations.
 Example format:
 [
-  {"index": 5, "relevanceScore": 95, "reasoning": "Directly aligns with machine learning career goals"},
+  {"index": 5, "relevanceScore": 95, "reasoning": "Directly aligns with machine learning career interests"},
   {"index": 12, "relevanceScore": 85, "reasoning": "Provides foundational knowledge in algorithms"}
 ]`
 

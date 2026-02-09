@@ -65,18 +65,7 @@ router.delete('/delete', authenticateUser, async (req: AuthenticatedRequest, res
       return res.status(500).json({ error: 'Failed to delete user data', message: flashcardsError.message })
     }
 
-    // 4. Delete user's goals
-    const { error: goalsError } = await supabase
-      .from('goals')
-      .delete()
-      .eq('user_id', userId)
-
-    if (goalsError) {
-      console.error('Error deleting goals:', goalsError)
-      return res.status(500).json({ error: 'Failed to delete user data', message: goalsError.message })
-    }
-
-    // 5. Delete user's folders
+    // 4. Delete user's folders
     const { error: foldersError } = await supabase
       .from('folders')
       .delete()

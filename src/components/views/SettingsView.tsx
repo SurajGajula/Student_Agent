@@ -150,7 +150,7 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
     const domain = trimmed.split('@')[1]?.toLowerCase()
     if (!trimmed || !domain) return { ok: false, message: 'Enter a valid email address.' }
 
-    // Supported universities (from Goals) + their email domains
+    // Supported universities + their email domains
     // Allow subdomains too (e.g. alumni.stanford.edu)
     const allowedRootDomains = [
       'stanford.edu',
@@ -543,7 +543,7 @@ function SettingsView({ onNavigate }: SettingsViewProps) {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your notes, tests, flashcards, goals, and other data.',
+      'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your notes, tests, flashcards, and other data.',
       [
         {
           text: 'Cancel',

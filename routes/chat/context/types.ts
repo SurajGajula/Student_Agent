@@ -1,7 +1,7 @@
 // Type definitions for chat context system
 
 export interface PageContext {
-  currentView?: string // e.g., 'notes', 'tests', 'flashcards', 'goals'
+  currentView?: string // e.g., 'notes', 'tests', 'flashcards', 'career'
   selectedItems?: {
     notes?: string[] // Array of note IDs
     tests?: string[] // Array of test IDs

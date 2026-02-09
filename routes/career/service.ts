@@ -750,7 +750,7 @@ Please respond with a JSON array of objects, where each object has:
 Return ONLY a valid JSON array, no other text. Order by relevanceScore descending. Limit to top ${limit} recommendations.
 Example format:
 [
-  {"index": 5, "relevanceScore": 95, "reasoning": "Directly aligns with machine learning career goals"},
+  {"index": 5, "relevanceScore": 95, "reasoning": "Directly aligns with machine learning career interests"},
   {"index": 12, "relevanceScore": 85, "reasoning": "Provides foundational knowledge in algorithms"}
 ]`
 

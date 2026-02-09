@@ -5,10 +5,11 @@ const router = express.Router()
 
 router.get('/', (_req: Request, res: Response) => {
   res.json({ 
-    message: 'Schedule Parser API',
+    message: 'Student Agent API',
     endpoints: {
       health: '/health',
-      parseSchedule: 'POST /api/parse-schedule'
+      parseNotes: 'POST /api/parse-notes',
+      chat: 'POST /api/chat'
     },
     geminiInitialized: getGeminiClient() !== null
   })

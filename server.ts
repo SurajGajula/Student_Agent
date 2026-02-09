@@ -9,13 +9,11 @@ import fs from 'fs'
 import { initializeGeminiClient } from './services/gemini.js'
 import healthRouter from './routes/health.js'
 import indexRouter from './routes/index.js'
-import scheduleRouter from './routes/schedule.js'
 import notesParseRouter from './routes/notes.js' // Keep parse-notes route
 import notesCRUDRouter from './routes/notes/index.js' // New CRUD routes
 import chatRouter from './routes/chat/index.js'
 import testsRouter from './routes/tests/index.js' // Updated to use index
 import flashcardsRouter from './routes/flashcards/index.js' // Updated to use index
-import goalsRouter from './routes/goals/index.js' // Goals routes
 import coursesRouter from './routes/courses/index.js' // Courses routes
 import careerRouter from './routes/career/index.js' // Career routes
 import userRouter from './routes/user/index.js' // User routes
@@ -87,13 +85,11 @@ app.use('/api/iap', iapRouter)
 
 // API Routes (must be before static file serving)
 app.use('/health', healthRouter)
-app.use('/api', scheduleRouter)
 app.use('/api', notesParseRouter) // Keep parse-notes route
 app.use('/api/notes', notesCRUDRouter) // New notes CRUD routes
 app.use('/api', chatRouter)
 app.use('/api/tests', testsRouter) // Includes generate + CRUD
 app.use('/api/flashcards', flashcardsRouter) // Includes generate + CRUD
-app.use('/api/goals', goalsRouter) // Goals CRUD routes
 app.use('/api/courses', coursesRouter) // Course search routes
 app.use('/api/career', careerRouter) // Career path routes
 app.use('/api/user', userRouter) // User account management routes
@@ -134,7 +130,7 @@ initializeGeminiClient()
   .catch((error) => {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('Gemini client initialization failed:', errorMessage)
-    console.error('Server will still run, but schedule parsing will fail until client is initialized')
+    console.error('Server will still run, but some features may fail until client is initialized')
   })
 
 const PORT = process.env.PORT || 3001

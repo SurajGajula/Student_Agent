@@ -63,7 +63,7 @@ function TermsOfServiceView({ onNavigate }: TermsOfServiceViewProps) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>2. Description of Service</Text>
             <Text style={styles.paragraph}>
-              Student Agent is an educational technology platform that provides tools for students to organize notes, create flashcards, generate practice tests, track goals, and interact with an AI-powered study assistant. The Service is available through our mobile application and web platform.
+              Student Agent is an educational technology platform that provides tools for students to organize notes, create flashcards, generate practice tests, plan career paths, and interact with an AI-powered study assistant. The Service is available through our mobile application and web platform.
             </Text>
             <Text style={styles.paragraph}>
               We reserve the right to modify, suspend, or discontinue any part of the Service at any time, with or without notice. We shall not be liable to you or any third party for any modification, suspension, or discontinuance of the Service.

@@ -35,7 +35,9 @@ function ChatHelpView() {
         if (!response.ok || !data.success) {
           throw new Error(data.error || data.message || 'Failed to load capabilities')
         }
-        setCapabilities(data.capabilities || [])
+        // Filter out course_search as it's not triggered by chat requests
+        const filteredCapabilities = (data.capabilities || []).filter(cap => cap.id !== 'course_search')
+        setCapabilities(filteredCapabilities)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load capabilities'
         setError(message)
@@ -76,18 +78,13 @@ function ChatHelpView() {
       <Text style={styles.subtitle}>
         Use these prompts in chat. Mention notes with @ to link them.
       </Text>
-      {capabilities.map(cap => (
+      {capabilities.map(cap => {
+        // Format capability ID for display
+        const displayName = cap.id === 'career_path' ? 'career' : cap.id
+        return (
         <View key={cap.id} style={styles.card}>
-          <Text style={styles.capTitle}>{cap.id}</Text>
+          <Text style={styles.capTitle}>{displayName}</Text>
           <Text style={styles.capDescription}>{cap.description}</Text>
-          {cap.id === 'course_search' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Supported schools / majors</Text>
-              <Text style={styles.keywords}>
-                Stanford (CS), Berkeley (CS), University of Waterloo (Engineering), Western University (Engineering)
-              </Text>
-            </View>
-          )}
           {cap.examples?.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Examples</Text>
@@ -109,7 +106,8 @@ function ChatHelpView() {
             </View>
           )}
         </View>
-      ))}
+        )
+      })}
     </ScrollView>
   )
 }

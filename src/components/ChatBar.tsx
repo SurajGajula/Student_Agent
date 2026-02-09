@@ -6,7 +6,6 @@ import ReanimatedAnimated, { useSharedValue, useAnimatedStyle } from 'react-nati
 import { useNotesStore, type Note } from '../stores/notesStore'
 import { useTestsStore } from '../stores/testsStore'
 import { useFlashcardsStore } from '../stores/flashcardsStore'
-import { useGoalsStore } from '../stores/goalsStore'
 import { useAuthStore } from '../stores/authStore'
 import { useUsageStore } from '../stores/usageStore'
 import { getApiBaseUrl } from '../lib/platform'
@@ -33,7 +32,6 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
   const { notes } = useNotesStore()
   const { addTest } = useTestsStore()
   const { addFlashcardSet } = useFlashcardsStore()
-  const { addGoal } = useGoalsStore()
   const { isLoggedIn } = useAuthStore()
   const { planName } = useUsageStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -555,43 +553,11 @@ function ChatBar({ onOpenLoginModal, currentView }: ChatBarProps) {
         }
 
         if (data.success && data.results && data.results.length > 0) {
-          try {
-            // Generate goal name from query - use the query itself as the substantive name
-            // Clean up the query to make it a good title (remove common prefixes, capitalize)
-            let goalName = message.trim()
-            // Remove common prefixes like "find", "show me", "get me", etc.
-            goalName = goalName.replace(/^(find|show me|get me|give me|i need|i want|help me with|courses for|courses that)\s+/i, '')
-            // Capitalize first letter
-            goalName = goalName.charAt(0).toUpperCase() + goalName.slice(1)
-            // Limit length to avoid overly long titles
-            if (goalName.length > 60) {
-              goalName = goalName.substring(0, 57) + '...'
-            }
-            // Fallback to school/department if query is too short or empty
-            if (goalName.length < 5) {
-              if (department) {
-                goalName = `${school} ${department} Courses`
-      } else {
-                goalName = `${school} Courses`
-              }
-            }
-            
-            await addGoal(
-              goalName,
-              message,
-              school,
-              department || null,
-              data.results
-            )
-            setStatusMessage({ 
-              type: 'success', 
-              text: `Goal "${goalName}" created with ${data.results.length} courses!` 
-            })
-        setMessage('')
-          } catch (error) {
-            console.error('Failed to add goal:', error)
-            setStatusMessage({ type: 'error', text: 'Failed to save goal. Please try again.' })
-          }
+          setStatusMessage({ 
+            type: 'success', 
+            text: `Found ${data.results.length} courses!` 
+          })
+          setMessage('')
         }
       }
       // Handle career path generation

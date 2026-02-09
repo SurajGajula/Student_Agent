@@ -48,13 +48,11 @@ export const syncAllStores = async () => {
       { useNotesStore },
       { useTestsStore },
       { useFlashcardsStore },
-      { useGoalsStore },
       { useUsageStore },
     ] = await Promise.all([
       import('./notesStore'),
       import('./testsStore'),
       import('./flashcardsStore'),
-      import('./goalsStore'),
       import('./usageStore'),
     ])
     
@@ -63,7 +61,6 @@ export const syncAllStores = async () => {
       useNotesStore.getState().syncFromSupabase().catch(err => console.error('Notes sync error:', err)),
       useTestsStore.getState().syncFromSupabase().catch(err => console.error('Tests sync error:', err)),
       useFlashcardsStore.getState().syncFromSupabase().catch(err => console.error('Flashcards sync error:', err)),
-      useGoalsStore.getState().syncFromSupabase().catch(err => console.error('Goals sync error:', err)),
       useUsageStore.getState().fetchUsage().catch(err => console.error('Usage sync error:', err)),
     ])
   } catch (error) {
@@ -80,7 +77,6 @@ const clearAllStores = async () => {
     'notes-storage',
     'tests-storage',
     'flashcards-storage',
-    'goals-storage',
   ]
 
   // Clear storage (platform-aware)
@@ -98,12 +94,10 @@ const clearAllStores = async () => {
         notesStoreModule,
         testsStoreModule,
         flashcardsStoreModule,
-        goalsStoreModule,
       ] = await Promise.allSettled([
         import('./notesStore'),
         import('./testsStore'),
         import('./flashcardsStore'),
-        import('./goalsStore'),
       ])
 
       // Reset stores only if imports succeeded
@@ -145,17 +139,6 @@ const clearAllStores = async () => {
       }
     }
 
-    if (goalsStoreModule.status === 'fulfilled' && goalsStoreModule.value?.useGoalsStore) {
-      try {
-        goalsStoreModule.value.useGoalsStore.setState({
-          goals: [],
-          isLoading: false,
-          error: null,
-        })
-      } catch (err) {
-        console.warn('[authStore] Error resetting goalsStore:', err)
-      }
-    }
   } catch (error) {
     console.warn('[authStore] Error clearing stores:', error)
     // Continue with logout even if store clearing fails

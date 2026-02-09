@@ -8,7 +8,6 @@ import MobileMenuButton from './components/MobileMenuButton'
 import NotesView from './components/views/NotesView'
 import TestsView from './components/views/TestsView'
 import FlashcardsView from './components/views/FlashcardsView'
-import GoalsView from './components/views/GoalsView'
 import CareerView from './components/views/CareerView'
 import SettingsView from './components/views/SettingsView'
 import PrivacyPolicyView from './components/views/PrivacyPolicyView'
@@ -35,7 +34,6 @@ const getViewFromUrl = (): string => {
     if (path === '/settings') return 'settings'
     if (path === '/tests') return 'tests'
     if (path === '/flashcards') return 'flashcards'
-    if (path === '/goals') return 'goals'
     if (path === '/career') return 'career'
     if (path === '/notes' || path === '/') return 'notes'
   }
@@ -218,7 +216,6 @@ function AppContent() {
           const { useNotesStore } = await import('./stores/notesStore')
           const { useFlashcardsStore } = await import('./stores/flashcardsStore')
           const { useTestsStore } = await import('./stores/testsStore')
-          const { useGoalsStore } = await import('./stores/goalsStore')
           
           // Reset stores to clear guards
           useUsageStore.getState().reset?.()
@@ -464,7 +461,6 @@ function AppContent() {
         {currentView === 'notes' && <NotesView onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'tests' && <TestsView key={`tests-view-${navCounter}`} onOpenLoginModal={openLoginModal} />}
         {currentView === 'flashcards' && <FlashcardsView onOpenLoginModal={openLoginModal} />}
-        {currentView === 'goals' && <GoalsView key={`goals-view-${navCounter}`} onOpenLoginModal={openLoginModal} onOpenUpgradeModal={openUpgradeModal} />}
         {currentView === 'career' && <CareerView onNavigate={handleNavigate} />}
         {currentView === 'settings' && <SettingsView onNavigate={handleNavigate} />}
         {currentView === 'privacy' && <PrivacyPolicyView onNavigate={handleNavigate} />}

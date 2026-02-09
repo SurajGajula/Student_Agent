@@ -3,7 +3,7 @@ import type { Capability } from './types.js'
 
 const courseSearchCapability: Capability = {
   id: 'course_search',
-  description: 'Search for relevant courses based on career goals or interests',
+  description: 'Search for relevant courses based on career interests or academic requirements',
   keywords: ['course', 'courses', 'class', 'classes', 'curriculum', 'program', 'major', 'department'],
   examples: [
     'recommend Stanford CS courses',
@@ -12,7 +12,7 @@ const courseSearchCapability: Capability = {
   ],
   functionDeclaration: {
     name: 'search_courses',
-    description: 'Search for relevant courses based on career goals, interests, or academic requirements. Extract school and department only if explicitly mentioned in the user message.',
+    description: 'Search for relevant courses based on career interests or academic requirements. Extract school and department only if explicitly mentioned in the user message.',
     parameters: {
       type: 'object',
       properties: {

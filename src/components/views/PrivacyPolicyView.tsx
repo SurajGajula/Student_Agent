@@ -68,7 +68,7 @@ function PrivacyPolicyView({ onNavigate }: PrivacyPolicyViewProps) {
               We collect information that you provide directly to us when you:
             </Text>
             <Text style={styles.listItem}>• Create an account (email address, name, password)</Text>
-            <Text style={styles.listItem}>• Create, edit, or organize notes, flashcards, tests, and goals</Text>
+            <Text style={styles.listItem}>• Create, edit, or organize notes, flashcards, tests, and career paths</Text>
             <Text style={styles.listItem}>• Interact with our AI chat assistant</Text>
             <Text style={styles.listItem}>• Subscribe to premium services (payment information is processed by Stripe, not stored by us)</Text>
             <Text style={styles.listItem}>• Contact us for support</Text>
@@ -95,7 +95,7 @@ function PrivacyPolicyView({ onNavigate }: PrivacyPolicyViewProps) {
             </Text>
             <Text style={styles.listItem}>• Provide, maintain, and improve our Service</Text>
             <Text style={styles.listItem}>• Process your account registration and authenticate users</Text>
-            <Text style={styles.listItem}>• Store and sync your notes, flashcards, tests, and goals across devices</Text>
+            <Text style={styles.listItem}>• Store and sync your notes, flashcards, tests, and career paths across devices</Text>
             <Text style={styles.listItem}>• Generate AI-powered content (tests, flashcards, chat responses)</Text>
             <Text style={styles.listItem}>• Process payments and manage subscriptions</Text>
             <Text style={styles.listItem}>• Send you technical notices, updates, and support messages</Text>
